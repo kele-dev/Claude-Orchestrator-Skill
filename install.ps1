@@ -3,7 +3,18 @@
 # aturan global di CLAUDE.md, dan izin perintah aman di settings.json.
 param([string]$ClaudeHome = (Join-Path $env:USERPROFILE ".claude"))
 $ErrorActionPreference = "Stop"
-$src = Join-Path $PSScriptRoot "files"
+$src = if ($PSScriptRoot) { Join-Path $PSScriptRoot "files" } else { "" }
+if (-not $src -or -not (Test-Path $src)) {
+  # Dijalankan langsung dari URL: unduh isi repo ke folder sementara
+  [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+  $tmp = Join-Path $env:TEMP ("orkestrasi-" + [guid]::NewGuid().ToString("N"))
+  New-Item -ItemType Directory -Force -Path $tmp | Out-Null
+  $zip = Join-Path $tmp "repo.zip"
+  Write-Host "Mengunduh orkestrasi dari GitHub..."
+  Invoke-WebRequest -UseBasicParsing "https://github.com/kele-dev/Claude-Orchestrator-Skill/archive/refs/heads/main.zip" -OutFile $zip
+  Expand-Archive $zip -DestinationPath $tmp -Force
+  $src = Join-Path $tmp "Claude-Orchestrator-Skill-main\files"
+}
 $ts = Get-Date -Format "yyyyMMddHHmmss"
 $backup = Join-Path $ClaudeHome "backups\orkestrasi-$ts"
 

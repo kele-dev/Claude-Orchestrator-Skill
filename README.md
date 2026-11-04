@@ -5,13 +5,24 @@ Opus tidak pernah mengedit kode sendiri.
 
 ## Instalasi (Windows)
 
-```bash
-git clone https://github.com/kele-dev/Claude-Orchestrator-Skill.git
+### Cara 1: lewat terminal
+
+Buka PowerShell, tempel satu baris ini, tekan Enter:
+
+```powershell
+irm https://raw.githubusercontent.com/kele-dev/Claude-Orchestrator-Skill/main/install.ps1 | iex
 ```
 
-Lalu klik dua kali `install.bat` di folder `Claude-Orchestrator-Skill`, dan buka sesi Claude Code baru dengan model Opus.
+### Cara 2: lewat Claude Desktop
 
-Update ke versi baru: `git pull`, lalu jalankan `install.bat` lagi (aman diulang).
+Buka sesi Claude Code di Claude Desktop dan ketik:
+
+```text
+Pasang orkestrasi dari https://github.com/kele-dev/Claude-Orchestrator-Skill dengan menjalankan perintah ini di PowerShell: irm https://raw.githubusercontent.com/kele-dev/Claude-Orchestrator-Skill/main/install.ps1 | iex
+```
+
+Setelah terpasang (cara mana pun), buka sesi Claude Code **baru** dengan model Opus.
+Update ke versi baru: jalankan perintah yang sama lagi (aman diulang).
 
 ## Yang dipasang ke `%USERPROFILE%\.claude`
 
