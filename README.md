@@ -38,7 +38,7 @@ Orchestration mode is active automatically in every session. Manual commands:
 - `/orchestrator:autopilot <task>` - autonomous mode: one short clarification round, a PRD, then batch after batch without asking in between, until done or a cap is hit. Caps: 5 batches, 2 fix rounds per batch, raised automatically up to 8 batches / 4 rounds only while work keeps passing (a cap you set, e.g. `batches=N`, is never raised). Add `--dry-run` to see the plan first.
 - Claude suggests `team` or `autopilot` when a task fits, but always starts in `on` mode; you decide whether to switch.
 - `/orchestrator:learn [list | add <lesson> | prune]` - project lessons: at the end of a task Claude decides by itself whether to save up to 3 verified lessons (working test commands, root causes, pitfalls) and fixes or removes outdated ones, as local `learned-*` skills in the main checkout's `.claude/skills/` (also when a session runs in a git worktree), so every later session in that project can read them. They stay out of git via the repo's shared `info/exclude`.
-- `/orchestrator:init [--refresh]` - maps a new project in one cheap Haiku pass: stack, key folders, and verified test/build/lint commands, saved as the `learned-map` lesson.
+- `/orchestrator:init [--refresh]` - maps a new project in one cheap Haiku pass: stack, key folders, and verified test/build/lint commands, saved as the `learned-map` lesson. It also writes `learned-map/verify.sh`, one command that runs the verified checks and prints `VERIFY: PASS|FAIL`.
 - `/orchestrator:resume [<name>]` - continues long work from a checkpoint after a context limit, rate limit, `/compact`, or crash. team/autopilot write checkpoints automatically at stops and between waves/batches.
 - `/orchestrator:status` - read-only summary: mode in this session, plugin version, project lessons, checkpoints, missing exclude lines, and team/autopilot caps.
 - `commit=batch` (team/autopilot) - one local commit per passed wave or batch, with a conventional message; never pushed.
@@ -55,6 +55,13 @@ Orchestration mode is active automatically in every session. Manual commands:
 - Briefs start with a type (`TYPE: EDIT | CREATE | RUN | TRIAGE | SCAN | COMMIT`) that Haiku already knows, so briefs stay short.
 - Before verifying a larger change, Haiku scans the diff for mechanical mistakes; Opus reads only the flagged hunks and the main logic.
 - In a long conversation Claude writes a checkpoint and suggests continuing in a new session.
+- Always-loaded rules are smaller: `hooks/rules.md` is shortened, and `orchestrator:on` is split into a core plus an on-demand `reference.md`.
+
+### Hooks
+
+- Output trim: Bash/PowerShell output over 80 lines is cut to the error lines plus the last 40 lines before the model sees it. Add `# notrim` to a command, or set env `ORCH_NO_TRIM=1`, for full output.
+- Edit guard: the main session cannot Edit/Write project files (except `docs/prd/`); subagents can. Turn it off with `/orchestrator:off` or env `ORCH_GUARD=off`.
+- Both hooks need Node 18+ on PATH. Without Node they do nothing (fail open).
 
 ## Plugin contents
 
@@ -92,6 +99,7 @@ If you previously installed via `install.ps1`, delete `haiku-coder.md`, `sonnet-
 - Hemat token: jawaban ringkas, output test dipotong, Opus tidak mendikte file panjang, self-review sebelum lapor, `learned-map` untuk peta project, saran sesi baru saat ganti topik, dan satu baris laporan token di akhir.
 - Baru di 1.4: `/orchestrator:init` (peta project sekali jalan), `/orchestrator:resume` (lanjut dari checkpoint), `commit=batch`, riset/triase oleh Haiku, tipe brief, dan scan diff oleh Haiku sebelum Opus memverifikasi.
 - Baru di 1.5: `/orchestrator:status` (ringkasan status read-only), aturan orkestrasi kini juga dimuat saat sesi di-resume, dan validator plugin `node scripts/validate.mjs` + CI.
+- Baru di 1.6: hook pemangkas output (Bash/PowerShell di atas 80 baris dipotong jadi baris error + 40 baris terakhir; `# notrim` atau `ORCH_NO_TRIM=1` untuk output penuh), hook penjaga edit (sesi utama tidak bisa Edit/Write file project kecuali `docs/prd/`; matikan dengan `/orchestrator:off` atau `ORCH_GUARD=off`), keduanya butuh Node 18+, dan `/orchestrator:init` kini menulis `learned-map/verify.sh`.
 - Mode orkestrasi aktif otomatis di setiap sesi.
 
 ## Maintainers

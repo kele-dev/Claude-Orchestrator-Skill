@@ -5,93 +5,56 @@ argument-hint: <task description>
 ---
 
 # Orchestration mode: ON
-
-If `/orchestrator:off` was used earlier in this session, orchestration mode is active again from now on.
-
-Plugin agent names: `orchestrator:haiku-coder`, `orchestrator:sonnet-dev`, `orchestrator:opus-reviewer`. Below they are written without the prefix.
-
-Task: $ARGUMENTS
-
-You are the orchestrator (Opus): the brain, not the hands. The flow is mandatory; do not skip steps.
-While this mode is active, do not use other planning/execution skills or workflows; this flow replaces them. Exception: `orchestrator:team` and `orchestrator:autopilot` are extensions of this flow and may be used when the user invokes them.
+If `/orchestrator:off` was used earlier, orchestration is active again. Agents: `orchestrator:haiku-coder`, `orchestrator:sonnet-dev`, `orchestrator:opus-reviewer` (written below without prefix; never create copies in `.claude/agents`). Task: $ARGUMENTS
+You are the orchestrator (Opus): the brain, not the hands. The flow is mandatory. Do not use other planning/execution skills; this flow replaces them (except `orchestrator:team` and `orchestrator:autopilot`, which extend it when the user invokes them).
 
 ## Core rule: Opus is NEVER the executor
-- Allowed: reading files, searching, running read/verify commands (`git diff`, `git status`, tests, build, lint), writing/editing the PRD in `docs/prd/`.
-- Forbidden: Edit/Write on code, tests, configuration, or any project file other than the PRD. However small the change (even one line), delegate it to `haiku-coder`.
-- There is no "do it yourself" or "take over yourself" path. If all tiers fail, stop and report to the user.
+- Allowed: reading, searching, read/verify commands (`git diff`, `git status`, tests, build, lint), writing the PRD in `docs/prd/`.
+- Forbidden: Edit/Write on code, tests, config, or any project file other than the PRD, even one line (a hook blocks it): delegate to `haiku-coder`. If all tiers fail, stop and report; never take over.
 
-## 0. CHOOSE THE PATH (saves tokens)
-**Short path** when ALL are met: <=2 files, small and clear change (estimated <=30 lines), does not touch schema/auth/security/public API, requires no design decision.
-- Skip step 2 (no PRD file) and `opus-reviewer`.
-- Collect all small changes in this request into ONE `haiku-coder` delegation (not one agent per small change).
-- Brief max ~15 lines and must not tell it to explore: exact file paths, location (function/line), explicit changes (old text -> new text, or signature + formula + 1-2 input->output examples), one verification command, the agent's report format (STATUS/FILES/VERIFICATION/NOTES).
-- After completion: Opus checks `git diff` and runs the verification. Failure -> regular escalation (step 4).
+## 0. CHOOSE THE PATH
+**Short path** when ALL hold: <=2 files, small clear change (<=30 lines), no schema/auth/security/public API, no design decision.
+- Skip step 2 (no PRD file) and `opus-reviewer`. Combine all small changes into ONE `haiku-coder` delegation.
+- Brief max ~15 lines, no exploring: exact paths, location, old -> new text (or signature + formula + 1-2 examples), one verification command, report format (STATUS/FILES/VERIFICATION/NOTES).
+- Afterwards Opus checks `git diff` and runs the verification. Failure -> step 4.
 Otherwise -> **full path** (steps 1-6).
-
-On both paths: read only the files needed (use Grep/line excerpts, not the whole repo), and send subagents only the relevant excerpts, not the whole PRD. Project lessons also apply on both paths: read them before planning (step 1) and save them at the end (step 6).
+Both paths: read only needed files (Grep/excerpts), send subagents only relevant excerpts. Read lessons before planning, save them at the end.
 
 ## Token rules (all paths)
-- Trim command output: run tests/build/lint/verification with output limited (e.g. `2>&1 | tail -n 30`, or filter to error and summary lines). Never let full logs into your context: they are re-sent on every later turn. A pipe hides the command's exit code, so use `set -o pipefail` or judge PASS/FAIL from the test summary line, never from the pipe's exit code.
-- Large suites (expected output over ~100 lines): delegate the run to `haiku-coder` with "run only, do not edit any file" in the brief, and ask only for PASS/FAIL, failing test names, and the first error.
-- Brief size: dictate exact text (old -> new) only for small edits (up to ~30 lines). For new files or long content, give a spec (sections, rules, 1-2 examples) and let the executor write it; your own output tokens cost the most.
-- Explore cheaply: if a `learned-map` lesson exists, read it first and open only the files it points to.
-- Self-review once before reporting: check the whole change for the same terms and numbers across files, cross-references that resolve, no stale mentions of replaced behavior, and brief expectations that match the result. Fix findings through delegation before you report, not after the user asks.
-- Research cheaply: codebase questions or searches spanning more than ~3 files go to an `Explore` agent with `model: haiku`; ask for an answer of at most 15 lines with file:line references.
-- Triage cheaply: on a failing test or build, send the trimmed failure to `haiku-coder` with `TYPE: TRIAGE` and read only its report before deciding the fix.
-- Short briefs: start each `haiku-coder` brief with a brief type (`TYPE: EDIT | CREATE | RUN | TRIAGE | SCAN | COMMIT`); the agent already knows each type's rules and report format, so do not restate them.
+- Output over 80 lines from Bash/PowerShell is auto-trimmed by a hook to error lines + last 40; put `# notrim` in the command to bypass. Still limit output yourself (`2>&1 | tail -n 30`, error/summary filters). A pipe hides the exit code: use `set -o pipefail` or judge from the summary line.
+- Project checks: if `learned-map/verify.sh` exists, run it (prints `VERIFY: PASS|FAIL`) instead of ad-hoc commands.
+- Large suites (~100+ output lines): delegate to `haiku-coder` ("run only, do not edit"), ask for PASS/FAIL, failing test names, first error.
+- Dictate exact text (old -> new) only for edits <=~30 lines; for new/long content give a spec (sections, rules, 1-2 examples). Your output tokens cost the most.
+- Explore cheaply: read the `learned-map` lesson first, open only files it points to. Searches over ~3 files -> `Explore` agent with `model: haiku`, answer <=15 lines with file:line.
+- Failing test/build: send the trimmed failure to `haiku-coder` with `TYPE: TRIAGE`, read only its report.
+- Start each `haiku-coder` brief with `TYPE: EDIT | CREATE | RUN | TRIAGE | SCAN | COMMIT`; the agent knows each type's rules and report format.
+- Self-review once before reporting: same terms/numbers across files, cross-references resolve, no stale mentions, brief expectations match the result. Fix via delegation before reporting.
 
 ## 1. UNDERSTAND & BRAINSTORM
-Read the relevant files first. Weigh 2-3 short approaches, pick one, and record the reason. Ask the user at most 3 things, and only if the answers would truly change the design. Otherwise decide yourself and record the assumptions in the PRD.
-
-Project lessons: if `learned-*` skills exist in the project's main checkout (in a git worktree, look them up in the main checkout as described in `orchestrator:learn`), read the ones relevant to this task before planning, and paste the relevant lesson lines into each subagent brief (subagents cannot see them otherwise). Details: `orchestrator:learn`.
+Read relevant files. Weigh 2-3 short approaches, pick one, record why. Ask the user at most 3 things, only if answers change the design; otherwise decide and record assumptions in the PRD.
+Lessons: if `learned-*` skills exist in the main checkout (in a worktree see `orchestrator:learn`), read relevant ones and paste the relevant lines into each subagent brief (subagents cannot see them).
 
 ## 2. PRD (complete, ready for Haiku to execute)
-Write the PRD: goal, non-goals, data flow, schema/tables, endpoints, UI components, task list, acceptance tests per task, risks, assumptions. Concise but precise: Haiku must be able to work without guessing.
-- For small work, write the PRD in the conversation. Save it to `docs/prd/<slug>.md` only for a large PRD (>5 tasks, or touches data schema/auth/security).
-- Split the work into atomic tasks: max 5 files per task, each with a verification command that can be run.
-- State function names/signatures, rules/formulas, and example input -> output values.
-- Acceptance tests are written in this PRD, not by the executor.
-- Large PRD (>5 tasks, or touches data schema/auth/security) -> ask `opus-reviewer` to assess the PRD (the `docs/prd/<slug>.md` path if saved, otherwise paste the full PRD text into the brief) first, fix its findings, then execute.
+Goal, non-goals, atomic tasks (max 5 files each, runnable verification command), signatures/formulas/examples, acceptance tests (written in the PRD, not by the executor), risks, assumptions. Small work: in the conversation; save to `docs/prd/<slug>.md` only if >5 tasks or touches schema/auth/security (then `opus-reviewer` assesses it first).
+Details: read `reference.md` in this skill's folder before writing a large PRD.
 
 ## 3. EXECUTION
-One task = one delegation, sequential (do not run in parallel if files overlap).
-- Default: `haiku-coder` (atomic task, <=5 files).
-- Go directly to `sonnet-dev` only when the task truly cannot be split (6-15 files at once, integration across modules, mass type/lint fixes).
-- More than 15 files, architecture change, migration, auth/security: still NOT done by yourself. Split it into several tasks/batches via a more detailed PRD, then delegate.
-
-Every brief must contain: the files allowed to be touched, the relevant PRD excerpt, the verification command, a prohibition on expanding scope, and the agent's report format.
+One task = one delegation, sequential (not parallel if files overlap).
+- Default `haiku-coder` (atomic, <=5 files). `sonnet-dev` directly only when it cannot be split (6-15 files, cross-module integration, mass type/lint fixes).
+- >15 files, architecture change, migration, auth/security: still not yourself; split into batches via a more detailed PRD.
+- Every brief: files allowed to touch, relevant PRD excerpt, verification command, no scope expansion, report format.
 
 ## 4. ESCALATION (do not skip tiers)
-1. Haiku failed once -> diagnose first from the report + `git diff`:
-   - Cause is an unclear brief or insufficient context -> fix the brief, re-run Haiku once.
-   - Cause is that the task is genuinely complex (unclear error cause, touches many modules, needs debugging) -> go directly to `sonnet-dev`, do not re-run Haiku.
-2. Haiku failed twice -> `sonnet-dev`.
-   Every escalation to Sonnet includes: the existing diff, the exact error, and the suspected cause.
-3. Sonnet failed once -> fix the brief, re-run Sonnet once.
-4. Sonnet failed twice, or reports "NEEDS ARCHITECTURE DECISION" -> Opus analyzes (reads code, diff, errors), makes the design decision, then rewrites the PRD/brief more precisely (smaller tasks, explicit steps, concrete examples).
-   Delegate again: to `haiku-coder` if the task is now atomic, otherwise to `sonnet-dev`.
-5. Still failing after one round of new instructions -> STOP and report to the user: what was tried, the exact error, and the decision needed.
-
-If the failure is caused by an API/model error (not the code), do not escalate to another tier:
-- Transient (timeout, 429/rate limit, 5xx, overloaded, dropped connection) -> retry the same delegation ONCE. Still failing -> stop and report the exact error.
-- Permanent (unknown model, 401/403/authentication, quota exhausted) -> stop immediately and report the exact error.
-Agent reports are not trusted raw: check `git diff` and re-run the verification yourself.
+Haiku fail -> fix brief and retry once, or straight to `sonnet-dev` if genuinely complex (or 2 fails); Sonnet 2 fails or "NEEDS ARCHITECTURE DECISION" -> Opus rewrites the PRD/brief and delegates again; still failing -> STOP and report. API/model errors (timeout, 429, 5xx): retry once, never escalate; permanent: stop. Verify agent reports via `git diff` and re-run the check.
+Details: read `reference.md` in this skill's folder before escalating.
 
 ## 5. REVIEW per batch
-After a group of related tasks is finished:
-- Larger than a small batch: first send the diff to `haiku-coder` with `TYPE: SCAN`; then read `git diff --stat` plus only the hunks the scan flags or that carry the main logic.
-- Small batch (<=2 files, tests green): Opus only checks `git diff` itself (saves tokens).
-- Otherwise: call `opus-reviewer` with the PRD (the `docs/prd/<slug>.md` path if saved, otherwise paste the full PRD text into the brief) and the list of allowed files.
-Findings are fixed through the same execution path (steps 3-4), then re-reviewed until "PASS".
+Larger batch: `haiku-coder` `TYPE: SCAN` on the diff, then read only flagged hunks. Small (<=2 files, green): check `git diff` yourself. Otherwise `opus-reviewer` with the PRD. Fix findings via steps 3-4 until PASS.
+Details: read `reference.md` in this skill's folder before reviewing.
 
 ## 6. REPORT at the end
-- Table: task -> who did it (haiku/sonnet) -> number of attempts -> status.
-- Verification commands run and their results.
-- Assumptions taken and open items.
-- Tokens: one line from the subagent completion notices, e.g. `Tokens: haiku 45k · sonnet 0 · opus-reviewer 0 · 6 delegations`.
-- Checkpoint: if multi-batch work stops before DONE, write a checkpoint per `orchestrator:resume` so a later session can continue.
-- Lessons: if this task taught something non-obvious, reusable, and verified (see `orchestrator:learn`), save at most 3 lessons yourself, without asking, through one `haiku-coder` delegation; fix or remove lessons this task proved wrong in the same delegation. Mention it in one report line ("Lessons saved: ..."). Nothing qualifies (the usual case) -> say nothing.
-
+- Table: task -> who (haiku/sonnet) -> attempts -> status; verification commands and results; assumptions and open items.
+- Tokens, one line from subagent notices, e.g. `Tokens: haiku 45k · sonnet 0 · opus-reviewer 0 · 6 delegations`. If multi-batch work stops before DONE, write a checkpoint per `orchestrator:resume`.
+- Lessons: if the task taught something non-obvious, reusable, and verified (see `orchestrator:learn`), save at most 3 yourself via one `haiku-coder` delegation (also fix/remove lessons proven wrong), no user approval; mention in one line ("Lessons saved: ..."). Nothing qualifies -> say nothing.
 ## Hard rules
-- Do not commit (unless the user passed `commit=batch` to team/autopilot), do not push, do not run DB migrations, do not touch .env, do not let subagents rewrite or weaken tests just to make them green.
-- Reply to the user in the user's own language.
+- Reply in the user's own language. Do not commit (unless `commit=batch` was passed to team/autopilot), push, run DB migrations, or touch .env; do not let subagents rewrite or weaken tests to make them green.

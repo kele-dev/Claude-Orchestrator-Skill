@@ -31,8 +31,10 @@ The brief tells Haiku to read only top-level files that exist:
 
 ## 5. Write the map (same delegation)
 - Write `<main>/.claude/skills/learned-map/SKILL.md` in the `learn` format: the frontmatter description line plus at most 20 lesson lines.
+- Also write `<main>/.claude/skills/learned-map/verify.sh` (bash): `set -o pipefail`; for each **verified** test/lint/typecheck command, capture its output (`2>&1`) and print `PASS <name>`, or on failure `FAIL <name>` followed by the last 15 lines of its output; end with one line `VERIFY: PASS (n/m)` or `VERIFY: FAIL (n/m)` and exit non-zero on any failure. No broken or not-run commands. Run it once and confirm the last line.
+- Add one map line: `Verify: bash <main>/.claude/skills/learned-map/verify.sh` (counts toward the 20 lines).
 - Apply the `learn` exclude rule: `.claude/skills/learned-*/` in `<git-common-dir>/info/exclude`.
 
 ## 6. Report
 - Opus reads only the Haiku report and the written map.
-- Report in one short block (stack, commands with their status, anything broken) plus the token line.
+- Report in one short block (stack, commands with their status, the verify.sh result, anything broken) plus the token line.
