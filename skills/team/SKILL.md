@@ -30,7 +30,7 @@ Opus may raise a cap on its own, without asking, only while the work is clearly 
 - Never go past the ceilings. A cap the user gave in the arguments (e.g. `lanes=2`) is final: never raise it.
 
 ## 1. PLAN (Opus)
-- Read the relevant `learned-*` project skills (see `orchestrator:on` step 1) and paste the relevant lesson lines into each lane brief.
+- Read the relevant project lessons (see `orchestrator:on` step 1) and paste the relevant lesson lines into each lane brief.
 - Read only the files you need. Write the PRD as in `orchestrator:on` step 2.
 - Split the work into lanes. Each lane has: id, goal, owned files, PRD excerpt, acceptance test, verification command.
 - Owned files are exclusive: no file appears in two lanes.

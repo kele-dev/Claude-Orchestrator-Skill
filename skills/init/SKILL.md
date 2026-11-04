@@ -8,10 +8,10 @@ argument-hint: [--refresh]
 
 Arguments: $ARGUMENTS
 
-`<main>` is defined in the `learn` skill (main checkout root, same from every git worktree). Opus never edits files and never reads the manifests itself.
+`<store>` is defined in the `learn` skill (per-project folder under `~/.claude/orchestrator/`, same from every git worktree, writable from worktree sessions); get its absolute path once and put it in the brief. Opus never edits files and never reads the manifests itself.
 
 ## 1. Skip
-- If `<main>/.claude/skills/learned-map/SKILL.md` exists and there is no `--refresh`, say so in one line and stop.
+- If `<store>/lessons/learned-map.md` exists and there is no `--refresh`, say so in one line and stop. Also skip if the legacy `<main>/.claude/skills/learned-map/SKILL.md` exists (it is migrated by `learn`), unless `--refresh`.
 
 ## 2. Delegate once (`orchestrator:haiku-coder`, `TYPE: CREATE`)
 The brief tells Haiku to read only top-level files that exist:
@@ -30,10 +30,9 @@ The brief tells Haiku to read only top-level files that exist:
 - Mark each one: verified, broken (with the first error), or not run (needs services, env, or secrets, or is slow, such as e2e or deploy).
 
 ## 5. Write the map (same delegation)
-- Write `<main>/.claude/skills/learned-map/SKILL.md` in the `learn` format: the frontmatter description line plus at most 20 lesson lines.
-- Also write `<main>/.claude/skills/learned-map/verify.sh` (bash): `set -o pipefail`; for each **verified** test/lint/typecheck command, capture its output (`2>&1`) and print `PASS <name>`, or on failure `FAIL <name>` followed by the last 15 lines of its output; end with one line `VERIFY: PASS (n/m)` or `VERIFY: FAIL (n/m)` and exit non-zero on any failure. No broken or not-run commands. Run it once and confirm the last line.
-- Add one map line: `Verify: bash <main>/.claude/skills/learned-map/verify.sh` (counts toward the 20 lines).
-- Apply the `learn` exclude rule: `.claude/skills/learned-*/` in `<git-common-dir>/info/exclude`.
+- Write `<store>/lessons/learned-map.md` in the `learn` format: the frontmatter description line plus at most 20 lesson lines.
+- Also write `<store>/verify.sh` (bash): `set -o pipefail`; for each **verified** test/lint/typecheck command, capture its output (`2>&1`) and print `PASS <name>`, or on failure `FAIL <name>` followed by the last 15 lines of its output; end with one line `VERIFY: PASS (n/m)` or `VERIFY: FAIL (n/m)` and exit non-zero on any failure. No broken or not-run commands. Run it once and confirm the last line.
+- Add one map line: `Verify: bash <store>/verify.sh` (counts toward the 20 lines).
 
 ## 6. Report
 - Opus reads only the Haiku report and the written map.

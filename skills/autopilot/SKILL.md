@@ -33,7 +33,7 @@ Opus may raise a cap on its own, without asking, only while the work is clearly 
 Ask the questions (if any) in one go. After the answers, do not ask again until a stop condition.
 
 ## 2. PRD + BATCH PLAN (Opus)
-- Read the relevant `learned-*` project skills (see `orchestrator:on` step 1) and paste the relevant lesson lines into each brief.
+- Read the relevant project lessons (see `orchestrator:on` step 1) and paste the relevant lesson lines into each brief.
 - Write the PRD as in `orchestrator:on` step 2.
 - Order the work into batches by dependency. Each batch = 1-3 atomic tasks with its own verification command.
 - Show the batch list in one short block, then continue without waiting (unless `--dry-run`).

@@ -22,17 +22,17 @@ Both paths: read only needed files (Grep/excerpts), send subagents only relevant
 
 ## Token rules (all paths)
 - Output over 80 lines from Bash/PowerShell is auto-trimmed by a hook to error lines + last 40; put `# notrim` in the command to bypass. Still limit output yourself (`2>&1 | tail -n 30`, error/summary filters). A pipe hides the exit code: use `set -o pipefail` or judge from the summary line.
-- Project checks: if `learned-map/verify.sh` exists, run it (prints `VERIFY: PASS|FAIL`) instead of ad-hoc commands.
+- Project checks: if `<store>/verify.sh` exists (`<store>`: see `orchestrator:learn`), run it (prints `VERIFY: PASS|FAIL`) instead of ad-hoc commands.
 - Large suites (~100+ output lines): delegate to `haiku-coder` ("run only, do not edit"), ask for PASS/FAIL, failing test names, first error.
 - Dictate exact text (old -> new) only for edits <=~30 lines; for new/long content give a spec (sections, rules, 1-2 examples). Your output tokens cost the most.
-- Explore cheaply: read the `learned-map` lesson first, open only files it points to. Searches over ~3 files -> `Explore` agent with `model: haiku`, answer <=15 lines with file:line.
+- Explore cheaply: read `<store>/lessons/learned-map.md` first, open only files it points to. Searches over ~3 files -> `Explore` agent with `model: haiku`, answer <=15 lines with file:line.
 - Failing test/build: send the trimmed failure to `haiku-coder` with `TYPE: TRIAGE`, read only its report.
 - Start each `haiku-coder` brief with `TYPE: EDIT | CREATE | RUN | TRIAGE | SCAN | COMMIT`; the agent knows each type's rules and report format.
 - Self-review once before reporting: same terms/numbers across files, cross-references resolve, no stale mentions, brief expectations match the result. Fix via delegation before reporting.
 
 ## 1. UNDERSTAND & BRAINSTORM
 Read relevant files. Weigh 2-3 short approaches, pick one, record why. Ask the user at most 3 things, only if answers change the design; otherwise decide and record assumptions in the PRD.
-Lessons: if `learned-*` skills exist in the main checkout (in a worktree see `orchestrator:learn`), read relevant ones and paste the relevant lines into each subagent brief (subagents cannot see them).
+Lessons: read relevant lessons from `<store>/lessons/` (path and legacy fallback: `orchestrator:learn`) and paste the relevant lines into each subagent brief (subagents cannot see them).
 
 ## 2. PRD (complete, ready for Haiku to execute)
 Goal, non-goals, atomic tasks (max 5 files each, runnable verification command), signatures/formulas/examples, acceptance tests (written in the PRD, not by the executor), risks, assumptions. Small work: in the conversation; save to `docs/prd/<slug>.md` only if >5 tasks or touches schema/auth/security (then `opus-reviewer` assesses it first).
