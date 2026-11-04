@@ -67,12 +67,46 @@ function normalize(p) {
 
 // True only when the most recent real orchestrator command/Skill call in the transcript is off.
 function orchestrationOff(transcriptPath) {
+  const WINDOW = 512 * 1024;
   let text;
+  let size = 0;
+  let partial = false;
   try {
-    text = fs.readFileSync(transcriptPath, 'utf8');
+    const fd = fs.openSync(transcriptPath, 'r');
+    try {
+      size = fs.fstatSync(fd).size;
+      const len = Math.min(size, WINDOW);
+      const buf = Buffer.alloc(len);
+      let got = 0;
+      while (got < len) {
+        const n = fs.readSync(fd, buf, got, len - got, size - len + got);
+        if (n <= 0) break;
+        got += n;
+      }
+      text = buf.toString('utf8', 0, got);
+      partial = size > len;
+    } finally {
+      fs.closeSync(fd);
+    }
   } catch {
     return false;
   }
+  if (partial) {
+    const nl = text.indexOf('\n');
+    text = nl === -1 ? '' : text.slice(nl + 1);
+  }
+  let mode = lastMode(text);
+  if (mode === null && partial) {
+    try {
+      mode = lastMode(fs.readFileSync(transcriptPath, 'utf8'));
+    } catch {
+      return false;
+    }
+  }
+  return mode === 'off';
+}
+
+function lastMode(text) {
   const lines = text.split('\n');
   for (let i = lines.length - 1; i >= 0; i--) {
     if (!lines[i].includes('orchestrator:')) continue;
@@ -83,9 +117,9 @@ function orchestrationOff(transcriptPath) {
       continue;
     }
     const mode = modeOf(entry);
-    if (mode) return mode === 'off';
+    if (mode) return mode;
   }
-  return false;
+  return null;
 }
 
 function modeOf(entry) {

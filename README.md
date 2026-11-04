@@ -49,7 +49,7 @@ Orchestration mode is active automatically in every session. Manual commands:
 - Concise answers: no preamble, no restated plan, tables or bullets; detail only when you ask.
 - Test/build output is trimmed before it reaches Opus; large suites are run by Haiku, which reports only PASS/FAIL and the first error.
 - Opus dictates exact text only for small edits; for long content it writes a spec and the executor writes the file.
-- One self-review pass before every report, so you need fewer review rounds.
+- One self-review pass before reporting on full-path or multi-file doc/config work, so you need fewer review rounds.
 - A `learned-map` lesson (max 20 lines) remembers the project layout and commands, so new sessions skip re-exploring.
 - Claude suggests a new session or `/compact` when you switch to an unrelated task.
 - Every report ends with one token line, e.g. `Tokens: haiku 45k · sonnet 0 · 6 delegations`.
@@ -61,8 +61,8 @@ Orchestration mode is active automatically in every session. Manual commands:
 
 ### Hooks
 
-- Session info: SessionStart prints the project store path, a one-line index of saved lessons, open checkpoints, and a note when legacy files exist, so Claude needs no extra tool calls to find them. Needs Node 18+; without Node the skills compute the path themselves.
-- Output trim: Bash/PowerShell output over 80 lines is cut to the error lines (up to 10) plus the last 30 lines before the model sees it. Add `# notrim` to a command, or set env `ORCH_NO_TRIM=1`, for full output. Env `ORCH_TRIM_TAIL` and `ORCH_TRIM_ERRORS` change the 30 and the 10.
+- Session info: SessionStart prints the project store path, a one-line index of saved lessons (at most 20), the 5 newest checkpoints, and a note when legacy files exist, so Claude needs no extra tool calls to find them. Needs Node 18+; without Node the skills compute the path themselves.
+- Output trim: Bash/PowerShell output is trimmed only when it is over 80 lines AND over 4000 chars. It keeps the first 3 lines, up to 10 error/failure lines, and the last 30 lines before the model sees it. `git diff/show`, `cat`, `jq`, `Get-Content`, `type`, and JSON output are not line-trimmed (a ~26k-char cap still applies to everything). Add `# notrim` to a command, or set env `ORCH_NO_TRIM=1`, for full output. Env `ORCH_TRIM_TAIL` and `ORCH_TRIM_ERRORS` change the 30 and the 10.
 - Edit guard: the main session cannot Edit/Write project files (except `docs/prd/`); subagents can. Turn it off with `/orchestrator:off` or env `ORCH_GUARD=off`.
 - The edit guard and output trim need Node 18+ on PATH. Without Node they do nothing (fail open).
 
@@ -106,6 +106,7 @@ If you previously installed via `install.ps1`, delete `haiku-coder.md`, `sonnet-
 - Baru di 1.6.1: lesson, peta project, dan `verify.sh` pindah dari `.claude/` di checkout utama ke `~/.claude/orchestrator/<project-key>/`, supaya sesi di worktree (misalnya desktop app) bisa menyimpannya. Checkpoint baru juga disimpan di sana. Tidak ada yang perlu di-ignore di git. Lesson lama di `.claude/` disalin ke store saat lesson berikutnya disimpan (per topik yang belum ada di store). Checkpoint lama tidak dipindah, tetap bisa dibaca oleh resume/status (ditandai legacy), dan boleh dihapus setelah selesai.
 - Baru di 1.7.0: hook info sesi (path store + indeks lesson di awal sesi, tanpa tool call), output trim lebih ringkas (10 baris error + 30 baris terakhir; env `ORCH_TRIM_TAIL` dan `ORCH_TRIM_ERRORS` mengubah angkanya), aturan bersama team/autopilot disatukan di `modes.md`, aturan legacy dipindah ke `legacy.md` (dibaca hanya bila perlu), `init` tidak mengulang isi CLAUDE.md, `verify.sh` diperbarui otomatis saat perintah di map berubah, dan audit/riset read-only memakai agent Explore.
 - Juga di 1.7.0 (perbaikan audit): guard tidak lagi mati hanya karena teks menyebut `/orchestrator:off`, root proyek memakai `CLAUDE_PROJECT_DIR`/git, output satu baris yang sangat panjang ikut dipotong, key store sama di macOS, dan aturan eskalasi/caps diperjelas.
+- Baru di 1.7.1: trim lebih cerdas (tidak memotong diff/JSON, simpan 3 baris awal), indeks lesson/checkpoint dibatasi, guard hanya membaca 512 KB terakhir transcript, brief COMMIT tanpa trailer, SCAN hanya untuk diff >5 file, perbaikan kecil digabung satu delegasi, laporan agent maks 8 baris, agent memakai `effort`, dan lesson hanya disimpan setelah ada kegagalan/eskalasi/koreksi.
 - Mode orkestrasi aktif otomatis di setiap sesi.
 
 ## Maintainers

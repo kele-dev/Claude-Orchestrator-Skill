@@ -29,3 +29,9 @@ Since v1.5.0: `rules.md` is also injected on resume (idea 3 matters more), and e
 - init skips facts already in CLAUDE.md; verify.sh regenerated when map commands change.
 - Read-only audits use Explore, not executor agents.
 - Not changed: rules re-injection on resume (could not verify a duplicate).
+
+## Done in v1.7.1 (second audit)
+- Smarter trim (only over 80 lines and 4000 chars; keeps first 3 lines; no line-trim of diff/show, cat, jq, Get-Content, type, JSON) and capped session index (20 lessons, 5 newest checkpoints).
+- Guard reads only the last 512 KB of the transcript.
+- Leaner flow: no COMMIT trailers, SCAN only for diffs over 5 files, small fixes batched into one delegation, agent reports max 8 lines, no background executors, lesson saves gated on a failure/escalation/correction.
+- Agent `effort` levels (idea 7 done).

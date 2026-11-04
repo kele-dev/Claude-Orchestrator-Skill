@@ -24,7 +24,7 @@
 
 ## Step 5: Review per batch
 After a group of related tasks is finished:
-- Larger than a small batch: first send the diff to `haiku-coder` with `TYPE: SCAN`; then read `git diff --stat` plus only the hunks the scan flags or that carry the main logic.
-- Small batch (<=2 files, tests green): Opus only checks `git diff` itself (saves tokens).
+- Up to 5 files: Opus reads `git diff --stat` and `git diff -U1` itself.
+- Above 5 files: `haiku-coder` `TYPE: SCAN`; brief = `git diff --stat` + a targeted checklist; the agent reads per-file `git diff -U1`. Opus then reads only the hunks the SCAN flags. Never SCAN and also re-read the whole diff.
 - Otherwise: call `opus-reviewer` with the PRD (the `docs/prd/<slug>.md` path if saved, otherwise paste the full PRD text into the brief) and the list of allowed files.
-- Findings are fixed through the same execution path (steps 3-4), then re-reviewed until "PASS".
+- Collect all findings first (SCAN, own diff review, verify output), then ONE fix delegation; small fully-specified fixes go together in one brief, never one delegation per finding. Fixes go through steps 3-4, then re-review until "PASS".

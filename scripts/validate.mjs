@@ -3,6 +3,7 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { spawnSync } from 'child_process';
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(process.argv[2] ?? path.join(scriptDir, '..'));
@@ -144,6 +145,17 @@ if (hooksJson) {
   };
   walk(hooksJson);
 }
+
+// 4b. Syntax check for hook and script modules
+for (const dir of ['hooks', 'scripts']) {
+  const abs = path.join(root, dir);
+  const files = exists(abs) ? fs.readdirSync(abs).filter((f) => f.endsWith('.mjs')).sort() : [];
+  for (const f of files) {
+    const res = spawnSync(process.execPath, ['--check', path.join(abs, f)], { encoding: 'utf8' });
+    if (res.status !== 0) err(`${dir}/${f}`, `syntax error: ${(res.stderr ?? '').split('\n')[0]}`);
+  }
+}
+if (!exists(path.join(root, 'hooks/rules.md'))) err('hooks/rules.md', 'missing');
 
 // 5. Cross-references
 const known = new Set([...skillDirs, ...agentFiles.map((f) => f.slice(0, -3))]);
