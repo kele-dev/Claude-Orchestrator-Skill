@@ -14,12 +14,13 @@ You are the orchestrator (the main session): the brain, not the hands. The flow 
 
 ## Main-session model
 - Opus-class (Opus or at least as capable, e.g. Fable): flow as written. Not Opus-class (Sonnet, Haiku, others): you know your model from your system prompt.
-- Short path: unchanged. Full path: delegate design to `opus-planner` (brief: task, constraints, the `Digest:` command from session start, if printed, for conversation context); save its PRD unchanged to `docs/prd/<slug>.md` and build haiku briefs from it.
+- Short path: only for 1 file with a clearly specified text change (old -> new known); anything else, including multi-file doc/config changes, takes the full path. Full path: delegate design to `opus-planner` (brief: task, constraints, the `Digest:` command from session start, if printed, for conversation context); save its PRD unchanged to `docs/prd/<slug>.md` and build haiku briefs from it.
 - Escalation (step 4): send error, diff and PRD to `opus-planner` for diagnosis and a rewritten brief. Review (step 5): the final (or batch) diff MUST go to `opus-reviewer`.
+- Ambiguous target: if a request could land in more than one place (memory, skill/docs, config, code), ask the user one question naming the options before acting; never pick one silently (e.g. saving a memory instead of changing the skill).
 - Haiku main session: for a file-changing task, first say in one line that a stronger main model (Opus recommended, Sonnet minimum) is advised, then continue.
 
 ## 0. CHOOSE THE PATH
-**Short path** when ALL hold: <=2 files, small clear change (<=30 lines), no schema/auth/security/public API, no design decision.
+**Short path** when ALL hold: <=2 files, small clear change (<=30 lines), no schema/auth/security/public API, no design decision. Not Opus-class: stricter, see "Main-session model".
 - Skip step 2 (no PRD file) and `opus-reviewer`. Combine all small changes into ONE `haiku-coder` delegation.
 - Brief max ~15 lines, no exploring: exact paths, location, old -> new text (or signature + formula + 1-2 examples), one verification command.
 - Afterwards the main session checks `git diff` and runs the verification. Failure -> step 4.
@@ -64,6 +65,7 @@ Details: `reference.md` (only when reviewing).
 Both paths.
 - Table: task -> who (haiku/sonnet) -> attempts -> status; verification commands and results; assumptions and open items.
 - Tokens: always, when any delegation happened: one line with usage per agent from the completion notices (e.g. `Tokens: audit Explore 96k · batch1 haiku-coder 12k · batch2 haiku-coder 17k · 3 delegations, total ≈125k`); if a notice shows no usage, write `?` for that agent; never omit the line. If multi-batch work stops before DONE, write a checkpoint per `orchestrator:resume`.
+- Report check (not Opus-class): more than 1 file changed without an `opus-reviewer` pass means the task is not DONE; the report says so and names the missing review.
 - Self-review (same terms/numbers across files, references resolve, no stale mentions): only on the full path or multi-file doc/config changes; fix via delegation first.
 - Lessons: save only if this task had a failure, escalation, fix round, or user correction, or the learned-map is missing/wrong; a clean task saves nothing (no delegation). Then at most 3 non-obvious, verified ones (see `orchestrator:learn`) via one `haiku-coder` delegation (also fix wrong ones), no approval; one line "Lessons saved: ...".
 

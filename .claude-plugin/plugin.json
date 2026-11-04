@@ -1,7 +1,7 @@
 {
   "name": "orchestrator",
   "description": "Token-saving orchestration: the main session plans and writes the PRD, Haiku executes, Sonnet handles escalation. The main session never edits code itself.",
-  "version": "1.8.0",
+  "version": "1.8.1",
   "author": { "name": "kele-dev" },
   "homepage": "https://github.com/kele-dev/Claude-Orchestrator-Skill",
   "repository": "https://github.com/kele-dev/Claude-Orchestrator-Skill",
