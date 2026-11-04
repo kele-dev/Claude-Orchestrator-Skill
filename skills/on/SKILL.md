@@ -13,7 +13,7 @@ Plugin agent names: `orchestrator:haiku-coder`, `orchestrator:sonnet-dev`, `orch
 Task: $ARGUMENTS
 
 You are the orchestrator (Opus): the brain, not the hands. The flow is mandatory; do not skip steps.
-While this mode is active, do not use other planning/execution skills or workflows; this flow replaces them.
+While this mode is active, do not use other planning/execution skills or workflows; this flow replaces them. Exception: `orchestrator:team` and `orchestrator:autopilot` are extensions of this flow and may be used when the user invokes them.
 
 ## Core rule: Opus is NEVER the executor
 - Allowed: reading files, searching, running read/verify commands (`git diff`, `git status`, tests, build, lint), writing/editing the PRD in `docs/prd/`.
@@ -28,10 +28,12 @@ While this mode is active, do not use other planning/execution skills or workflo
 - After completion: Opus checks `git diff` and runs the verification. Failure -> regular escalation (step 4).
 Otherwise -> **full path** (steps 1-6).
 
-On both paths: read only the files needed (use Grep/line excerpts, not the whole repo), and send subagents only the relevant excerpts, not the whole PRD.
+On both paths: read only the files needed (use Grep/line excerpts, not the whole repo), and send subagents only the relevant excerpts, not the whole PRD. Project lessons also apply on both paths: read them before planning (step 1) and save them at the end (step 6).
 
 ## 1. UNDERSTAND & BRAINSTORM
 Read the relevant files first. Weigh 2-3 short approaches, pick one, and record the reason. Ask the user at most 3 things, and only if the answers would truly change the design. Otherwise decide yourself and record the assumptions in the PRD.
+
+Project lessons: if `learned-*` skills exist in the project's main checkout (in a git worktree, look them up in the main checkout as described in `orchestrator:learn`), read the ones relevant to this task before planning, and paste the relevant lesson lines into each subagent brief (subagents cannot see them otherwise). Details: `orchestrator:learn`.
 
 ## 2. PRD (complete, ready for Haiku to execute)
 Write the PRD: goal, non-goals, data flow, schema/tables, endpoints, UI components, task list, acceptance tests per task, risks, assumptions. Concise but precise: Haiku must be able to work without guessing.
@@ -75,6 +77,7 @@ Findings are fixed through the same execution path (steps 3-4), then re-reviewed
 - Table: task -> who did it (haiku/sonnet) -> number of attempts -> status.
 - Verification commands run and their results.
 - Assumptions taken and open items.
+- Lessons: if this task taught something non-obvious, reusable, and verified (see `orchestrator:learn`), save at most 3 lessons yourself, without asking, through one `haiku-coder` delegation; fix or remove lessons this task proved wrong in the same delegation. Mention it in one report line ("Lessons saved: ..."). Nothing qualifies (the usual case) -> say nothing.
 
 ## Hard rules
 - Do not commit, do not push, do not run DB migrations, do not touch .env, do not let subagents rewrite or weaken tests just to make them green.
