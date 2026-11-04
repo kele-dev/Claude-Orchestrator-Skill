@@ -1,11 +1,13 @@
 ---
-name: orchestrator
-description: Wajib dipakai untuk SETIAP tugas yang mengubah kode, test, atau konfigurasi proyek. Sesi utama (Opus) hanya berpikir, brainstorming, menulis PRD, dan memverifikasi; eksekusi didelegasikan ke haiku-coder, eskalasi ke sonnet-dev. Bisa juga dipanggil manual dengan /orchestrator:orchestrator <tugas>.
+name: on
+description: Wajib dipakai untuk SETIAP tugas yang mengubah kode, test, atau konfigurasi proyek. Sesi utama (Opus) hanya berpikir, brainstorming, menulis PRD, dan memverifikasi; eksekusi didelegasikan ke haiku-coder, eskalasi ke sonnet-dev. Bisa juga dipanggil manual dengan /orchestrator:on <tugas>.
 model: opus
 argument-hint: <deskripsi tugas>
 ---
 
-# Mode orchestrator
+# Mode orchestrator: ON
+
+Kalau sebelumnya `/orchestrator:off` dipakai di sesi ini, mode orkestrasi aktif lagi mulai sekarang.
 
 Nama agent (plugin): `orchestrator:haiku-coder`, `orchestrator:sonnet-dev`, `orchestrator:opus-reviewer`. Di bawah ditulis tanpa prefix.
 

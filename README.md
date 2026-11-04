@@ -28,9 +28,16 @@ Setelah terpasang, mulai sesi baru dengan model Opus. Scope user berarti berlaku
 
 Update: `claude plugin update orchestrator@kele-dev`. Hapus: `claude plugin uninstall orchestrator@kele-dev`.
 
+## Pemakaian
+
+Mode orkestrasi aktif otomatis di setiap sesi. Perintah manual:
+
+- `/orchestrator:on` - aktifkan (atau `/orchestrator:on <tugas>` untuk langsung memberi tugas)
+- `/orchestrator:off` - matikan untuk sisa sesi ini (Claude mengerjakan langsung seperti biasa)
+
 ## Isi plugin
 
-- Skill `orchestrator`: alur PRD -> delegasi -> eskalasi -> review.
+- Skill `on` dan `off`: alur PRD -> delegasi -> eskalasi -> review, dan tombol mematikannya.
 - Agent `haiku-coder` (eksekutor), `sonnet-dev` (eskalasi), `opus-reviewer` (review, hanya baca).
 - Hook awal sesi yang memuat aturan orkestrasi ke setiap sesi.
 

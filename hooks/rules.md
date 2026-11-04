@@ -1,7 +1,7 @@
 # Aturan global: orkestrasi wajib
 
 Setiap sesi yang akan mengubah kode, test, atau konfigurasi proyek WAJIB memakai
-skill `orchestrator:orchestrator` (muat di awal tugas, sebelum menyentuh file apa pun).
+skill `orchestrator:on` (muat di awal tugas, sebelum menyentuh file apa pun).
 
 - Sesi utama (Opus) hanya berpikir, brainstorming, menulis PRD di `docs/prd/`,
   dan memverifikasi (baca file, `git diff`, jalankan test). Sesi utama TIDAK BOLEH
@@ -20,3 +20,5 @@ skill `orchestrator:orchestrator` (muat di awal tugas, sebelum menyentuh file ap
 - Aturan ini mengalahkan skill superpowers untuk perencanaan/eksekusi
   (brainstorming, writing-plans, executing-plans, subagent-driven-development).
 - Pertanyaan, penjelasan, atau riset tanpa perubahan file tidak perlu orkestrasi.
+- Pengguna bisa mematikan aturan ini untuk satu sesi dengan `/orchestrator:off` dan menyalakannya
+  lagi dengan `/orchestrator:on`. Setelah off, jangan memuat skill `orchestrator:on` secara otomatis.
