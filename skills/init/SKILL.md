@@ -11,7 +11,7 @@ Arguments: $ARGUMENTS
 `<store>` is defined in the `learn` skill (per-project folder under `~/.claude/orchestrator/`, same from every git worktree, writable from worktree sessions); use the session-start `Orchestrator store:` line, or run the Store command once, and put the absolute path in the brief. The main session never reads the manifests itself.
 
 ## 1. Skip
-- If `<store>/lessons/learned-map.md` exists and there is no `--refresh`, say so in one line and stop. Also skip if a legacy learned-map exists (see `legacy.md` in the `orchestrator:learn` skill folder (read it only when legacy files are present)), unless `--refresh`.
+- If `<store>/lessons/learned-map.md` exists and there is no `--refresh`, say so in one line and stop. Also skip if a legacy learned-map exists (`legacy.md` in the `orchestrator:learn` folder; only if legacy files exist), unless `--refresh`.
 
 ## 2. Delegate once (`orchestrator:haiku-coder`, `TYPE: CREATE`)
 The brief tells Haiku to read only top-level files that exist:
@@ -21,7 +21,7 @@ The brief tells Haiku to read only top-level files that exist:
 - The first 60 lines of README.
 - A per-folder file count from `git ls-files` (top 2 levels, counts only, not the full list).
 
-Same delegation: also copy missing legacy topics (see `legacy.md` in the `orchestrator:learn` skill folder (read it only when legacy files are present)).
+Same delegation: also copy missing legacy topics (`legacy.md` in the `orchestrator:learn` folder; only if legacy files exist).
 
 ## 3. Derive (same delegation)
 - Stack, key folders and their purpose, entry points.

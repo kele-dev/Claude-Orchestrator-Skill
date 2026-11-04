@@ -52,9 +52,9 @@ Orchestration mode is active automatically in every session. Manual commands:
 - One self-review pass before reporting on full-path or multi-file doc/config work, so you need fewer review rounds.
 - A `learned-map` lesson (max 20 lines) remembers the project layout and commands, so new sessions skip re-exploring.
 - Claude suggests a new session or `/compact` when you switch to an unrelated task.
-- Every report ends with one token line, e.g. `Tokens: haiku 45k · sonnet 0 · 6 delegations`.
+- Every report ends with one token line per agent, e.g. `Tokens: audit Explore 96k · batch1 haiku-coder 12k · 3 delegations, total ≈125k`.
 - Code questions and test-failure triage go to Haiku; the main session reads only a short answer with file:line references.
-- Briefs start with a type (`TYPE: EDIT | CREATE | RUN | TRIAGE | SCAN | COMMIT`) that Haiku already knows, so briefs stay short.
+- Briefs start with a type (`TYPE: EDIT | CREATE | RUN | TRIAGE | SCAN | COMMIT | APPLY`) that Haiku already knows, so briefs stay short.
 - Before verifying a larger change, Haiku scans the diff for mechanical mistakes; the main session reads only the flagged hunks and the main logic.
 - In a long conversation Claude writes a checkpoint and suggests continuing in a new session.
 - Always-loaded rules are smaller: `hooks/rules.md` is shortened, and `orchestrator:on` is split into a core plus an on-demand `reference.md`.

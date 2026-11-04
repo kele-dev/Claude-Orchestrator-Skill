@@ -13,8 +13,8 @@ disable-model-invocation: true
 - Plugin version: `version` from `${CLAUDE_PLUGIN_ROOT}/.claude-plugin/plugin.json`; if that variable is not resolved, read `.claude-plugin/plugin.json` two folders above this skill's folder; if neither works, show `unknown`.
 - `<store>`: the path (outside git it uses the project root; say "not a git repo").
 - Lessons: each `<store>/lessons/*.md` -> file name + its frontmatter `description` (frontmatter only). Flag whether `learned-map` exists; if missing, suggest `/orchestrator:init`.
-- Checkpoints: each `<store>/checkpoints/*.md` -> name, its `Task:` line, its `Updated:` line. If any exist, suggest `/orchestrator:resume <name>`. Also list legacy `<main>/.claude/orchestrator/checkpoints/*.md`, marked "(legacy)" (see `legacy.md` in the `orchestrator:learn` skill folder (read it only when legacy files are present)).
-- Legacy: flag if `<main>/.claude/skills/learned-*/SKILL.md` or the legacy checkpoints exist, and suggest per `legacy.md` in the `orchestrator:learn` skill folder (read it only when legacy files are present).
+- Checkpoints: each `<store>/checkpoints/*.md` -> name, its `Task:` line, its `Updated:` line. If any exist, suggest `/orchestrator:resume <name>`. Also list legacy `<main>/.claude/orchestrator/checkpoints/*.md`, marked "(legacy)" (`legacy.md` in the `orchestrator:learn` folder; only if legacy files exist).
+- Legacy: flag if `<main>/.claude/skills/learned-*/SKILL.md` or the legacy checkpoints exist, and suggest per `legacy.md` (`orchestrator:learn` folder; only if legacy files exist).
 - Session: delegations so far per agent (haiku-coder, sonnet-dev, opus-reviewer), counted from this conversation; "unknown" after a compaction.
 
 ## Caps

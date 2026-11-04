@@ -97,6 +97,7 @@ function orchestrationOff(transcriptPath) {
   }
   let mode = lastMode(text);
   if (mode === null && partial) {
+    if (size > 16 * 1024 * 1024) return false;
     try {
       mode = lastMode(fs.readFileSync(transcriptPath, 'utf8'));
     } catch {

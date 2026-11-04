@@ -63,7 +63,7 @@ Details: `reference.md` (only when reviewing).
 ## 6. REPORT at the end
 Both paths.
 - Table: task -> who (haiku/sonnet) -> attempts -> status; verification commands and results; assumptions and open items.
-- Tokens: one line, only if completion notices showed usage (e.g. `Tokens: haiku 45k · sonnet 0 · 6 delegations`), otherwise omit. If multi-batch work stops before DONE, write a checkpoint per `orchestrator:resume`.
+- Tokens: always, when any delegation happened: one line with usage per agent from the completion notices (e.g. `Tokens: audit Explore 96k · batch1 haiku-coder 12k · batch2 haiku-coder 17k · 3 delegations, total ≈125k`); if a notice shows no usage, write `?` for that agent; never omit the line. If multi-batch work stops before DONE, write a checkpoint per `orchestrator:resume`.
 - Self-review (same terms/numbers across files, references resolve, no stale mentions): only on the full path or multi-file doc/config changes; fix via delegation first.
 - Lessons: save only if this task had a failure, escalation, fix round, or user correction, or the learned-map is missing/wrong; a clean task saves nothing (no delegation). Then at most 3 non-obvious, verified ones (see `orchestrator:learn`) via one `haiku-coder` delegation (also fix wrong ones), no approval; one line "Lessons saved: ...".
 

@@ -45,7 +45,7 @@ The agent decides; the user is not asked.
 Delegate the write to `orchestrator:haiku-coder` in one brief with the exact text (the main session does not edit files):
 - Always write under `<store>/lessons/`, never inside the repo or a worktree folder: worktrees are deleted together with their session.
 - Pick a topic slug. Prefer an existing `learned-*.md` file; create a new one only for a new topic. Keep at most 6 `learned-*.md` files per project.
-- Every save (from learn or init) also copies missing legacy topics, in the same delegation (see `legacy.md` in the `orchestrator:learn` skill folder (read it only when legacy files are present)).
+- Every save (from learn or init) also copies missing legacy topics, in the same delegation (`legacy.md` in the `orchestrator:learn` folder; only if legacy files exist).
 - File format:
   ```
   ---
@@ -69,7 +69,7 @@ One special lesson file, `learned-map`, saves re-exploring the project in every 
 - `/orchestrator:init` creates it in one cheap pass for a new project.
 
 ## Using lessons (start of a task)
-- On step 1, use the session-start `Orchestrator store:` and `Lessons:` lines (file + description) when present; run the Store command and one Glob of `<store>/lessons/learned-*.md` (frontmatter descriptions only) only if they are missing. Then read the full text of those whose description matches the task, before planning. Read `learned-map` first when it exists. Legacy topics: see `legacy.md` in the `orchestrator:learn` skill folder (read it only when legacy files are present).
+- On step 1, use the session-start `Orchestrator store:` and `Lessons:` lines (file + description) when present; run the Store command and one Glob of `<store>/lessons/learned-*.md` (frontmatter descriptions only) only if they are missing. Then read the full text of those whose description matches the task, before planning. Read `learned-map` first when it exists. Legacy topics: see `legacy.md` in the `orchestrator:learn` folder; only if legacy files exist.
 - Paste the relevant lesson lines into every subagent brief: subagents cannot see them otherwise.
 - A lesson that turned out wrong or outdated in this task: fix or remove it automatically in the end-of-task save delegation.
 
