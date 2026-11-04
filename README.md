@@ -40,6 +40,7 @@ Orchestration mode is active automatically in every session. Manual commands:
 - `/orchestrator:learn [list | add <lesson> | prune]` - project lessons: at the end of a task Claude decides by itself whether to save up to 3 verified lessons (working test commands, root causes, pitfalls) and fixes or removes outdated ones, as local `learned-*` skills in the main checkout's `.claude/skills/` (also when a session runs in a git worktree), so every later session in that project can read them. They stay out of git via the repo's shared `info/exclude`.
 - `/orchestrator:init [--refresh]` - maps a new project in one cheap Haiku pass: stack, key folders, and verified test/build/lint commands, saved as the `learned-map` lesson.
 - `/orchestrator:resume [<name>]` - continues long work from a checkpoint after a context limit, rate limit, `/compact`, or crash. team/autopilot write checkpoints automatically at stops and between waves/batches.
+- `/orchestrator:status` - read-only summary: mode in this session, plugin version, project lessons, checkpoints, missing exclude lines, and team/autopilot caps.
 - `commit=batch` (team/autopilot) - one local commit per passed wave or batch, with a conventional message; never pushed.
 
 ### Token-saving defaults
@@ -60,7 +61,7 @@ Orchestration mode is active automatically in every session. Manual commands:
 - Skills `on` and `off`: the PRD -> delegate -> escalate -> review flow, and the switch to turn it off.
 - Skills `team` and `autopilot` (user-invoked only): parallel and autonomous modes on top of `on`, with hard caps to keep token cost bounded.
 - Skill `learn`: project lessons saved and maintained automatically as local skills; one report line tells you what changed, and the manual commands are optional.
-- Skills `init` and `resume`: one-pass project map, and checkpoints to continue in a new session.
+- Skills `init`, `resume`, and `status`: one-pass project map, checkpoints to continue in a new session, and a read-only state summary.
 - Agents `haiku-coder` (executor), `sonnet-dev` (escalation), `opus-reviewer` (review, read-only).
 - A session-start hook that loads the orchestration rules into every session.
 
@@ -90,11 +91,12 @@ If you previously installed via `install.ps1`, delete `haiku-coder.md`, `sonnet-
 - Belajar: di akhir tugas Claude sendiri yang memutuskan pelajaran mana yang disimpan (maks 3, hanya yang sudah terbukti), serta memperbaiki atau menghapus yang usang, sebagai skill lokal `learned-*` di project. Satu baris di laporan memberi tahu apa yang berubah. `/orchestrator:learn list` untuk melihat, `prune` untuk merapikan.
 - Hemat token: jawaban ringkas, output test dipotong, Opus tidak mendikte file panjang, self-review sebelum lapor, `learned-map` untuk peta project, saran sesi baru saat ganti topik, dan satu baris laporan token di akhir.
 - Baru di 1.4: `/orchestrator:init` (peta project sekali jalan), `/orchestrator:resume` (lanjut dari checkpoint), `commit=batch`, riset/triase oleh Haiku, tipe brief, dan scan diff oleh Haiku sebelum Opus memverifikasi.
+- Baru di 1.5: `/orchestrator:status` (ringkasan status read-only), aturan orkestrasi kini juga dimuat saat sesi di-resume, dan validator plugin `node scripts/validate.mjs` + CI.
 - Mode orkestrasi aktif otomatis di setiap sesi.
 
 ## Maintainers
 
-Releasing: bump `version` in `.claude-plugin/plugin.json` and `marketplace.json` on every release so `claude plugin update` picks it up.
+Releasing: bump `version` in `.claude-plugin/plugin.json` and `marketplace.json` on every release so `claude plugin update` picks it up. Run `node scripts/validate.mjs` before pushing (Node 18+, no dependencies); CI runs the same check on every push and pull request.
 
 ## License
 
