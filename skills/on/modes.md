@@ -1,0 +1,18 @@
+# orchestrator:on modes (shared rules for team and autopilot)
+
+## Modes: shared rules for team and autopilot
+"Unit" = a lane (team) or a batch (autopilot). "Group" = a wave (team) or a batch (autopilot). The mode file gives the numbers (caps, ceilings); these rules apply to both.
+- Agent names: `orchestrator:haiku-coder`, `orchestrator:sonnet-dev`, `orchestrator:opus-reviewer`.
+- Base rules: every rule of `orchestrator:on` still applies (Opus never edits, the escalation ladder, API-error handling, the hard rules). The mode file only adds what changes. If the `orchestrator:on` rules are not in context yet, load that skill first.
+- Lessons in: read the relevant project lessons (`orchestrator:on` step 1) and paste the relevant lesson lines into each brief. Write the PRD as in `orchestrator:on` step 2.
+- Fix round: one re-delegation of a unit at any tier, including the delegation after an Opus rewrite. Follow the step 4 ladder inside the cap; if the cap is reached mid-ladder and no raise applies, the unit is BLOCKED (report the next ladder step that was not run).
+- Argument caps: a cap given in the arguments is clamped to the hard ceiling and never raised automatically; it is final.
+- Raising caps: Opus may raise a cap on its own, without asking, only while the work is clearly progressing. Fix rounds: a unit at its cap gets more rounds (up to the ceiling) only if every round made measurable progress: a different error than the round before, or fewer failing tests/checks. The same error twice in a row means no progress: the unit is BLOCKED. Announce every raise in one line when it happens (what, old -> new, why) and list it in the report. Never go past the ceilings.
+- Verify: for a group larger than the small-batch size, review the diff per `orchestrator:on` step 5 (Opus reads `git diff --stat` and `git diff -U1` itself up to 5 files; SCAN only above 5, never both), then run the unit's verification command, run by you with output trimmed per the token rules in `orchestrator:on`. Read diffs and summaries, not whole files, unless a diff is ambiguous. After the last group passes, run the project-level check once (full test/build/lint, if any).
+- Fix loop: re-run only the failed units; never touch a unit that already passed. Collect all findings first, then ONE fix delegation per unit (small fully-specified fixes together in one brief). New brief = exact error + that unit's current diff + suspected cause; pick the tier per `orchestrator:on` step 4.
+- NEEDS ARCHITECTURE DECISION: sonnet-dev reports in its own format and may report this status; handle it per `orchestrator:on` step 4 (Opus decides and rewrites; if Opus cannot decide safely -> DECISION NEEDED stop).
+- `commit=batch`: after each group is verified, delegate one `haiku-coder` `TYPE: COMMIT` with only the files of that group's PASS units and a conventional commit message. The commit message is subject and body only; never put Co-Authored-By or other trailers in a COMMIT brief: the executor adds its own attribution. Files of BLOCKED units stay uncommitted and are listed in the checkpoint. Never push. Without this argument nothing is committed.
+- Checkpoint: write one per `orchestrator:resume` at the timing the mode file gives, and at every stop that is not DONE.
+- Report: table (unit -> files/tasks -> executor -> attempts -> status PASS / BLOCKED); verification commands run and their results; tokens and delegations per `orchestrator:on` step 6, and caps used vs. caps allowed (including any automatic raises); assumptions and open items.
+- Lessons out: save per `orchestrator:on` step 6 (automatic, one delegation, one report line).
+- Hard rules: same as `orchestrator:on`. No commit unless `commit=batch`; never push.

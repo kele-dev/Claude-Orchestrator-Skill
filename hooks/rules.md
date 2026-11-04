@@ -1,19 +1,10 @@
 # Global rule: mandatory orchestration
-
-Every session that will change code, tests, or project configuration MUST use the skill `orchestrator:on` (load it at the start of the task, before touching any file).
-
-- The main session (Opus) only thinks, brainstorms, writes the PRD (in the conversation for small work; saved to `docs/prd/<slug>.md` only for large PRDs), and verifies (reads files, `git diff`, runs tests). The main session MUST NOT edit code/tests/configuration itself, however small the change.
-- Execution: `haiku-coder` first. Haiku fails because the brief is unclear -> retry once with a corrected brief; fails because the task is complex, or fails 2x -> `sonnet-dev`. Sonnet fails 2x -> Opus writes new, more precise instructions/PRD and delegates again. Still failing -> stop and report to the user. Opus never takes over execution.
-- Small changes (<=2 files, clear, no design decisions): shortcut path - no PRD file and no opus-reviewer; all small changes are combined into one Haiku delegation with an explicit brief (old text -> new text). Still, Opus does not do the editing.
-- API/model errors on subagents are not a reason to escalate. Temporary errors (timeout, 429, 5xx) -> retry once; permanent errors or still failing -> stop and report.
-- Full agent names in this plugin: `orchestrator:haiku-coder`, `orchestrator:sonnet-dev`, `orchestrator:opus-reviewer`. Do not create copies of these agents in `.claude/agents`.
-- These rules take precedence over any other planning or execution skill/workflow. Exception: `orchestrator:team` and `orchestrator:autopilot` are part of this plugin and extend these rules.
-- Questions, explanations, or research without file changes do not need orchestration.
-- The user can turn this rule off for one session with `/orchestrator:off` and turn it back on with `/orchestrator:on`. After off, do not automatically load the skill `orchestrator:on`.
-- Optional modes, user-invoked only: `/orchestrator:team <task>` (parallel file-disjoint lanes, capped fix rounds) and `/orchestrator:autopilot <task>` (autonomous batches, capped batches and fix rounds). Both extend `orchestrator:on`; every rule above still applies. The default is always `orchestrator:on`. When a task clearly fits one of these modes (team: 2 or more independent parts touching separate files; autopilot: many sequential steps the user wants done hands-off), suggest the command in one line at the start of the reply, then continue with `orchestrator:on` unless the user switches. Never start them yourself.
-- Project lessons: the orchestrator keeps local `learned-*` skills in the main checkout's `.claude/skills/`, also when working in a git worktree (see `orchestrator:learn`). Read the relevant ones before planning and pass their lines into briefs. At the end of a task the orchestrator itself decides which verified lessons to save, fix, or remove (no user approval needed) and mentions it in one report line.
-- Output style (always): no preamble or closing pleasantries, do not restate the request or the plan, no recap that repeats a table. Use tables or bullets, one sentence each; give detail only when asked. Stay clear enough that the user never has to ask again: concise, not cryptic.
-- Context hygiene: when the user starts a task unrelated to the conversation so far, suggest in one line a new session or `/compact`, because a long context makes every later turn more expensive.
-- Long sessions: when this conversation has grown long (roughly 30+ delegations, or after a context compaction) and the user starts a new step, write a checkpoint per `orchestrator:resume` and suggest continuing in a new session with `/orchestrator:resume`.
-- More commands: `/orchestrator:init` maps a new project into `learned-map`; `/orchestrator:resume` continues from a checkpoint; `/orchestrator:status` shows mode, lessons, checkpoints, and caps (read-only); team and autopilot accept `commit=batch` for one commit per passed wave or batch (never pushed).
-- Always reply to the user in the user's own language.
+- Any task that changes code, tests, or project configuration, or any other project file except a PRD in `docs/prd/`, MUST load skill `orchestrator:on` first, before touching any file. It overrides other planning/execution skills (except `orchestrator:team` and `orchestrator:autopilot`, which extend it).
+- Opus (main session) only thinks, writes the PRD, and verifies; it never edits project files, however small the change (a hook enforces this). Delegation, escalation, and API-error handling are defined in `orchestrator:on`.
+- Questions, explanations, and research without file changes need no orchestration.
+- `/orchestrator:off` disables this for the session (do not auto-load `orchestrator:on` afterwards); `/orchestrator:on` re-enables it.
+- `/orchestrator:team <task>` and `/orchestrator:autopilot <task>` are user-invoked only; never start them. When a task fits (team: 2+ independent file-disjoint parts; autopilot: many sequential hands-off steps), suggest the command in one line, then continue with `orchestrator:on`.
+- Other commands: `/orchestrator:init` (map a new project), `/orchestrator:resume` (continue from checkpoint), `/orchestrator:status` (read-only overview), `/orchestrator:learn` (project lessons).
+- Output style: no preamble or closing, do not restate the request or plan, no recap repeating a table; use tables/bullets, one sentence each; concise, not cryptic.
+- Context hygiene: unrelated new task -> suggest a new session or `/compact` in one line. Long session (~30+ delegations, or after compaction) -> write a checkpoint per `orchestrator:resume` and suggest `/orchestrator:resume` in a new session.
+- Always reply in the user's own language.

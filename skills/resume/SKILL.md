@@ -8,12 +8,13 @@ argument-hint: [<checkpoint name>]
 
 Arguments: $ARGUMENTS
 
-`<main>` is defined in the `learn` skill (main checkout root, same from every git worktree). Opus never edits files: every write or delete goes to `orchestrator:haiku-coder` (`TYPE: CREATE` or `TYPE: EDIT`).
+`<store>` is defined in the `learn` skill (per-project folder under `~/.claude/orchestrator/`, same from every git worktree, outside the repo). Use the session-start `Orchestrator store:` and `Checkpoints:` lines when present; run the Store command only if they are missing. Every write or delete goes to `orchestrator:haiku-coder` (`TYPE: CREATE`, or `TYPE: RUN` for a delete) with the absolute `<store>` path.
 
 ## Location
-- `<main>/.claude/orchestrator/checkpoints/<slug>.md`, slug = kebab-case task name, max 5 words.
+- `<store>/checkpoints/<slug>.md`, slug = kebab-case task name, max 5 words.
 - One file per task, overwritten each time. No history.
-- Keep it local: ensure the line `.claude/orchestrator/` is in `<git-common-dir>/info/exclude` (same rule as `learn`). Do not edit `.gitignore`.
+- Never write checkpoints inside the repo or a worktree.
+- Legacy checkpoints are also read (see `legacy.md` in the `orchestrator:learn` skill folder (read it only when legacy files are present)); new ones always go to `<store>`.
 
 ## When to write
 - At every stop that is not DONE: BLOCKED, DECISION NEEDED, cap or batch limit reached.
@@ -35,12 +36,13 @@ Arguments: $ARGUMENTS
 - Write facts in your own words. Never include secrets.
 
 ## Reading (`/orchestrator:resume`)
-- No argument: list checkpoints (name, task, updated). Load the only or most recent one if unambiguous, else ask which.
+- No argument: list checkpoints from `<store>/checkpoints/` plus legacy `<main>/.claude/orchestrator/checkpoints/*.md` (legacy ones marked "(legacy)"): name, task, updated. Load the only or most recent one if unambiguous, else ask which.
 - With a name: load that checkpoint.
 - Verify cheaply: current branch matches, `git log --oneline -5`, `git status --porcelain`.
 - Trust PASS items unless git contradicts them.
-- Do not re-plan and do not re-read the project. Continue at Next step, in the recorded mode, with the remaining caps.
+- Do not re-plan and do not re-read the project. Continue at Next step. If the recorded mode is team or autopilot, those modes are user-invoked only: do not continue in that mode; tell the user in one line to run `/orchestrator:team ...` or `/orchestrator:autopilot ...` with the remaining task and caps from the checkpoint. Otherwise continue in `on`.
 - If git contradicts the checkpoint, report the mismatch in max 3 lines and ask.
 
 ## Finishing
-- When the task reaches DONE, delete its checkpoint (`orchestrator:haiku-coder`, `TYPE: EDIT`) and say so in the report line.
+- When the task reaches DONE, delete only its checkpoint in `<store>`, via `orchestrator:haiku-coder` `TYPE: RUN` with `rm "<absolute path>"` (RUN may delete only the file named in the brief), and say so in the report line.
+- A finished legacy checkpoint: tell the user its path; never delete it yourself.

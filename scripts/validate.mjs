@@ -3,6 +3,7 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { spawnSync } from 'child_process';
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(process.argv[2] ?? path.join(scriptDir, '..'));
@@ -112,6 +113,22 @@ if (hooksJson) {
   const missing = ['startup', 'resume', 'clear', 'compact'].filter((m) => !matchers.has(m));
   if (missing.length) err('hooks/hooks.json', `SessionStart matchers missing: ${missing.join(', ')}`);
 
+  for (const [event, entries] of Object.entries(hooksJson.hooks ?? {})) {
+    if (!Array.isArray(entries)) continue;
+    entries.forEach((entry, i) => {
+      if (/^(Pre|Post)ToolUse$/.test(event) && (typeof entry?.matcher !== 'string' || !entry.matcher.trim())) {
+        err('hooks/hooks.json', `${event}[${i}] matcher must be a non-empty string`);
+      }
+      const hooks = Array.isArray(entry?.hooks) ? entry.hooks : [];
+      hooks.forEach((h, j) => {
+        if (h?.type !== 'command') err('hooks/hooks.json', `${event}[${i}].hooks[${j}] type must be "command"`);
+        if (h?.timeout !== undefined && !(typeof h.timeout === 'number' && h.timeout > 0)) {
+          err('hooks/hooks.json', `${event}[${i}].hooks[${j}] timeout must be a positive number`);
+        }
+      });
+    });
+  }
+
   const checkCommand = (cmd) => {
     for (const m of cmd.matchAll(/\$\{CLAUDE_PLUGIN_ROOT\}\/([^\s"']+)/g)) {
       if (!exists(path.join(root, m[1]))) err('hooks/hooks.json', `command references missing file: ${m[1]}`);
@@ -129,12 +146,23 @@ if (hooksJson) {
   walk(hooksJson);
 }
 
+// 4b. Syntax check for hook and script modules
+for (const dir of ['hooks', 'scripts']) {
+  const abs = path.join(root, dir);
+  const files = exists(abs) ? fs.readdirSync(abs).filter((f) => f.endsWith('.mjs')).sort() : [];
+  for (const f of files) {
+    const res = spawnSync(process.execPath, ['--check', path.join(abs, f)], { encoding: 'utf8' });
+    if (res.status !== 0) err(`${dir}/${f}`, `syntax error: ${(res.stderr ?? '').split('\n')[0]}`);
+  }
+}
+if (!exists(path.join(root, 'hooks/rules.md'))) err('hooks/rules.md', 'missing');
+
 // 5. Cross-references
 const known = new Set([...skillDirs, ...agentFiles.map((f) => f.slice(0, -3))]);
 const refFiles = [
   'README.md',
   'hooks/rules.md',
-  ...skillDirs.map((d) => `skills/${d}/SKILL.md`),
+  ...skillDirs.flatMap((d) => listMd(`skills/${d}`).map((f) => `skills/${d}/${f}`)),
   ...agentFiles.map((f) => `agents/${f}`),
 ];
 for (const file of refFiles) {
