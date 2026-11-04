@@ -21,3 +21,11 @@ Since v1.5.0: `rules.md` is also injected on resume (idea 3 matters more), and e
 ## Longer term
 11. `learned-errors` lesson: verified "error pattern -> cause -> fix" entries, so repeated errors skip TRIAGE.
 12. Eval suite (`claude plugin eval`) with 3-5 standard scenarios logging tokens per version, to prove savings and catch rule regressions.
+
+## Done in v1.7.0 (redundancy review)
+- Session-info hook replaces per-task store lookup and lesson Glob.
+- team/autopilot shared rules moved to skills/on/modes.md; legacy rules to skills/learn/legacy.md.
+- Trim tightened to 10 error + 30 tail lines (env-tunable).
+- init skips facts already in CLAUDE.md; verify.sh regenerated when map commands change.
+- Read-only audits use Explore, not executor agents.
+- Not changed: rules re-injection on resume (could not verify a duplicate).

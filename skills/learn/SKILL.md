@@ -12,7 +12,7 @@ Arguments: $ARGUMENTS
 `<store>` = `~/.claude/orchestrator/<key>/`: one folder per project, the same from the main checkout and every git worktree, outside the repo. It is never committed (no `info/exclude` or `.gitignore` lines needed) and is writable from worktree sessions, which cannot write to the main checkout. `resume` and `status` use the same `<store>`.
 - Get it with exactly this one Bash command (prints an absolute path, `C:/...` on Windows Git Bash). Run it once per task and paste the result into every brief:
   ```bash
-  m=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null) && m=$(dirname "$m") || m=$(pwd -W 2>/dev/null || pwd); h=$(cygpath -m ~ 2>/dev/null || echo ~); k=$(printf %s "$m" | tr A-Z a-z | sed 's/[^a-z0-9][^a-z0-9]*/-/g' | tail -c 80); echo "$h/.claude/orchestrator/$k"
+  m=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null) && m=$(dirname "$m") || m=$(pwd -W 2>/dev/null || pwd); h=$(cygpath -m ~ 2>/dev/null || echo ~); k=$(printf %s "$m" | tr A-Z a-z | sed 's/[^a-z0-9][^a-z0-9]*/-/g' | tr -d '\n' | tail -c 80); echo "$h/.claude/orchestrator/$k"
   ```
 - Without Bash (PowerShell only), run this instead; it prints the same path:
   ```powershell
@@ -22,7 +22,7 @@ Arguments: $ARGUMENTS
 - Layout: `<store>/lessons/learned-<topic>.md` (including `learned-map`), `<store>/verify.sh`, `<store>/checkpoints/<slug>.md`.
 - Writes go to `<store>` only, delegated to `orchestrator:haiku-coder` with the absolute path from the command. Never write lessons or checkpoints inside the repo or a worktree.
 - Lessons are not auto-loaded skills: the orchestrator reads `<store>/lessons/` explicitly (see "Using lessons"). Full text is read only when relevant, so they cost few tokens.
-- Legacy (v1.6.0 and older): `<main>/.claude/skills/learned-*/SKILL.md` and `<main>/.claude/orchestrator/checkpoints/*.md` (`<main>` = parent of the git-common-dir) are still READ when `<store>` has no lessons/checkpoints. See "Saving" for migration.
+- Files from v1.6.0 and older are still read: see `legacy.md` in the `orchestrator:learn` skill folder (read it only when legacy files are present).
 
 ## What counts as a lesson
 Save only what is non-obvious, reusable, and verified in this project:
@@ -45,7 +45,7 @@ The agent decides; the user is not asked.
 Delegate the write to `orchestrator:haiku-coder` in one brief with the exact text (Opus does not edit files):
 - Always write under `<store>/lessons/`, never inside the repo or a worktree folder: worktrees are deleted together with their session.
 - Pick a topic slug. Prefer an existing `learned-*.md` file; create a new one only for a new topic. Keep at most 6 `learned-*.md` files per project.
-- First save with legacy lessons present (and `<store>/lessons/` empty): in the same delegation, copy each legacy `learned-<topic>/SKILL.md` into `<store>/lessons/learned-<topic>.md` (same frontmatter and lines) together with the new lesson. Never delete legacy files from a worktree session. After that, legacy lessons are ignored.
+- Every save (from learn or init) also copies missing legacy topics, in the same delegation (see `legacy.md` in the `orchestrator:learn` skill folder (read it only when legacy files are present)).
 - File format:
   ```
   ---
@@ -58,17 +58,18 @@ Delegate the write to `orchestrator:haiku-coder` in one brief with the exact tex
   - [YYYY-MM-DD] <lesson, at most 2 lines>. Source: <what happened, a few words>.
   ```
 - Append new lessons at the end. If the same lesson already exists, update that line instead of adding a duplicate.
-- At most 15 lessons per file. When a file is full, prune it in the same delegation (see `prune`) and mention it in the report line.
+- At most 15 lessons per file (`learned-map` is exempt: it has its own 20-line limit). When a file is full, prune it in the same delegation (see `prune`) and mention it in the report line.
 
 ## Project map (`learned-map`)
 One special lesson file, `learned-map`, saves re-exploring the project in every session:
 - At most 20 lines: key folders and what lives there, entry points, test/build/lint commands, generated or do-not-edit paths.
 - Create it at the end of the first task that had to explore the project; update it when a task finds it wrong or incomplete. Same save rules as other lessons (automatic, verified facts only, one report line).
+- Whenever a save changes a command in `learned-map`, regenerate `<store>/verify.sh` in the same delegation, in the format of `init` step 5.
 - It counts toward the 6-file limit, but not toward the 3-lessons-per-task limit.
 - `/orchestrator:init` creates it in one cheap pass for a new project.
 
 ## Using lessons (start of a task)
-- On step 1, list `<store>/lessons/learned-*.md` with one Glob and read only their frontmatter descriptions; if there are none, use the legacy files instead (Glob `<main>/.claude/skills/learned-*/SKILL.md`). Then read the full text of those whose description matches the task, before planning. Read `learned-map` first when it exists.
+- On step 1, use the session-start `Orchestrator store:` and `Lessons:` lines (file + description) when present; run the Store command and one Glob of `<store>/lessons/learned-*.md` (frontmatter descriptions only) only if they are missing. Then read the full text of those whose description matches the task, before planning. Read `learned-map` first when it exists. Legacy topics: see `legacy.md` in the `orchestrator:learn` skill folder (read it only when legacy files are present).
 - Paste the relevant lesson lines into every subagent brief: subagents cannot see them otherwise.
 - A lesson that turned out wrong or outdated in this task: fix or remove it automatically in the end-of-task save delegation.
 

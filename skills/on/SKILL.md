@@ -21,18 +21,18 @@ Otherwise -> **full path** (steps 1-6).
 Both paths: read only needed files (Grep/excerpts), send subagents only relevant excerpts. Read lessons before planning, save them at the end.
 
 ## Token rules (all paths)
-- Output over 80 lines from Bash/PowerShell is auto-trimmed by a hook to error lines + last 40; put `# notrim` in the command to bypass. Still limit output yourself (`2>&1 | tail -n 30`, error/summary filters). A pipe hides the exit code: use `set -o pipefail` or judge from the summary line.
+- Output over 80 lines from Bash/PowerShell is auto-trimmed by a hook to error lines + last 30; put `# notrim` in the command to bypass. Still limit output yourself (`2>&1 | tail -n 30`, error/summary filters). A pipe hides the exit code: use `set -o pipefail` or judge from the summary line.
 - Project checks: if `<store>/verify.sh` exists (`<store>`: see `orchestrator:learn`), run it (prints `VERIFY: PASS|FAIL`) instead of ad-hoc commands.
-- Large suites (~100+ output lines): delegate to `haiku-coder` ("run only, do not edit"), ask for PASS/FAIL, failing test names, first error.
+- Large suites (output over ~80 lines, the trim-hook limit): delegate to `haiku-coder` ("run only, do not edit"), ask for PASS/FAIL, failing test names, first error.
 - Dictate exact text (old -> new) only for edits <=~30 lines; for new/long content give a spec (sections, rules, 1-2 examples). Your output tokens cost the most.
-- Explore cheaply: read `<store>/lessons/learned-map.md` first, open only files it points to. Searches over ~3 files -> `Explore` agent with `model: haiku`, answer <=15 lines with file:line.
+- Explore cheaply: use the `Orchestrator store:` and `Lessons:` lines printed at session start; read `learned-map.md` first, open only files it points to. Searches over ~3 files -> `Explore` agent, answer <=15 lines with file:line. Read-only research and audits go to an `Explore` agent (`model: haiku`; `sonnet` only for deep audits), never to an executor agent (haiku-coder/sonnet-dev).
 - Failing test/build: send the trimmed failure to `haiku-coder` with `TYPE: TRIAGE`, read only its report.
 - Start each `haiku-coder` brief with `TYPE: EDIT | CREATE | RUN | TRIAGE | SCAN | COMMIT`; the agent knows each type's rules and report format.
 - Self-review once before reporting: same terms/numbers across files, cross-references resolve, no stale mentions, brief expectations match the result. Fix via delegation before reporting.
 
 ## 1. UNDERSTAND & BRAINSTORM
 Read relevant files. Weigh 2-3 short approaches, pick one, record why. Ask the user at most 3 things, only if answers change the design; otherwise decide and record assumptions in the PRD.
-Lessons: read relevant lessons from `<store>/lessons/` (path and legacy fallback: `orchestrator:learn`) and paste the relevant lines into each subagent brief (subagents cannot see them).
+Lessons: use the `Orchestrator store:` and `Lessons:` lines printed at session start; read full text only of relevant lessons (only if those lines are missing, get `<store>` per `orchestrator:learn` "## Store"). Paste the relevant lines into each subagent brief (subagents cannot see them).
 
 ## 2. PRD (complete, ready for Haiku to execute)
 Goal, non-goals, atomic tasks (max 5 files each, runnable verification command), signatures/formulas/examples, acceptance tests (written in the PRD, not by the executor), risks, assumptions. Small work: in the conversation; save to `docs/prd/<slug>.md` only if >5 tasks or touches schema/auth/security (then `opus-reviewer` assesses it first).
@@ -45,7 +45,7 @@ One task = one delegation, sequential (not parallel if files overlap).
 - Every brief: files allowed to touch, relevant PRD excerpt, verification command, no scope expansion, report format.
 
 ## 4. ESCALATION (do not skip tiers)
-Haiku fail -> fix brief and retry once, or straight to `sonnet-dev` if genuinely complex (or 2 fails); Sonnet 2 fails or "NEEDS ARCHITECTURE DECISION" -> Opus rewrites the PRD/brief and delegates again; still failing -> STOP and report. API/model errors (timeout, 429, 5xx): retry once, never escalate; permanent: stop. Verify agent reports via `git diff` and re-run the check.
+Haiku fail -> fix brief and retry once, or straight to `sonnet-dev` if genuinely complex (or 2 fails); Sonnet 2 fails or "NEEDS ARCHITECTURE DECISION" -> Opus rewrites the PRD/brief and delegates again. After the Opus rewrite: at most one haiku-coder attempt and one sonnet-dev attempt (or one sonnet-dev attempt if the rewrite went to sonnet). Still failing -> STOP and report. API/model errors (timeout, 429, 5xx): retry once, never escalate; permanent: stop. Verify agent reports via `git diff` and re-run the check.
 Details: read `reference.md` in this skill's folder before escalating.
 
 ## 5. REVIEW per batch
@@ -53,6 +53,7 @@ Larger batch: `haiku-coder` `TYPE: SCAN` on the diff, then read only flagged hun
 Details: read `reference.md` in this skill's folder before reviewing.
 
 ## 6. REPORT at the end
+Applies to both the short and the full path (report, token line, lessons).
 - Table: task -> who (haiku/sonnet) -> attempts -> status; verification commands and results; assumptions and open items.
 - Tokens, one line from subagent notices, e.g. `Tokens: haiku 45k · sonnet 0 · opus-reviewer 0 · 6 delegations`. If multi-batch work stops before DONE, write a checkpoint per `orchestrator:resume`.
 - Lessons: if the task taught something non-obvious, reusable, and verified (see `orchestrator:learn`), save at most 3 yourself via one `haiku-coder` delegation (also fix/remove lessons proven wrong), no user approval; mention in one line ("Lessons saved: ..."). Nothing qualifies -> say nothing.

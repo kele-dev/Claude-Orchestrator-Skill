@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // PreToolUse hook for Edit/Write/NotebookEdit: denies project edits from the main session while orchestration is on.
-// Fails open: on any error or unexpected input it prints nothing and exits 0.
+// Fails open on malformed input (prints nothing, exits 0). With no on/off info in the transcript the default is "on".
 import fs from 'fs';
+import { execFileSync } from 'child_process';
 import path from 'path';
 
 let raw = '';
@@ -31,7 +32,7 @@ function shouldDeny(input) {
   if (typeof target !== 'string' || target === '') return false;
   if (typeof input.cwd !== 'string') return false;
 
-  const root = normalize(path.resolve(input.cwd));
+  const root = normalize(path.resolve(projectRoot(input.cwd)));
   const file = normalize(path.resolve(input.cwd, target));
   const inside = file === root || file.startsWith(root + '/');
   if (!inside) return false;
@@ -43,13 +44,28 @@ function shouldDeny(input) {
   return true;
 }
 
-// Forward slashes; lowercase on Windows so path comparisons are case-insensitive.
-function normalize(p) {
-  const s = p.split(path.sep).join('/');
-  return process.platform === 'win32' ? s.toLowerCase() : s;
+function projectRoot(cwd) {
+  const env = process.env.CLAUDE_PROJECT_DIR;
+  if (typeof env === 'string' && env !== '') return env;
+  try {
+    const top = execFileSync('git', ['rev-parse', '--show-toplevel'], {
+      cwd, timeout: 3000, stdio: ['ignore', 'pipe', 'ignore'], encoding: 'utf8',
+    }).trim();
+    if (top) return top;
+  } catch {
+    // not a git repo
+  }
+  return cwd;
 }
 
-// True when the last orchestrator command in the transcript is /orchestrator:off.
+// Forward slashes, no trailing slash; lowercase on Windows so comparisons are case-insensitive.
+function normalize(p) {
+  let s = p.split(path.sep).join('/');
+  if (process.platform === 'win32') s = s.toLowerCase();
+  return s.replace(/\/+$/, '');
+}
+
+// True only when the most recent real orchestrator command/Skill call in the transcript is off.
 function orchestrationOff(transcriptPath) {
   let text;
   try {
@@ -57,10 +73,41 @@ function orchestrationOff(transcriptPath) {
   } catch {
     return false;
   }
-  const off = text.lastIndexOf('<command-name>/orchestrator:off</command-name>');
-  const on = Math.max(
-    ...['/orchestrator:on', '/orchestrator:team', '/orchestrator:autopilot']
-      .map((c) => text.lastIndexOf(`<command-name>${c}</command-name>`)),
-  );
-  return off > on;
+  const lines = text.split('\n');
+  for (let i = lines.length - 1; i >= 0; i--) {
+    if (!lines[i].includes('orchestrator:')) continue;
+    let entry;
+    try {
+      entry = JSON.parse(lines[i]);
+    } catch {
+      continue;
+    }
+    const mode = modeOf(entry);
+    if (mode) return mode === 'off';
+  }
+  return false;
+}
+
+function modeOf(entry) {
+  const content = entry?.message?.content;
+  if (entry?.type === 'user') {
+    let s = null;
+    if (typeof content === 'string') s = content;
+    else if (Array.isArray(content)) {
+      const first = content.find((p) => p?.type === 'text');
+      if (typeof first?.text === 'string') s = first.text;
+    }
+    if (s === null || !s.trimStart().startsWith('<command-message>')) return null;
+    const m = /<command-name>\/orchestrator:(on|off|team|autopilot)<\/command-name>/.exec(s);
+    return m ? m[1] : null;
+  }
+  if (entry?.type === 'assistant' && Array.isArray(content)) {
+    for (const p of content) {
+      if (p?.type === 'tool_use' && p.name === 'Skill' && typeof p.input?.skill === 'string') {
+        const m = /^orchestrator:(on|off|team|autopilot)$/.exec(p.input.skill);
+        if (m) return m[1];
+      }
+    }
+  }
+  return null;
 }

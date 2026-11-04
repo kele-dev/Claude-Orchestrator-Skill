@@ -15,7 +15,7 @@
 2. Haiku failed twice -> `sonnet-dev`. Every escalation to Sonnet includes: the existing diff, the exact error, and the suspected cause.
 3. Sonnet failed once -> fix the brief, re-run Sonnet once.
 4. Sonnet failed twice, or reports "NEEDS ARCHITECTURE DECISION" -> Opus analyzes (reads code, diff, errors), makes the design decision, then rewrites the PRD/brief more precisely (smaller tasks, explicit steps, concrete examples). Delegate again: to `haiku-coder` if the task is now atomic, otherwise to `sonnet-dev`.
-5. Still failing after one round of new instructions -> STOP and report to the user: what was tried, the exact error, and the decision needed. Opus never takes over execution.
+5. After the Opus rewrite: at most one haiku-coder attempt and one sonnet-dev attempt (or one sonnet-dev attempt if the rewrite went to sonnet). Still failing -> STOP and report to the user: what was tried, the exact error, and the decision needed. Opus never takes over execution.
 
 ## API/model errors (not a reason to escalate to another tier)
 - Transient (timeout, 429/rate limit, 5xx, overloaded, dropped connection) -> retry the same delegation ONCE. Still failing -> stop and report the exact error.

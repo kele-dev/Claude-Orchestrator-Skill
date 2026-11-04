@@ -43,7 +43,7 @@ Orchestration mode is active automatically in every session. Manual commands:
 - `/orchestrator:status` - read-only summary: mode in this session, plugin version, project lessons, checkpoints, and team/autopilot caps.
 - `commit=batch` (team/autopilot) - one local commit per passed wave or batch, with a conventional message; never pushed.
 
-**Data location:** lessons, checkpoints, and `verify.sh` are stored per project in `~/.claude/orchestrator/<project-key>/` (`lessons/`, `checkpoints/`, `verify.sh`). This store is shared by the main checkout and all git worktrees, is never committed, and needs no git ignore entries. Older lessons and checkpoints in the project's `.claude/` folders are still read and copied into the store on the next lesson save; you can delete those folders afterwards.
+**Data location:** lessons, checkpoints, and `verify.sh` are stored per project in `~/.claude/orchestrator/<project-key>/` (`lessons/`, `checkpoints/`, `verify.sh`). This store is shared by the main checkout and all git worktrees, is never committed, and needs no git ignore entries. Older lessons in the project's `.claude/` folders are still read and copied into the store on the next lesson save (per topic missing from the store). Older checkpoints are not migrated: `resume` and `status` still read them and mark them as legacy; delete them yourself once that work is finished.
 
 ### Token-saving defaults
 - Concise answers: no preamble, no restated plan, tables or bullets; detail only when you ask.
@@ -61,9 +61,10 @@ Orchestration mode is active automatically in every session. Manual commands:
 
 ### Hooks
 
-- Output trim: Bash/PowerShell output over 80 lines is cut to the error lines plus the last 40 lines before the model sees it. Add `# notrim` to a command, or set env `ORCH_NO_TRIM=1`, for full output.
+- Session info: SessionStart prints the project store path, a one-line index of saved lessons, open checkpoints, and a note when legacy files exist, so Claude needs no extra tool calls to find them. Needs Node 18+; without Node the skills compute the path themselves.
+- Output trim: Bash/PowerShell output over 80 lines is cut to the error lines (up to 10) plus the last 30 lines before the model sees it. Add `# notrim` to a command, or set env `ORCH_NO_TRIM=1`, for full output. Env `ORCH_TRIM_TAIL` and `ORCH_TRIM_ERRORS` change the 30 and the 10.
 - Edit guard: the main session cannot Edit/Write project files (except `docs/prd/`); subagents can. Turn it off with `/orchestrator:off` or env `ORCH_GUARD=off`.
-- Both hooks need Node 18+ on PATH. Without Node they do nothing (fail open).
+- The edit guard and output trim need Node 18+ on PATH. Without Node they do nothing (fail open).
 
 ## Plugin contents
 
@@ -72,7 +73,7 @@ Orchestration mode is active automatically in every session. Manual commands:
 - Skill `learn`: project lessons saved and maintained automatically as local files in the project store; one report line tells you what changed, and the manual commands are optional.
 - Skills `init`, `resume`, and `status`: one-pass project map, checkpoints to continue in a new session, and a read-only state summary.
 - Agents `haiku-coder` (executor), `sonnet-dev` (escalation), `opus-reviewer` (review, read-only).
-- A session-start hook that loads the orchestration rules into every session.
+- Hooks: SessionStart rules (loads the orchestration rules into every session), SessionStart session info (store path, lesson index, open checkpoints), edit guard (PreToolUse), output trim (PostToolUse).
 
 ## Optional: reduce permission prompts
 
@@ -102,7 +103,9 @@ If you previously installed via `install.ps1`, delete `haiku-coder.md`, `sonnet-
 - Baru di 1.4: `/orchestrator:init` (peta project sekali jalan), `/orchestrator:resume` (lanjut dari checkpoint), `commit=batch`, riset/triase oleh Haiku, tipe brief, dan scan diff oleh Haiku sebelum Opus memverifikasi.
 - Baru di 1.5: `/orchestrator:status` (ringkasan status read-only), aturan orkestrasi kini juga dimuat saat sesi di-resume, dan validator plugin `node scripts/validate.mjs` + CI.
 - Baru di 1.6: hook pemangkas output (Bash/PowerShell di atas 80 baris dipotong jadi baris error + 40 baris terakhir; `# notrim` atau `ORCH_NO_TRIM=1` untuk output penuh), hook penjaga edit (sesi utama tidak bisa Edit/Write file project kecuali `docs/prd/`; matikan dengan `/orchestrator:off` atau `ORCH_GUARD=off`), keduanya butuh Node 18+, dan `/orchestrator:init` kini menulis `verify.sh`.
-- Baru di 1.6.1: lesson, peta project, `verify.sh`, dan checkpoint pindah dari `.claude/` di checkout utama ke `~/.claude/orchestrator/<project-key>/`, supaya sesi di worktree (misalnya desktop app) bisa menyimpannya. Tidak ada yang perlu di-ignore di git. Lesson dan checkpoint lama di `.claude/` tetap dibaca dan disalin saat lesson berikutnya disimpan.
+- Baru di 1.6.1: lesson, peta project, dan `verify.sh` pindah dari `.claude/` di checkout utama ke `~/.claude/orchestrator/<project-key>/`, supaya sesi di worktree (misalnya desktop app) bisa menyimpannya. Checkpoint baru juga disimpan di sana. Tidak ada yang perlu di-ignore di git. Lesson lama di `.claude/` disalin ke store saat lesson berikutnya disimpan (per topik yang belum ada di store). Checkpoint lama tidak dipindah, tetap bisa dibaca oleh resume/status (ditandai legacy), dan boleh dihapus setelah selesai.
+- Baru di 1.7.0: hook info sesi (path store + indeks lesson di awal sesi, tanpa tool call), output trim lebih ringkas (10 baris error + 30 baris terakhir; env `ORCH_TRIM_TAIL` dan `ORCH_TRIM_ERRORS` mengubah angkanya), aturan bersama team/autopilot disatukan di `modes.md`, aturan legacy dipindah ke `legacy.md` (dibaca hanya bila perlu), `init` tidak mengulang isi CLAUDE.md, `verify.sh` diperbarui otomatis saat perintah di map berubah, dan audit/riset read-only memakai agent Explore.
+- Juga di 1.7.0 (perbaikan audit): guard tidak lagi mati hanya karena teks menyebut `/orchestrator:off`, root proyek memakai `CLAUDE_PROJECT_DIR`/git, output satu baris yang sangat panjang ikut dipotong, key store sama di macOS, dan aturan eskalasi/caps diperjelas.
 - Mode orkestrasi aktif otomatis di setiap sesi.
 
 ## Maintainers

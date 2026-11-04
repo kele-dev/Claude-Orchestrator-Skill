@@ -112,6 +112,22 @@ if (hooksJson) {
   const missing = ['startup', 'resume', 'clear', 'compact'].filter((m) => !matchers.has(m));
   if (missing.length) err('hooks/hooks.json', `SessionStart matchers missing: ${missing.join(', ')}`);
 
+  for (const [event, entries] of Object.entries(hooksJson.hooks ?? {})) {
+    if (!Array.isArray(entries)) continue;
+    entries.forEach((entry, i) => {
+      if (/^(Pre|Post)ToolUse$/.test(event) && (typeof entry?.matcher !== 'string' || !entry.matcher.trim())) {
+        err('hooks/hooks.json', `${event}[${i}] matcher must be a non-empty string`);
+      }
+      const hooks = Array.isArray(entry?.hooks) ? entry.hooks : [];
+      hooks.forEach((h, j) => {
+        if (h?.type !== 'command') err('hooks/hooks.json', `${event}[${i}].hooks[${j}] type must be "command"`);
+        if (h?.timeout !== undefined && !(typeof h.timeout === 'number' && h.timeout > 0)) {
+          err('hooks/hooks.json', `${event}[${i}].hooks[${j}] timeout must be a positive number`);
+        }
+      });
+    });
+  }
+
   const checkCommand = (cmd) => {
     for (const m of cmd.matchAll(/\$\{CLAUDE_PLUGIN_ROOT\}\/([^\s"']+)/g)) {
       if (!exists(path.join(root, m[1]))) err('hooks/hooks.json', `command references missing file: ${m[1]}`);
@@ -134,7 +150,7 @@ const known = new Set([...skillDirs, ...agentFiles.map((f) => f.slice(0, -3))]);
 const refFiles = [
   'README.md',
   'hooks/rules.md',
-  ...skillDirs.map((d) => `skills/${d}/SKILL.md`),
+  ...skillDirs.flatMap((d) => listMd(`skills/${d}`).map((f) => `skills/${d}/${f}`)),
   ...agentFiles.map((f) => `agents/${f}`),
 ];
 for (const file of refFiles) {
