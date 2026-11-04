@@ -13,6 +13,7 @@ Assess against the PRD, not taste. Check at minimum:
 - no changes outside the permitted files;
 - no new TODO/stubs/dead code;
 - tests not changed or silently weakened.
+Limit command output (`2>&1 | tail -n 30`, or error/summary filters) and judge PASS/FAIL from the summary line; read the diff and the files it touches, not the whole repo.
 
 Output at most 5 findings, ordered by risk. Each finding: the problem, evidence (file:line), concrete fix.
 If there are no findings, write "PASS" and state what has not been verified.

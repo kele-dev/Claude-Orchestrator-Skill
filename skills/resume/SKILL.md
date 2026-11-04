@@ -37,7 +37,8 @@ Arguments: $ARGUMENTS
 
 ## Reading (`/orchestrator:resume`)
 - No argument: list checkpoints from `<store>/checkpoints/` plus legacy `<main>/.claude/orchestrator/checkpoints/*.md` (legacy ones marked "(legacy)"): name, task, updated. Load the only or most recent one if unambiguous, else ask which.
-- With a name: load that checkpoint.
+- With an argument: load the checkpoint with that name; if none matches, treat the argument as keywords and match them against each checkpoint's `Task:` line (load a single match, else list the candidates and ask).
+- No checkpoints found: say so in one line, search no further, and offer to start the task fresh with `orchestrator:on`.
 - Verify cheaply: current branch matches, `git log --oneline -5`, `git status --porcelain`.
 - Trust PASS items unless git contradicts them.
 - Do not re-plan and do not re-read the project. Continue at Next step. If the recorded mode is team or autopilot, those modes are user-invoked only: do not continue in that mode; tell the user in one line to run `/orchestrator:team ...` or `/orchestrator:autopilot ...` with the remaining task and caps from the checkpoint. Otherwise continue in `on`.

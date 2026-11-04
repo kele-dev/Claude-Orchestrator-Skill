@@ -107,6 +107,7 @@ If you previously installed via `install.ps1`, delete `haiku-coder.md`, `sonnet-
 - Baru di 1.7.0: hook info sesi (path store + indeks lesson di awal sesi, tanpa tool call), output trim lebih ringkas (10 baris error + 30 baris terakhir; env `ORCH_TRIM_TAIL` dan `ORCH_TRIM_ERRORS` mengubah angkanya), aturan bersama team/autopilot disatukan di `modes.md`, aturan legacy dipindah ke `legacy.md` (dibaca hanya bila perlu), `init` tidak mengulang isi CLAUDE.md, `verify.sh` diperbarui otomatis saat perintah di map berubah, dan audit/riset read-only memakai agent Explore.
 - Juga di 1.7.0 (perbaikan audit): guard tidak lagi mati hanya karena teks menyebut `/orchestrator:off`, root proyek memakai `CLAUDE_PROJECT_DIR`/git, output satu baris yang sangat panjang ikut dipotong, key store sama di macOS, dan aturan eskalasi/caps diperjelas.
 - Baru di 1.7.1: trim lebih cerdas (tidak memotong diff/JSON, simpan 3 baris awal), indeks lesson/checkpoint dibatasi, guard hanya membaca 512 KB terakhir transcript, brief COMMIT tanpa trailer, SCAN hanya untuk diff >5 file, perbaikan kecil digabung satu delegasi, laporan agent maks 8 baris, agent memakai `effort`, dan lesson hanya disimpan setelah ada kegagalan/eskalasi/koreksi.
+- Baru di 1.7.2: sonnet-dev dan opus-reviewer membatasi output perintah, resume mencocokkan argumen bebas ke baris `Task:` dan langsung bilang bila tidak ada checkpoint, status membaca cap dari skill team/autopilot (tidak ditulis ulang).
 - Mode orkestrasi aktif otomatis di setiap sesi.
 
 ## Maintainers

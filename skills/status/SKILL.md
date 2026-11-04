@@ -17,10 +17,8 @@ disable-model-invocation: true
 - Legacy: flag if `<main>/.claude/skills/learned-*/SKILL.md` or the legacy checkpoints exist, and suggest per `legacy.md` in the `orchestrator:learn` skill folder (read it only when legacy files are present).
 - Session: delegations so far per agent (haiku-coder, sonnet-dev, opus-reviewer), counted from this conversation; "unknown" after a compaction.
 
-## Caps (defaults)
-- Team: 3 lanes, 2 fix rounds per lane; auto-raise up to 4 lanes / 4 rounds while fixes progress.
-- Autopilot: 5 batches, 2 fix rounds per batch; auto-raise up to 8 batches / 4 rounds while work passes.
-- A cap the user sets (`lanes=N`, `batches=N`) is never raised.
+## Caps
+- Show the defaults and ceilings from the `## Budget` bullets of the `team` and `autopilot` SKILL.md files (sibling skill folders); never restate numbers from memory. A cap the user sets (`lanes=N`, `batches=N`) is never raised.
 
 ## Report
 - One table `Item | Value`, max 12 rows, then at most 2 suggestion lines (init / resume / legacy).
