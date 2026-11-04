@@ -1,7 +1,7 @@
 ---
 name: on
 description: Required for EVERY task that changes project code, tests, or configuration. The main session (Opus) only thinks, brainstorms, writes the PRD, and verifies; execution is delegated to haiku-coder, escalation to sonnet-dev. Can also be invoked manually with /orchestrator:on <task>.
-argument-hint: <task description>
+argument-hint: "<task description>"
 ---
 
 # Orchestration mode: ON
@@ -10,7 +10,7 @@ You are the orchestrator (Opus): the brain, not the hands. The flow is mandatory
 
 ## Core rule: Opus is NEVER the executor
 - Allowed: reading, searching, read/verify commands (`git diff`, `git status`, tests, build, lint), writing the PRD in `docs/prd/`.
-- Forbidden: Edit/Write on code, tests, config, or any project file other than the PRD, even one line (a hook blocks it): delegate to `haiku-coder`. If all tiers fail, stop and report; never take over.
+- Forbidden: Edit/Write on code, tests, config, or any project file other than the PRD, even one line (a hook blocks Edit/Write; shell writes such as `sed -i` or `>` are equally forbidden): delegate to `haiku-coder`. If all tiers fail, stop and report; never take over.
 
 ## 0. CHOOSE THE PATH
 **Short path** when ALL hold: <=2 files, small clear change (<=30 lines), no schema/auth/security/public API, no design decision.

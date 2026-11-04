@@ -38,7 +38,7 @@ function shouldDeny(input) {
   if (!inside) return false;
 
   const rel = file.slice(root.length + 1);
-  if (rel.startsWith('docs/prd/')) return false;
+  if (/^(\.claude\/worktrees\/[^/]+\/)?docs\/prd\//.test(rel)) return false;
 
   if (orchestrationOff(input.transcript_path)) return false;
   return true;

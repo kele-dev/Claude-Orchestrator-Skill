@@ -189,6 +189,97 @@ if (!exists(path.join(root, 'README.md'))) {
   }
 }
 
+// 7. Required files, headings, frontmatter flags, README version note
+for (const f of ['skills/on/modes.md', 'skills/on/reference.md', 'skills/learn/legacy.md']) {
+  if (!exists(path.join(root, f))) err(f, 'required file missing');
+}
+const headingChecks = [
+  ['skills/team/SKILL.md', '## Budget'],
+  ['skills/autopilot/SKILL.md', '## Budget'],
+  ['skills/learn/SKILL.md', '## Store'],
+];
+for (const [f, h] of headingChecks) {
+  if (!exists(path.join(root, f))) continue;
+  if (!readText(path.join(root, f)).split(/\r?\n/).some((l) => l.startsWith(h))) err(f, `missing heading "${h}"`);
+}
+for (const s of ['off', 'team', 'autopilot', 'status']) {
+  const f = `skills/${s}/SKILL.md`;
+  if (!exists(path.join(root, f))) continue;
+  const fm = frontmatter(f);
+  if (fm && fm['disable-model-invocation'] !== 'true') err(f, 'frontmatter must set disable-model-invocation: true');
+}
+if (exists(path.join(root, 'README.md')) && plugin && !readText(path.join(root, 'README.md')).includes(`Baru di ${plugin.version}`)) {
+  err('README.md', `missing "Baru di ${plugin.version}"`);
+}
+
+// 8. Hook smoke tests
+function runHook(name, payload, extraEnv = {}) {
+  const hookPath = path.join(root, 'hooks', name);
+  if (!exists(hookPath)) {
+    err(`hooks/${name}`, 'missing, cannot smoke test');
+    return null;
+  }
+  return spawnSync(process.execPath, [hookPath], {
+    input: JSON.stringify(payload),
+    encoding: 'utf8',
+    cwd: root,
+    env: { ...process.env, ORCH_GUARD: '', ORCH_NO_TRIM: '', CLAUDE_PROJECT_DIR: root, ...extraEnv },
+  });
+}
+{
+  const lines = Array.from({ length: 150 }, (_, i) => (i === 69 ? 'Error: boom'.padEnd(50, '.') : 'x'.repeat(50)));
+  const stdout = lines.join('\n');
+  const trimPayload = (command) => ({
+    hook_event_name: 'PostToolUse',
+    tool_name: 'Bash',
+    tool_input: { command },
+    tool_response: { stdout, stderr: '', interrupted: false },
+    cwd: root,
+  });
+  let r = runHook('trim-output.mjs', trimPayload('npm test'));
+  if (r) {
+    let out = null;
+    try {
+      out = JSON.parse(r.stdout).hookSpecificOutput.updatedToolOutput.stdout;
+    } catch {
+      err('hooks/trim-output.mjs', `smoke "trim npm test": stdout is not the expected JSON (${(r.stdout ?? '').slice(0, 80)})`);
+    }
+    if (out !== null && !(out.includes('[orchestrator: trimmed') && out.includes('Error: boom'))) {
+      err('hooks/trim-output.mjs', 'smoke "trim npm test": output not trimmed or lost the error line');
+    }
+  }
+  r = runHook('trim-output.mjs', trimPayload('git diff'));
+  if (r && r.stdout.trim() !== '') err('hooks/trim-output.mjs', 'smoke "git diff untouched": expected empty stdout');
+
+  const guard = (file, extra = {}) =>
+    runHook('guard-edit.mjs', {
+      hook_event_name: 'PreToolUse',
+      tool_name: 'Edit',
+      tool_input: { file_path: file },
+      transcript_path: path.join(root, 'no-such-transcript.jsonl'),
+      cwd: root,
+      ...extra,
+    });
+  const guardCases = [
+    ['guard agents/x.md main thread denied', path.join(root, 'agents', 'x.md'), {}, true],
+    ['guard agents/x.md subagent allowed', path.join(root, 'agents', 'x.md'), { agent_id: 'a1' }, false],
+    ['guard docs/prd allowed', path.join(root, 'docs', 'prd', 'x.md'), {}, false],
+    ['guard worktree docs/prd allowed', path.join(root, '.claude', 'worktrees', 'w1', 'docs', 'prd', 'x.md'), {}, false],
+  ];
+  for (const [name, file, extra, deny] of guardCases) {
+    const g = guard(file, extra);
+    if (!g) continue;
+    const denied = g.stdout.includes('"permissionDecision":"deny"');
+    if (deny && !denied) err('hooks/guard-edit.mjs', `smoke "${name}": expected deny`);
+    if (!deny && g.stdout.trim() !== '') err('hooks/guard-edit.mjs', `smoke "${name}": expected empty stdout`);
+  }
+
+  r = runHook('session-info.mjs', { hook_event_name: 'SessionStart', source: 'startup', cwd: root });
+  if (r && (r.status !== 0 || !r.stdout.includes('Orchestrator store:'))) {
+    err('hooks/session-info.mjs', `smoke "session-info": exit ${r.status}, expected "Orchestrator store:" in stdout`);
+  }
+}
+
 for (const e of errors) console.log(e);
 if (errors.length) {
   console.log(`FAILED: ${errors.length} error(s)`);

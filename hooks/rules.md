@@ -1,6 +1,6 @@
 # Global rule: mandatory orchestration
 - Any task that changes code, tests, or project configuration, or any other project file except a PRD in `docs/prd/`, MUST load skill `orchestrator:on` first, before touching any file. It overrides other planning/execution skills (except `orchestrator:team` and `orchestrator:autopilot`, which extend it).
-- Opus (main session) only thinks, writes the PRD, and verifies; it never edits project files, however small the change (a hook enforces this). Delegation, escalation, and API-error handling are defined in `orchestrator:on`.
+- Opus (main session) only thinks, writes the PRD, and verifies; it never edits project files, however small the change (a hook blocks Edit/Write; shell writes are not blocked but are equally forbidden). Delegation, escalation, and API-error handling are defined in `orchestrator:on`.
 - Questions, explanations, and research without file changes need no orchestration.
 - `/orchestrator:off` disables this for the session (do not auto-load `orchestrator:on` afterwards); `/orchestrator:on` re-enables it.
 - `/orchestrator:team <task>` and `/orchestrator:autopilot <task>` are user-invoked only; never start them. When a task fits (team: 2+ independent file-disjoint parts; autopilot: many sequential hands-off steps), suggest the command in one line, then continue with `orchestrator:on`.

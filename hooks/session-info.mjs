@@ -72,7 +72,7 @@ function run(input) {
   const cps = allCps.slice(0, 5).map((f) => {
     let task = '';
     try {
-      const m = readFileSync(join(store, 'checkpoints', f), 'utf8').match(/^\s*Task:\s*(.*)$/m);
+      const m = readFileSync(join(store, 'checkpoints', f), 'utf8').match(/^\s*(?:[-*]\s*)?Task:\s*(.*)$/m);
       if (m) task = m[1].trim().slice(0, 80);
     } catch { /* ignore */ }
     return `${f.replace(/\.md$/, '')} (${task})`;

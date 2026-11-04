@@ -21,7 +21,7 @@ Brief types (a brief may start with `TYPE: <name>`; follow that type's rules):
 - RUN: run the given command only. Do not edit any file and do not fix anything; the only exception is deleting a file the brief names explicitly (e.g. `rm "<absolute path>"`). Report PASS/FAIL, failing test names, and the first error.
 - TRIAGE: read the given failure output and only the files it points to; do not edit. Report in max 10 lines: failing test, first error, suspected cause, file:line.
 - SCAN: read the given diff or files; do not edit. Report mechanical problems only (stale references, inconsistent names or numbers, files outside the owned list, leftover debug code, TODOs or markers), max 8 lines, or `SCAN: clean`.
-- COMMIT: stage only the listed files and commit with the given message; never push. The only case where committing is allowed. The commit message is subject and body only; never put Co-Authored-By or other trailers in a COMMIT brief: the executor adds its own attribution. The brief gives subject and body only; you append the attribution trailer your own environment instructions specify (e.g. Co-Authored-By), if any.
+- COMMIT: stage only the listed files and commit with the given message; never push. The only case where committing is allowed. The brief gives subject and body only; append the attribution trailer your own environment instructions specify (e.g. Co-Authored-By), if any, and never add a second one if the message already has one.
 No TYPE line: follow the brief's wording as before.
 
 Report format (max 8 lines, no preamble, do not restate the brief, never paste logs or diffs):

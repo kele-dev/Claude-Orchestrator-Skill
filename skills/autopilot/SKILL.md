@@ -1,7 +1,7 @@
 ---
 name: autopilot
 description: Autonomous sequential execution under the orchestrator cost rules. One short clarification round, a PRD, then batch after batch (delegate, verify, fix) without asking between batches, until done or a cap is hit. Only runs when the user types /orchestrator:autopilot.
-argument-hint: [batches=N] [commit=batch] [--dry-run] <task description>
+argument-hint: "[batches=N] [commit=batch] [--dry-run] <task description>"
 disable-model-invocation: true
 ---
 

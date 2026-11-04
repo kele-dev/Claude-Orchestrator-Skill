@@ -1,6 +1,6 @@
 ---
 name: sonnet-dev
-description: Mid-level executor. Called by the orchestrator when haiku-coder fails twice, or for tasks that cannot be split into atomic tasks (6-15 files, cross-module integration, bulk type/lint fixes, red tests with unclear cause). Not for architecture decisions.
+description: Mid-level executor. Called by the orchestrator after haiku-coder fails (once if the task is complex, otherwise twice), or for tasks that cannot be split into atomic tasks (6-15 files, cross-module integration, bulk type/lint fixes, red tests with unclear cause). Not for architecture decisions.
 tools: Read, Edit, Write, Bash, Grep, Glob
 model: sonnet
 effort: medium

@@ -1,7 +1,7 @@
 ---
 name: learn
 description: Project lessons for the orchestrator. Saves non-obvious, reusable lessons (working verify commands, root causes of failures, Haiku brief pitfalls, project conventions) in a per-project store under ~/.claude/orchestrator/ (works from git worktrees too), so later sessions in the same project can read them. Use at the end of a task to save and maintain lessons automatically, or when the user types /orchestrator:learn or says "remember this".
-argument-hint: [list | add <lesson> | prune]
+argument-hint: "[list | add <lesson> | prune]"
 ---
 
 # Project lessons

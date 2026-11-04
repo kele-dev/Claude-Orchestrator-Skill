@@ -1,7 +1,7 @@
 ---
 name: team
 description: Parallel multi-lane execution under the orchestrator cost rules. Opus plans and splits the work into file-disjoint lanes, haiku-coder lanes run in parallel, Opus verifies, and only failed lanes loop through fixes, with hard caps. Only runs when the user types /orchestrator:team.
-argument-hint: [lanes=N] [commit=batch] [--dry-run] <task description>
+argument-hint: "[lanes=N] [commit=batch] [--dry-run] <task description>"
 disable-model-invocation: true
 ---
 
