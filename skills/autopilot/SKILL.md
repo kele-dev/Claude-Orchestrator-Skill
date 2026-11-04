@@ -1,7 +1,7 @@
 ---
 name: autopilot
 description: Autonomous sequential execution under the orchestrator cost rules. One short clarification round, a PRD, then batch after batch (delegate, verify, fix) without asking between batches, until done or a cap is hit. Only runs when the user types /orchestrator:autopilot.
-argument-hint: [batches=N] [commit=batch] [--dry-run] <task description>
+argument-hint: "[batches=N] [commit=batch] [--dry-run] <task description>"
 disable-model-invocation: true
 ---
 
@@ -9,7 +9,7 @@ disable-model-invocation: true
 
 Task: $ARGUMENTS
 
-Autopilot is `orchestrator:on` without stopping between batches (Opus never edits). Shared mode rules (caps, fix rounds, raises, commit=batch, report, lessons): read `modes.md` in the `orchestrator:on` skill folder. Unit = group = batch.
+Autopilot is `orchestrator:on` without stopping between batches (the main session never edits). Shared mode rules (caps, fix rounds, raises, commit=batch, report, lessons): read `modes.md` in the `orchestrator:on` skill folder. Unit = group = batch.
 
 ## Budget (defaults; the user may override them in the arguments, e.g. `batches=8`)
 - Clarification: one round only, at most 3 questions, asked at the start and only if the answers would change the design. Otherwise decide yourself and record the assumptions in the PRD.
@@ -23,7 +23,7 @@ Autopilot is `orchestrator:on` without stopping between batches (Opus never edit
 ## 1. CLARIFY
 Ask the questions (if any) in one go. After the answers, do not ask again until a stop condition.
 
-## 2. PRD + BATCH PLAN (Opus)
+## 2. PRD + BATCH PLAN (main session)
 - Lessons in and PRD: per `modes.md`.
 - Order the work into batches by dependency. Each batch = 1-3 atomic tasks with its own verification command.
 - Show the batch list in one short block, then continue without waiting (unless `--dry-run`).

@@ -6,7 +6,7 @@ disable-model-invocation: true
 
 # Orchestrator status (read-only)
 
-`<store>` is defined in the `learn` skill. Use the session-start `Orchestrator store:`, `Lessons:` and `Checkpoints:` lines when present; run the Store command only if they are missing. This skill writes nothing and delegates nothing: Opus may run the read-only commands below itself. Do not read lesson bodies or checkpoint bodies beyond the lines named.
+`<store>` is defined in the `learn` skill. Use the session-start `Orchestrator store:`, `Lessons:` and `Checkpoints:` lines when present; run the Store command only if they are missing. This skill writes nothing and delegates nothing: the main session may run the read-only commands below itself. Do not read lesson bodies or checkpoint bodies beyond the lines named.
 
 ## Collect
 - Mode: `on` unless the latest of `/orchestrator:on` / `/orchestrator:off` in this conversation is off; note whether `team` or `autopilot` is running.

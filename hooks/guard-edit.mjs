@@ -38,7 +38,7 @@ function shouldDeny(input) {
   if (!inside) return false;
 
   const rel = file.slice(root.length + 1);
-  if (rel.startsWith('docs/prd/')) return false;
+  if (/^(\.claude\/worktrees\/[^/]+\/)?docs\/prd\//.test(rel)) return false;
 
   if (orchestrationOff(input.transcript_path)) return false;
   return true;
@@ -58,10 +58,10 @@ function projectRoot(cwd) {
   return cwd;
 }
 
-// Forward slashes, no trailing slash; lowercase on Windows so comparisons are case-insensitive.
+// Forward slashes, no trailing slash; lowercase on Windows and macOS so comparisons are case-insensitive.
 function normalize(p) {
   let s = p.split(path.sep).join('/');
-  if (process.platform === 'win32') s = s.toLowerCase();
+  if (process.platform === 'win32' || process.platform === 'darwin') s = s.toLowerCase();
   return s.replace(/\/+$/, '');
 }
 

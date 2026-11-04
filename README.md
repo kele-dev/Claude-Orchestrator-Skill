@@ -2,7 +2,7 @@
 
 Bahasa Indonesia: plugin ini membalas dalam bahasa pengguna. Lihat [ringkasan](#ringkasan-bahasa-indonesia).
 
-Claude Code plugin for token-saving orchestration: Opus thinks and writes the PRD, `haiku-coder` executes, and `sonnet-dev` handles escalation. Opus never edits code itself.
+Claude Code plugin for token-saving orchestration: the main session (any model; Opus-class recommended) thinks and writes the PRD, `haiku-coder` executes, and `sonnet-dev` handles escalation. The main session never edits code itself.
 Runs on Windows, macOS, and Linux.
 
 ## Installation
@@ -34,7 +34,7 @@ Orchestration mode is active automatically in every session. Manual commands:
 
 - `/orchestrator:on` - turn on (or `/orchestrator:on <task>` to give a task directly)
 - `/orchestrator:off` - turn off for the rest of this session (Claude works directly as usual)
-- `/orchestrator:team <task>` - parallel mode: Opus splits the work into lanes that own separate files, Haiku lanes run at the same time, only failed lanes are retried. Caps: 3 lanes, 2 fix rounds per lane, raised automatically up to 4 lanes / 4 rounds only while fixes make progress (a cap you set, e.g. `lanes=N`, is never raised). Lanes that need each other's files cooperate through Opus. Add `--dry-run` to see the lane plan first.
+- `/orchestrator:team <task>` - parallel mode: the main session splits the work into lanes that own separate files, Haiku lanes run at the same time, only failed lanes are retried. Caps: 3 lanes, 2 fix rounds per lane, raised automatically up to 4 lanes / 4 rounds only while fixes make progress (a cap you set, e.g. `lanes=N`, is never raised). Lanes that need each other's files cooperate through the main session. Add `--dry-run` to see the lane plan first. `isolate=worktree` (opt-in) runs each lane in its own git worktree; needs `worktree.baseRef` set to `"head"` in settings, a clean working tree, and `commit=batch`, otherwise it warns and uses the shared tree; passed lanes are copied back into the main tree.
 - `/orchestrator:autopilot <task>` - autonomous mode: one short clarification round, a PRD, then batch after batch without asking in between, until done or a cap is hit. Caps: 5 batches, 2 fix rounds per batch, raised automatically up to 8 batches / 4 rounds only while work keeps passing (a cap you set, e.g. `batches=N`, is never raised). Add `--dry-run` to see the plan first.
 - Claude suggests `team` or `autopilot` when a task fits, but always starts in `on` mode; you decide whether to switch.
 - `/orchestrator:learn [list | add <lesson> | prune]` - project lessons: at the end of a task Claude decides by itself whether to save up to 3 verified lessons (working test commands, root causes, pitfalls) and fixes or removes outdated ones, as local files in the project store (see Data location below), so every later session in that project can read them, also from a git worktree. Nothing is written into the repo. Old `.claude/skills/learned-*` lessons are still read and copied into the store on the next save.
@@ -47,24 +47,25 @@ Orchestration mode is active automatically in every session. Manual commands:
 
 ### Token-saving defaults
 - Concise answers: no preamble, no restated plan, tables or bullets; detail only when you ask.
-- Test/build output is trimmed before it reaches Opus; large suites are run by Haiku, which reports only PASS/FAIL and the first error.
-- Opus dictates exact text only for small edits; for long content it writes a spec and the executor writes the file.
+- Test/build output is trimmed before it reaches the main session; large suites are run by Haiku, which reports only PASS/FAIL and the first error.
+- The main session dictates exact text only for small edits; for long content it writes a spec and the executor writes the file.
 - One self-review pass before reporting on full-path or multi-file doc/config work, so you need fewer review rounds.
 - A `learned-map` lesson (max 20 lines) remembers the project layout and commands, so new sessions skip re-exploring.
 - Claude suggests a new session or `/compact` when you switch to an unrelated task.
 - Every report ends with one token line, e.g. `Tokens: haiku 45k · sonnet 0 · 6 delegations`.
-- Code questions and test-failure triage go to Haiku; Opus reads only a short answer with file:line references.
+- Code questions and test-failure triage go to Haiku; the main session reads only a short answer with file:line references.
 - Briefs start with a type (`TYPE: EDIT | CREATE | RUN | TRIAGE | SCAN | COMMIT`) that Haiku already knows, so briefs stay short.
-- Before verifying a larger change, Haiku scans the diff for mechanical mistakes; Opus reads only the flagged hunks and the main logic.
+- Before verifying a larger change, Haiku scans the diff for mechanical mistakes; the main session reads only the flagged hunks and the main logic.
 - In a long conversation Claude writes a checkpoint and suggests continuing in a new session.
 - Always-loaded rules are smaller: `hooks/rules.md` is shortened, and `orchestrator:on` is split into a core plus an on-demand `reference.md`.
+- A long-session warning appears once when the transcript passes 2 MB or 30 delegations (`ORCH_LONG=off`, `ORCH_LONG_BYTES`, `ORCH_LONG_DELEGATIONS`); `scripts/digest.mjs` gives planners a compact conversation summary.
 
 ### Hooks
 
 - Session info: SessionStart prints the project store path, a one-line index of saved lessons (at most 20), the 5 newest checkpoints, and a note when legacy files exist, so Claude needs no extra tool calls to find them. Needs Node 18+; without Node the skills compute the path themselves.
 - Output trim: Bash/PowerShell output is trimmed only when it is over 80 lines AND over 4000 chars. It keeps the first 3 lines, up to 10 error/failure lines, and the last 30 lines before the model sees it. `git diff/show`, `cat`, `jq`, `Get-Content`, `type`, and JSON output are not line-trimmed (a ~26k-char cap still applies to everything). Add `# notrim` to a command, or set env `ORCH_NO_TRIM=1`, for full output. Env `ORCH_TRIM_TAIL` and `ORCH_TRIM_ERRORS` change the 30 and the 10.
 - Edit guard: the main session cannot Edit/Write project files (except `docs/prd/`); subagents can. Turn it off with `/orchestrator:off` or env `ORCH_GUARD=off`.
-- The edit guard and output trim need Node 18+ on PATH. Without Node they do nothing (fail open).
+- The edit guard and output trim need Node 18+ on PATH. Without Node they do nothing (fail open). macOS desktop app: Node from nvm or Homebrew may be missing from the app's PATH; check that `/orchestrator:status` shows the store line, or install Node system-wide.
 
 ## Plugin contents
 
@@ -72,7 +73,7 @@ Orchestration mode is active automatically in every session. Manual commands:
 - Skills `team` and `autopilot` (user-invoked only): parallel and autonomous modes on top of `on`, with hard caps to keep token cost bounded.
 - Skill `learn`: project lessons saved and maintained automatically as local files in the project store; one report line tells you what changed, and the manual commands are optional.
 - Skills `init`, `resume`, and `status`: one-pass project map, checkpoints to continue in a new session, and a read-only state summary.
-- Agents `haiku-coder` (executor), `sonnet-dev` (escalation), `opus-reviewer` (review, read-only).
+- Agents `haiku-coder` (executor), `sonnet-dev` (escalation), `opus-reviewer` (review, read-only; now runs on Opus), `opus-planner` (PRD and diagnosis when the main session is not Opus-class, read-only).
 - Hooks: SessionStart rules (loads the orchestration rules into every session), SessionStart session info (store path, lesson index, open checkpoints), edit guard (PreToolUse), output trim (PostToolUse).
 
 ## Optional: reduce permission prompts
@@ -108,6 +109,9 @@ If you previously installed via `install.ps1`, delete `haiku-coder.md`, `sonnet-
 - Juga di 1.7.0 (perbaikan audit): guard tidak lagi mati hanya karena teks menyebut `/orchestrator:off`, root proyek memakai `CLAUDE_PROJECT_DIR`/git, output satu baris yang sangat panjang ikut dipotong, key store sama di macOS, dan aturan eskalasi/caps diperjelas.
 - Baru di 1.7.1: trim lebih cerdas (tidak memotong diff/JSON, simpan 3 baris awal), indeks lesson/checkpoint dibatasi, guard hanya membaca 512 KB terakhir transcript, brief COMMIT tanpa trailer, SCAN hanya untuk diff >5 file, perbaikan kecil digabung satu delegasi, laporan agent maks 8 baris, agent memakai `effort`, dan lesson hanya disimpan setelah ada kegagalan/eskalasi/koreksi.
 - Baru di 1.7.2: sonnet-dev dan opus-reviewer membatasi output perintah, resume mencocokkan argumen bebas ke baris `Task:` dan langsung bilang bila tidak ada checkpoint, status membaca cap dari skill team/autopilot (tidak ditulis ulang).
+- Baru di 1.7.3: guard-edit mengizinkan PRD di folder worktree, pemangkas output tidak lagi salah mengenali `--type`/`[INFO]`, indeks checkpoint mengenali `- Task:`, validator memeriksa file rujukan, heading, frontmatter, dan smoke test ketiga hook, CI berjalan di Linux/Windows/macOS.
+- Baru di 1.7.4: verifikasi lane hanya untuk file miliknya, cek file di luar daftar dibandingkan dengan gabungan semua lane, COMMIT hanya menambah path yang dicantumkan, opsi `isolate=worktree` dengan brief `APPLY`, output perintah gagal wajib dipangkas lewat `tail`, dan sonnet-dev tidak menjalankan perintah git tulis di lane; cek gabungan memakai baseline `git status` sebelum wave, urutan wave isolate dibuat eksplisit, dan dua perbaikan hook (pemangkasan `[1/12]`, huruf kecil path di macOS).
+- Baru di 1.8.0: model sesi utama bebas (Opus disarankan); bila bukan kelas Opus, PRD dan diagnosis dari agent baru `opus-planner`, dan diff akhir wajib ke `opus-reviewer` (kini selalu Opus); sesi Haiku menyarankan ganti model; `scripts/digest.mjs` meringkas transcript (baris `Digest:` di awal sesi); peringatan sekali saat sesi panjang (>2 MB atau 30 delegasi; `ORCH_LONG=off`, `ORCH_LONG_BYTES`, `ORCH_LONG_DELEGATIONS`).
 - Mode orkestrasi aktif otomatis di setiap sesi.
 
 ## Maintainers

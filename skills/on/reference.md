@@ -14,8 +14,8 @@
    - Cause is that the task is genuinely complex (unclear error cause, touches many modules, needs debugging) -> go directly to `sonnet-dev`, do not re-run Haiku.
 2. Haiku failed twice -> `sonnet-dev`. Every escalation to Sonnet includes: the existing diff, the exact error, and the suspected cause.
 3. Sonnet failed once -> fix the brief, re-run Sonnet once.
-4. Sonnet failed twice, or reports "NEEDS ARCHITECTURE DECISION" -> Opus analyzes (reads code, diff, errors), makes the design decision, then rewrites the PRD/brief more precisely (smaller tasks, explicit steps, concrete examples). Delegate again: to `haiku-coder` if the task is now atomic, otherwise to `sonnet-dev`.
-5. After the Opus rewrite: at most one haiku-coder attempt and one sonnet-dev attempt (or one sonnet-dev attempt if the rewrite went to sonnet). Still failing -> STOP and report to the user: what was tried, the exact error, and the decision needed. Opus never takes over execution.
+4. Sonnet failed twice, or reports "NEEDS ARCHITECTURE DECISION" -> the main session analyzes (reads code, diff, errors), makes the design decision, then rewrites the PRD/brief more precisely (smaller tasks, explicit steps, concrete examples). Delegate again: to `haiku-coder` if the task is now atomic, otherwise to `sonnet-dev`. (not Opus-class: send error, diff and PRD to `opus-planner`, which diagnoses and returns the rewritten brief)
+5. After the rewrite: at most one haiku-coder attempt and one sonnet-dev attempt (or one sonnet-dev attempt if the rewrite went to sonnet). Still failing -> STOP and report to the user: what was tried, the exact error, and the decision needed. The main session never takes over execution.
 
 ## API/model errors (not a reason to escalate to another tier)
 - Transient (timeout, 429/rate limit, 5xx, overloaded, dropped connection) -> retry the same delegation ONCE. Still failing -> stop and report the exact error.
@@ -24,7 +24,7 @@
 
 ## Step 5: Review per batch
 After a group of related tasks is finished:
-- Up to 5 files: Opus reads `git diff --stat` and `git diff -U1` itself.
-- Above 5 files: `haiku-coder` `TYPE: SCAN`; brief = `git diff --stat` + a targeted checklist; the agent reads per-file `git diff -U1`. Opus then reads only the hunks the SCAN flags. Never SCAN and also re-read the whole diff.
-- Otherwise: call `opus-reviewer` with the PRD (the `docs/prd/<slug>.md` path if saved, otherwise paste the full PRD text into the brief) and the list of allowed files.
+- Up to 5 files: the main session reads `git diff --stat` and `git diff -U1` itself.
+- Above 5 files: `haiku-coder` `TYPE: SCAN`; brief = `git diff --stat` + a targeted checklist; the agent reads per-file `git diff -U1`. The main session then reads only the hunks the SCAN flags. Never SCAN and also re-read the whole diff.
+- Risky or large work (>5 tasks, or schema/auth/security): also call `opus-reviewer` with the PRD (the `docs/prd/<slug>.md` path if saved, otherwise paste the full PRD text into the brief) and the list of allowed files. (not Opus-class: the final or batch diff always goes to `opus-reviewer`)
 - Collect all findings first (SCAN, own diff review, verify output), then ONE fix delegation; small fully-specified fixes go together in one brief, never one delegation per finding. Fixes go through steps 3-4, then re-review until "PASS".

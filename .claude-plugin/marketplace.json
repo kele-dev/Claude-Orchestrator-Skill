@@ -5,8 +5,8 @@
   "plugins": [
     {
       "name": "orchestrator",
-      "description": "Token-saving orchestration: Opus plans, Haiku executes, Sonnet escalates.",
-      "version": "1.7.2",
+      "description": "Token-saving orchestration: the main session plans, Haiku executes, Sonnet escalates.",
+      "version": "1.8.0",
       "source": "./",
       "author": { "name": "kele-dev" }
     }

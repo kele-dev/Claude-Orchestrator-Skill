@@ -1,7 +1,7 @@
 ---
 name: learn
 description: Project lessons for the orchestrator. Saves non-obvious, reusable lessons (working verify commands, root causes of failures, Haiku brief pitfalls, project conventions) in a per-project store under ~/.claude/orchestrator/ (works from git worktrees too), so later sessions in the same project can read them. Use at the end of a task to save and maintain lessons automatically, or when the user types /orchestrator:learn or says "remember this".
-argument-hint: [list | add <lesson> | prune]
+argument-hint: "[list | add <lesson> | prune]"
 ---
 
 # Project lessons
@@ -42,7 +42,7 @@ The agent decides; the user is not asked.
 - Mention it in one report line, e.g. `Lessons saved: learned-testing (+1), learned-build (1 fixed)`, so the user can say "remove that" if they disagree.
 
 ## Saving
-Delegate the write to `orchestrator:haiku-coder` in one brief with the exact text (Opus does not edit files):
+Delegate the write to `orchestrator:haiku-coder` in one brief with the exact text (the main session does not edit files):
 - Always write under `<store>/lessons/`, never inside the repo or a worktree folder: worktrees are deleted together with their session.
 - Pick a topic slug. Prefer an existing `learned-*.md` file; create a new one only for a new topic. Keep at most 6 `learned-*.md` files per project.
 - Every save (from learn or init) also copies missing legacy topics, in the same delegation (see `legacy.md` in the `orchestrator:learn` skill folder (read it only when legacy files are present)).
