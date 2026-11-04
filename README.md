@@ -38,6 +38,9 @@ Orchestration mode is active automatically in every session. Manual commands:
 - `/orchestrator:autopilot <task>` - autonomous mode: one short clarification round, a PRD, then batch after batch without asking in between, until done or a cap is hit. Caps: 5 batches, 2 fix rounds per batch, raised automatically up to 8 batches / 4 rounds only while work keeps passing (a cap you set, e.g. `batches=N`, is never raised). Add `--dry-run` to see the plan first.
 - Claude suggests `team` or `autopilot` when a task fits, but always starts in `on` mode; you decide whether to switch.
 - `/orchestrator:learn [list | add <lesson> | prune]` - project lessons: at the end of a task Claude decides by itself whether to save up to 3 verified lessons (working test commands, root causes, pitfalls) and fixes or removes outdated ones, as local `learned-*` skills in the main checkout's `.claude/skills/` (also when a session runs in a git worktree), so every later session in that project can read them. They stay out of git via the repo's shared `info/exclude`.
+- `/orchestrator:init [--refresh]` - maps a new project in one cheap Haiku pass: stack, key folders, and verified test/build/lint commands, saved as the `learned-map` lesson.
+- `/orchestrator:resume [<name>]` - continues long work from a checkpoint after a context limit, rate limit, `/compact`, or crash. team/autopilot write checkpoints automatically at stops and between waves/batches.
+- `commit=batch` (team/autopilot) - one local commit per passed wave or batch, with a conventional message; never pushed.
 
 ### Token-saving defaults
 - Concise answers: no preamble, no restated plan, tables or bullets; detail only when you ask.
@@ -47,12 +50,17 @@ Orchestration mode is active automatically in every session. Manual commands:
 - A `learned-map` lesson (max 20 lines) remembers the project layout and commands, so new sessions skip re-exploring.
 - Claude suggests a new session or `/compact` when you switch to an unrelated task.
 - Every report ends with one token line, e.g. `Tokens: haiku 45k · sonnet 0 · 6 delegations`.
+- Code questions and test-failure triage go to Haiku; Opus reads only a short answer with file:line references.
+- Briefs start with a type (`TYPE: EDIT | CREATE | RUN | TRIAGE | SCAN | COMMIT`) that Haiku already knows, so briefs stay short.
+- Before verifying a larger change, Haiku scans the diff for mechanical mistakes; Opus reads only the flagged hunks and the main logic.
+- In a long conversation Claude writes a checkpoint and suggests continuing in a new session.
 
 ## Plugin contents
 
 - Skills `on` and `off`: the PRD -> delegate -> escalate -> review flow, and the switch to turn it off.
 - Skills `team` and `autopilot` (user-invoked only): parallel and autonomous modes on top of `on`, with hard caps to keep token cost bounded.
 - Skill `learn`: project lessons saved and maintained automatically as local skills; one report line tells you what changed, and the manual commands are optional.
+- Skills `init` and `resume`: one-pass project map, and checkpoints to continue in a new session.
 - Agents `haiku-coder` (executor), `sonnet-dev` (escalation), `opus-reviewer` (review, read-only).
 - A session-start hook that loads the orchestration rules into every session.
 
@@ -81,6 +89,7 @@ If you previously installed via `install.ps1`, delete `haiku-coder.md`, `sonnet-
 - Claude akan menyarankan team/autopilot kalau tugasnya cocok, tapi default tetap `on`. Batas iterasi naik otomatis (maks 4 putaran fix) hanya selama perbaikannya ada kemajuan.
 - Belajar: di akhir tugas Claude sendiri yang memutuskan pelajaran mana yang disimpan (maks 3, hanya yang sudah terbukti), serta memperbaiki atau menghapus yang usang, sebagai skill lokal `learned-*` di project. Satu baris di laporan memberi tahu apa yang berubah. `/orchestrator:learn list` untuk melihat, `prune` untuk merapikan.
 - Hemat token: jawaban ringkas, output test dipotong, Opus tidak mendikte file panjang, self-review sebelum lapor, `learned-map` untuk peta project, saran sesi baru saat ganti topik, dan satu baris laporan token di akhir.
+- Baru di 1.4: `/orchestrator:init` (peta project sekali jalan), `/orchestrator:resume` (lanjut dari checkpoint), `commit=batch`, riset/triase oleh Haiku, tipe brief, dan scan diff oleh Haiku sebelum Opus memverifikasi.
 - Mode orkestrasi aktif otomatis di setiap sesi.
 
 ## Maintainers

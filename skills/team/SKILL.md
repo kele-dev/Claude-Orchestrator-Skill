@@ -1,7 +1,7 @@
 ---
 name: team
 description: Parallel multi-lane execution under the orchestrator cost rules. Opus plans and splits the work into file-disjoint lanes, haiku-coder lanes run in parallel, Opus verifies, and only failed lanes loop through fixes, with hard caps. Only runs when the user types /orchestrator:team.
-argument-hint: [lanes=N] [--dry-run] <task description>
+argument-hint: [lanes=N] [commit=batch] [--dry-run] <task description>
 disable-model-invocation: true
 ---
 
@@ -19,6 +19,8 @@ Agent names: `orchestrator:haiku-coder`, `orchestrator:sonnet-dev`, `orchestrato
 - Caps can be raised automatically for complex problems (see "Raising the caps"). Hard ceilings: 4 lanes per wave, 4 fix rounds per lane.
 - `opus-reviewer`: at most once, on the final combined diff, and only for large work (>5 tasks, or touches schema/auth/security).
 - `--dry-run`: stop after stage 1, show the lane plan and the planned number of delegations, and wait for the user's go.
+- `commit=batch`: after each wave is verified, delegate one `haiku-coder` `TYPE: COMMIT` with only the files of that wave's PASS lanes and a conventional commit message. Files of BLOCKED lanes stay uncommitted and are listed in the checkpoint. Never push. Without this argument nothing is committed.
+- Checkpoint: write one per `orchestrator:resume` after each wave when more waves remain, and at every stop that is not DONE.
 
 ## Raising the caps (complex problems)
 Opus may raise a cap on its own, without asking, only while the work is clearly progressing:
@@ -44,6 +46,7 @@ Opus may raise a cap on its own, without asking, only while the work is clearly 
 - Wait for the completion notifications. Do not poll.
 
 ## 3. VERIFY (Opus)
+- Wave larger than the small-batch size: run `TYPE: SCAN` on the wave's diff first (see `orchestrator:on` step 5).
 - Per lane: run `git status --porcelain` and `git diff -- <owned files>`, confirm that no file outside the lane's owned list changed, and run the lane's verification command yourself, with output trimmed per the token rules in `orchestrator:on`.
 - Read diffs and summaries, not whole files, unless a diff is ambiguous.
 - After the last wave passes, run the project-level check once (full test/build/lint, if the project has one).
@@ -63,4 +66,4 @@ Opus may raise a cap on its own, without asking, only while the work is clearly 
 - Assumptions and open items.
 - Lessons: save per `orchestrator:on` step 6 (automatic, one delegation, one report line).
 
-Hard rules: same as `orchestrator:on`. No commit, no push.
+Hard rules: same as `orchestrator:on`. No commit unless `commit=batch`; never push.

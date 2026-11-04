@@ -51,6 +51,7 @@ One special lesson file, `learned-map`, saves re-exploring the project in every 
 - At most 20 lines: key folders and what lives there, entry points, test/build/lint commands, generated or do-not-edit paths.
 - Create it at the end of the first task that had to explore the project; update it when a task finds it wrong or incomplete. Same save rules as other lessons (automatic, verified facts only, one report line).
 - It counts toward the 6-folder limit, but not toward the 3-lessons-per-task limit.
+- `/orchestrator:init` creates it in one cheap pass for a new project.
 
 ## Using lessons (start of a task)
 - Find lessons with one Glob on `<main>/.claude/skills/learned-*/SKILL.md` (required in a worktree, where they are not loaded automatically), then read the ones whose description matches the task, before planning. Read `learned-map` first when it exists.

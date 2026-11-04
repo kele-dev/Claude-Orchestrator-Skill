@@ -1,7 +1,7 @@
 ---
 name: autopilot
 description: Autonomous sequential execution under the orchestrator cost rules. One short clarification round, a PRD, then batch after batch (delegate, verify, fix) without asking between batches, until done or a cap is hit. Only runs when the user types /orchestrator:autopilot.
-argument-hint: [batches=N] [--dry-run] <task description>
+argument-hint: [batches=N] [commit=batch] [--dry-run] <task description>
 disable-model-invocation: true
 ---
 
@@ -19,6 +19,8 @@ Agent names: `orchestrator:haiku-coder`, `orchestrator:sonnet-dev`, `orchestrato
 - Max fix rounds per batch: 2, raised automatically up to 4 (see "Raising the caps"). The tier for each round follows `orchestrator:on` step 4.
 - `opus-reviewer`: at most once on the PRD and once on the final diff, and only for large work (>5 tasks, or touches schema/auth/security). Never per batch.
 - `--dry-run`: stop after stage 2 and show the PRD and batch plan.
+- `commit=batch`: after each batch passes verification, delegate one `haiku-coder` `TYPE: COMMIT` with only that batch's files and a conventional commit message. Never push. Without this argument nothing is committed.
+- Checkpoint: write one per `orchestrator:resume` after every 3rd batch, and at every stop that is not DONE.
 
 ## Raising the caps (complex problems)
 Opus may raise a cap on its own, without asking, only while the work is clearly progressing:
@@ -38,7 +40,7 @@ Ask the questions (if any) in one go. After the answers, do not ask again until 
 
 ## 3. LOOP, per batch
 1. Delegate: per `orchestrator:on` step 3. Tasks inside a batch run sequentially, or in parallel only when they touch disjoint files.
-2. Verify: `git diff` plus the batch's verification command, run by you with output trimmed per the token rules in `orchestrator:on`. Read diffs and summaries, not whole files.
+2. Verify: for a batch larger than the small-batch size, run `TYPE: SCAN` first (see `orchestrator:on` step 5); then `git diff` plus the batch's verification command, run by you with output trimmed per the token rules in `orchestrator:on`. Read diffs and summaries, not whole files.
 3. Fix: re-run only the failed tasks, at most 2 rounds (or up to 4 per "Raising the caps"), with exact error + diff + suspected cause in the brief.
 4. Batch passed: go straight to the next batch. Do not ask the user for confirmation between batches.
 
@@ -55,4 +57,4 @@ Ask the questions (if any) in one go. After the answers, do not ask again until 
 - Assumptions and open items.
 - Lessons: save per `orchestrator:on` step 6 (automatic, one delegation, one report line).
 
-Hard rules: same as `orchestrator:on`. No commit, no push.
+Hard rules: same as `orchestrator:on`. No commit unless `commit=batch`; never push.

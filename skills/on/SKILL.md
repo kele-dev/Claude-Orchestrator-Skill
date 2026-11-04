@@ -36,6 +36,9 @@ On both paths: read only the files needed (use Grep/line excerpts, not the whole
 - Brief size: dictate exact text (old -> new) only for small edits (up to ~30 lines). For new files or long content, give a spec (sections, rules, 1-2 examples) and let the executor write it; your own output tokens cost the most.
 - Explore cheaply: if a `learned-map` lesson exists, read it first and open only the files it points to.
 - Self-review once before reporting: check the whole change for the same terms and numbers across files, cross-references that resolve, no stale mentions of replaced behavior, and brief expectations that match the result. Fix findings through delegation before you report, not after the user asks.
+- Research cheaply: codebase questions or searches spanning more than ~3 files go to an `Explore` agent with `model: haiku`; ask for an answer of at most 15 lines with file:line references.
+- Triage cheaply: on a failing test or build, send the trimmed failure to `haiku-coder` with `TYPE: TRIAGE` and read only its report before deciding the fix.
+- Short briefs: start each `haiku-coder` brief with a brief type (`TYPE: EDIT | CREATE | RUN | TRIAGE | SCAN | COMMIT`); the agent already knows each type's rules and report format, so do not restate them.
 
 ## 1. UNDERSTAND & BRAINSTORM
 Read the relevant files first. Weigh 2-3 short approaches, pick one, and record the reason. Ask the user at most 3 things, and only if the answers would truly change the design. Otherwise decide yourself and record the assumptions in the PRD.
@@ -76,6 +79,7 @@ Agent reports are not trusted raw: check `git diff` and re-run the verification 
 
 ## 5. REVIEW per batch
 After a group of related tasks is finished:
+- Larger than a small batch: first send the diff to `haiku-coder` with `TYPE: SCAN`; then read `git diff --stat` plus only the hunks the scan flags or that carry the main logic.
 - Small batch (<=2 files, tests green): Opus only checks `git diff` itself (saves tokens).
 - Otherwise: call `opus-reviewer` with the PRD (the `docs/prd/<slug>.md` path if saved, otherwise paste the full PRD text into the brief) and the list of allowed files.
 Findings are fixed through the same execution path (steps 3-4), then re-reviewed until "PASS".
@@ -85,8 +89,9 @@ Findings are fixed through the same execution path (steps 3-4), then re-reviewed
 - Verification commands run and their results.
 - Assumptions taken and open items.
 - Tokens: one line from the subagent completion notices, e.g. `Tokens: haiku 45k · sonnet 0 · opus-reviewer 0 · 6 delegations`.
+- Checkpoint: if multi-batch work stops before DONE, write a checkpoint per `orchestrator:resume` so a later session can continue.
 - Lessons: if this task taught something non-obvious, reusable, and verified (see `orchestrator:learn`), save at most 3 lessons yourself, without asking, through one `haiku-coder` delegation; fix or remove lessons this task proved wrong in the same delegation. Mention it in one report line ("Lessons saved: ..."). Nothing qualifies (the usual case) -> say nothing.
 
 ## Hard rules
-- Do not commit, do not push, do not run DB migrations, do not touch .env, do not let subagents rewrite or weaken tests just to make them green.
+- Do not commit (unless the user passed `commit=batch` to team/autopilot), do not push, do not run DB migrations, do not touch .env, do not let subagents rewrite or weaken tests just to make them green.
 - Reply to the user in the user's own language.

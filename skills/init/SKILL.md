@@ -1,0 +1,38 @@
+---
+name: init
+description: Maps a project for the orchestrator in one cheap pass. Haiku reads manifest and config files and writes the learned-map lesson with verified test/build/lint commands. Use when the user types /orchestrator:init, or at the start of the first task in a project that has no learned-map.
+argument-hint: [--refresh]
+---
+
+# Project init: one-pass map
+
+Arguments: $ARGUMENTS
+
+`<main>` is defined in the `learn` skill (main checkout root, same from every git worktree). Opus never edits files and never reads the manifests itself.
+
+## 1. Skip
+- If `<main>/.claude/skills/learned-map/SKILL.md` exists and there is no `--refresh`, say so in one line and stop.
+
+## 2. Delegate once (`orchestrator:haiku-coder`, `TYPE: CREATE`)
+The brief tells Haiku to read only top-level files that exist:
+- package.json and workspace files, pyproject.toml, requirements*.txt, Cargo.toml, go.mod, composer.json, Gemfile.
+- Makefile, justfile, Dockerfile, compose files, CI workflows (.github/workflows).
+- The first 60 lines of README.
+- A per-folder file count from `git ls-files` (top 2 levels, counts only, not the full list).
+
+## 3. Derive (same delegation)
+- Stack, key folders and their purpose, entry points.
+- Test, build, lint, and typecheck commands.
+- Generated or do-not-edit paths.
+
+## 4. Verify commands (same delegation)
+- Run each detected test/lint/typecheck command once. Run-only: no edits, no fixes. Trim the output.
+- Mark each one: verified, broken (with the first error), or not run (needs services, env, or secrets, or is slow, such as e2e or deploy).
+
+## 5. Write the map (same delegation)
+- Write `<main>/.claude/skills/learned-map/SKILL.md` in the `learn` format: the frontmatter description line plus at most 20 lesson lines.
+- Apply the `learn` exclude rule: `.claude/skills/learned-*/` in `<git-common-dir>/info/exclude`.
+
+## 6. Report
+- Opus reads only the Haiku report and the written map.
+- Report in one short block (stack, commands with their status, anything broken) plus the token line.
