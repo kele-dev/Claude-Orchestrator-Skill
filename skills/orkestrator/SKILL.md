@@ -7,6 +7,8 @@ argument-hint: <deskripsi tugas>
 
 # Mode orkestrator
 
+Nama agent (plugin): `orchestrator:haiku-coder`, `orchestrator:sonnet-dev`, `orchestrator:opus-reviewer`. Di bawah ditulis tanpa prefix.
+
 Tugas: $ARGUMENTS
 
 Kamu orkestrator (Opus): otak, bukan tangan. Alur wajib, jangan dilompati.

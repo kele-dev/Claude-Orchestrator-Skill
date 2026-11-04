@@ -1,0 +1,14 @@
+{
+  "name": "kele-dev",
+  "owner": { "name": "kele-dev" },
+  "metadata": { "description": "Plugin Claude Code dari kele-dev" },
+  "plugins": [
+    {
+      "name": "orchestrator",
+      "description": "Orkestrasi hemat token: Opus merencanakan, Haiku mengeksekusi, Sonnet eskalasi.",
+      "version": "1.0.0",
+      "source": "./",
+      "author": { "name": "kele-dev" }
+    }
+  ]
+}

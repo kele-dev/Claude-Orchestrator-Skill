@@ -1,0 +1,10 @@
+{
+  "name": "orchestrator",
+  "description": "Orkestrasi hemat token: Opus berpikir dan menulis PRD, Haiku mengeksekusi, Sonnet untuk eskalasi. Opus tidak pernah mengedit kode.",
+  "version": "1.0.0",
+  "author": { "name": "kele-dev" },
+  "homepage": "https://github.com/kele-dev/Claude-Orchestrator-Skill",
+  "repository": "https://github.com/kele-dev/Claude-Orchestrator-Skill",
+  "license": "MIT",
+  "keywords": ["orchestration", "subagents", "haiku", "token-saving"]
+}

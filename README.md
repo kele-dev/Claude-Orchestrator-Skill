@@ -1,37 +1,52 @@
-# Orkestrasi Claude Code
+# Claude Orchestrator Skill
 
-Opus berpikir dan menulis PRD, `haiku-coder` mengeksekusi, `sonnet-dev` untuk eskalasi.
-Opus tidak pernah mengedit kode sendiri.
+Plugin Claude Code untuk orkestrasi hemat token: Opus berpikir dan menulis PRD,
+`haiku-coder` mengeksekusi, `sonnet-dev` untuk eskalasi. Opus tidak pernah mengedit kode sendiri.
+Jalan di Windows, macOS, dan Linux.
 
-## Instalasi (Windows)
+## Instalasi
 
-### Cara 1: lewat terminal
+**Terminal (Windows, macOS, Linux)** - satu perintah:
 
-Buka PowerShell, tempel satu baris ini, tekan Enter:
-
-```powershell
-irm https://raw.githubusercontent.com/kele-dev/Claude-Orchestrator-Skill/main/install.ps1 | iex
+```bash
+claude plugin install orchestrator --marketplace kele-dev/Claude-Orchestrator-Skill
 ```
 
-### Cara 2: lewat Claude Desktop
+Kalau versi Claude Code-mu belum mendukung perintah di atas, pakai dua perintah ini:
 
-Buka sesi Claude Code di Claude Desktop dan ketik:
-
-```text
-Pasang orkestrasi dari https://github.com/kele-dev/Claude-Orchestrator-Skill dengan menjalankan perintah ini di PowerShell: irm https://raw.githubusercontent.com/kele-dev/Claude-Orchestrator-Skill/main/install.ps1 | iex
+```bash
+claude plugin marketplace add kele-dev/Claude-Orchestrator-Skill
+claude plugin install orchestrator@kele-dev
 ```
 
-Setelah terpasang (cara mana pun), buka sesi Claude Code **baru** dengan model Opus.
-Update ke versi baru: jalankan perintah yang sama lagi (aman diulang).
+Di dalam sesi `claude` juga bisa: `/plugin marketplace add kele-dev/Claude-Orchestrator-Skill`, lalu `/plugin install orchestrator@kele-dev`.
 
-## Yang dipasang ke `%USERPROFILE%\.claude`
+**Claude Desktop (tab Code)** - klik `+` di samping kotak prompt, pilih **Add plugins**,
+tambahkan marketplace `kele-dev/Claude-Orchestrator-Skill`, lalu pasang `orchestrator` dengan scope **User**.
 
-- `agents/`: `haiku-coder`, `sonnet-dev`, `opus-reviewer`
-- `skills/orkestrator/SKILL.md`
-- Aturan orkestrasi di `CLAUDE.md` (di antara penanda `BEGIN/END:orkestrasi`; isi lain tidak dihapus)
-- `settings.json`: izin perintah aman (`npm test`, `git diff`, dst.) dan `defaultMode: acceptEdits`; setelan lain tidak diubah
+Setelah terpasang, mulai sesi baru dengan model Opus. Scope user berarti berlaku di semua proyek.
 
-File lama disalin dulu ke `.claude\backups\orkestrasi-<waktu>\`.
+Update: `claude plugin update orchestrator@kele-dev`. Hapus: `claude plugin uninstall orchestrator@kele-dev`.
+
+## Isi plugin
+
+- Skill `orkestrator`: alur PRD -> delegasi -> eskalasi -> review.
+- Agent `haiku-coder` (eksekutor), `sonnet-dev` (eskalasi), `opus-reviewer` (review, hanya baca).
+- Hook awal sesi yang memuat aturan orkestrasi ke setiap sesi.
+
+## Opsional: kurangi kotak izin
+
+Plugin tidak bisa mengubah izin. Supaya subagent tidak sering menunggu persetujuan,
+pilih mode **Accept edits** saat membuka sesi, atau tambahkan ke `~/.claude/settings.json`:
+
+```json
+{ "permissions": { "defaultMode": "acceptEdits", "allow": ["Bash(npm test *)", "Bash(git diff *)", "Bash(git status *)"] } }
+```
+
+## Pindah dari versi installer lama
+
+Kalau dulu memasang lewat `install.ps1`, hapus `haiku-coder.md`, `sonnet-dev.md`, `opus-reviewer.md`
+dari `~/.claude/agents/`, folder `~/.claude/skills/orkestrator/`, dan blok `BEGIN/END:orkestrasi` di `~/.claude/CLAUDE.md`.
 
 ## Lisensi
 
