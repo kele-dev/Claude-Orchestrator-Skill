@@ -8,7 +8,7 @@ argument-hint: "[--refresh]"
 
 Arguments: $ARGUMENTS
 
-`<store>` is defined in the `learn` skill (per-project folder under `~/.claude/orchestrator/`, same from every git worktree, writable from worktree sessions); use the session-start `Orchestrator store:` line, or run the Store command once, and put the absolute path in the brief. Opus never reads the manifests itself.
+`<store>` is defined in the `learn` skill (per-project folder under `~/.claude/orchestrator/`, same from every git worktree, writable from worktree sessions); use the session-start `Orchestrator store:` line, or run the Store command once, and put the absolute path in the brief. The main session never reads the manifests itself.
 
 ## 1. Skip
 - If `<store>/lessons/learned-map.md` exists and there is no `--refresh`, say so in one line and stop. Also skip if a legacy learned-map exists (see `legacy.md` in the `orchestrator:learn` skill folder (read it only when legacy files are present)), unless `--refresh`.
@@ -38,5 +38,5 @@ Same delegation: also copy missing legacy topics (see `legacy.md` in the `orches
 - Add one map line: `Verify: bash <absolute store path>/verify.sh`, using the absolute store path from the brief, never the literal `<store>` (counts toward the 20 lines).
 
 ## 6. Report
-- Opus reads only the Haiku report and the written map.
+- The main session reads only the Haiku report and the written map.
 - Report in one short block (stack, commands with their status, the verify.sh result, anything broken) plus the token line.

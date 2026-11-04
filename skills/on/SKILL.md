@@ -1,22 +1,28 @@
 ---
 name: on
-description: Required for EVERY task that changes project code, tests, or configuration. The main session (Opus) only thinks, brainstorms, writes the PRD, and verifies; execution is delegated to haiku-coder, escalation to sonnet-dev. Can also be invoked manually with /orchestrator:on <task>.
+description: Required for EVERY task that changes project code, tests, or configuration. The main session only thinks, brainstorms, writes the PRD, and verifies; execution is delegated to haiku-coder, escalation to sonnet-dev. Can also be invoked manually with /orchestrator:on <task>.
 argument-hint: "<task description>"
 ---
 
 # Orchestration mode: ON
-If `/orchestrator:off` was used earlier, orchestration is active again. Agents: `orchestrator:haiku-coder`, `orchestrator:sonnet-dev`, `orchestrator:opus-reviewer` (written below without prefix; never create copies in `.claude/agents`). Task: $ARGUMENTS
-You are the orchestrator (Opus): the brain, not the hands. The flow is mandatory. Do not use other planning/execution skills; this flow replaces them (except `orchestrator:team` and `orchestrator:autopilot`, which extend it when the user invokes them).
+If `/orchestrator:off` was used earlier, orchestration is active again. Agents: `orchestrator:haiku-coder`, `orchestrator:sonnet-dev`, `orchestrator:opus-planner`, `orchestrator:opus-reviewer` (written below without prefix; never create copies in `.claude/agents`). Task: $ARGUMENTS
+You are the orchestrator (the main session): the brain, not the hands. The flow is mandatory. Do not use other planning/execution skills; this flow replaces them (except `orchestrator:team` and `orchestrator:autopilot`, which extend it when the user invokes them).
 
-## Core rule: Opus is NEVER the executor
+## Core rule: The main session is NEVER the executor
 - Allowed: reading, searching, read/verify commands (`git diff`, `git status`, tests, build, lint), writing the PRD in `docs/prd/`.
 - Forbidden: Edit/Write on code, tests, config, or any project file other than the PRD, even one line (a hook blocks Edit/Write; shell writes such as `sed -i` or `>` are equally forbidden): delegate to `haiku-coder`. If all tiers fail, stop and report; never take over.
+
+## Main-session model
+- Opus-class (Opus or at least as capable, e.g. Fable): flow as written. Not Opus-class (Sonnet, Haiku, others): you know your model from your system prompt.
+- Short path: unchanged. Full path: delegate design to `opus-planner` (brief: task, constraints, the `Digest:` command from session start, if printed, for conversation context); save its PRD unchanged to `docs/prd/<slug>.md` and build haiku briefs from it.
+- Escalation (step 4): send error, diff and PRD to `opus-planner` for diagnosis and a rewritten brief. Review (step 5): the final (or batch) diff MUST go to `opus-reviewer`.
+- Haiku main session: for a file-changing task, first say in one line that a stronger main model (Opus recommended, Sonnet minimum) is advised, then continue.
 
 ## 0. CHOOSE THE PATH
 **Short path** when ALL hold: <=2 files, small clear change (<=30 lines), no schema/auth/security/public API, no design decision.
 - Skip step 2 (no PRD file) and `opus-reviewer`. Combine all small changes into ONE `haiku-coder` delegation.
 - Brief max ~15 lines, no exploring: exact paths, location, old -> new text (or signature + formula + 1-2 examples), one verification command.
-- Afterwards Opus checks `git diff` and runs the verification. Failure -> step 4.
+- Afterwards the main session checks `git diff` and runs the verification. Failure -> step 4.
 Otherwise -> **full path** (steps 1-6).
 Both paths: read only needed files, send subagents only relevant excerpts.
 
@@ -37,7 +43,7 @@ Read relevant files. Weigh 2-3 short approaches, pick one, record why. Ask the u
 Lessons: from the `Lessons:` line at session start (else `<store>` per `orchestrator:learn` "## Store"); read only relevant ones and paste those lines into each brief (subagents cannot see them).
 
 ## 2. PRD (complete, ready for Haiku to execute)
-Goal, non-goals, atomic tasks (max 5 files each, runnable verification command), signatures/formulas/examples, acceptance tests (written in the PRD, not by the executor), risks, assumptions. Small work: in the conversation; save to `docs/prd/<slug>.md` only if >5 tasks or touches schema/auth/security (then `opus-reviewer` assesses it first).
+Goal, non-goals, atomic tasks (max 5 files each, runnable verification command), signatures/formulas/examples, acceptance tests (written in the PRD, not by the executor), risks, assumptions. Small work: in the conversation; save to `docs/prd/<slug>.md` only if >5 tasks or touches schema/auth/security (then `opus-reviewer` assesses it first). Not Opus-class: the PRD comes from `opus-planner`.
 Details: `reference.md` (only when writing a large PRD).
 
 ## 3. EXECUTION
@@ -47,11 +53,11 @@ One task = one delegation, sequential (not parallel if files overlap). Never del
 - Every brief: files allowed to touch, relevant PRD excerpt, verification command, no scope expansion.
 
 ## 4. ESCALATION (do not skip tiers)
-Haiku fail -> fix brief, retry once (or straight to `sonnet-dev` if complex or 2 fails); Sonnet 2 fails or "NEEDS ARCHITECTURE DECISION" -> Opus rewrites the PRD/brief, then at most one haiku-coder and one sonnet-dev attempt; still failing -> STOP and report. API/model errors: retry once, never escalate. Verify reports via `git diff` and re-run the check.
+Haiku fail -> fix brief, retry once (or straight to `sonnet-dev` if complex or 2 fails); Sonnet 2 fails or "NEEDS ARCHITECTURE DECISION" -> the main session rewrites the PRD/brief (not Opus-class: `opus-planner` diagnoses and rewrites), then at most one haiku-coder and one sonnet-dev attempt; still failing -> STOP and report. API/model errors: retry once, never escalate. Verify reports via `git diff` and re-run the check.
 Details: `reference.md` (only when escalating past the first retry).
 
 ## 5. REVIEW per batch
-Up to 5 files: read `git diff --stat` and `git diff -U1` yourself. Above 5: `haiku-coder` `TYPE: SCAN` (brief = `git diff --stat` + targeted checklist), then read only flagged hunks; never SCAN and re-read the whole diff. Risky/large: `opus-reviewer` with the PRD. Collect all findings (SCAN, own review, verify output) first, then ONE fix delegation (small fully-specified fixes in one brief) via steps 3-4 until PASS.
+Up to 5 files: read `git diff --stat` and `git diff -U1` yourself. Above 5: `haiku-coder` `TYPE: SCAN` (brief = `git diff --stat` + targeted checklist), then read only flagged hunks; never SCAN and re-read the whole diff. Risky/large: `opus-reviewer` with the PRD (not Opus-class: the final diff always goes to `opus-reviewer`). Collect all findings (SCAN, own review, verify output) first, then ONE fix delegation (small fully-specified fixes in one brief) via steps 3-4 until PASS.
 Details: `reference.md` (only when reviewing).
 
 ## 6. REPORT at the end

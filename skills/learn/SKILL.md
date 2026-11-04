@@ -42,7 +42,7 @@ The agent decides; the user is not asked.
 - Mention it in one report line, e.g. `Lessons saved: learned-testing (+1), learned-build (1 fixed)`, so the user can say "remove that" if they disagree.
 
 ## Saving
-Delegate the write to `orchestrator:haiku-coder` in one brief with the exact text (Opus does not edit files):
+Delegate the write to `orchestrator:haiku-coder` in one brief with the exact text (the main session does not edit files):
 - Always write under `<store>/lessons/`, never inside the repo or a worktree folder: worktrees are deleted together with their session.
 - Pick a topic slug. Prefer an existing `learned-*.md` file; create a new one only for a new topic. Keep at most 6 `learned-*.md` files per project.
 - Every save (from learn or init) also copies missing legacy topics, in the same delegation (see `legacy.md` in the `orchestrator:learn` skill folder (read it only when legacy files are present)).

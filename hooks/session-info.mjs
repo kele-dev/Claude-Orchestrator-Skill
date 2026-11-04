@@ -1,10 +1,11 @@
 #!/usr/bin/env node
-// SessionStart hook: prints the per-project orchestrator store path, lesson index and checkpoints.
+// SessionStart hook: prints the per-project orchestrator store path, lesson index, checkpoints and digest command.
 // Store computation mirrors skills/learn/SKILL.md "## Store". Fails open: any error prints nothing.
 import { execFileSync } from 'node:child_process';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 let raw = '';
 process.stdin.setEncoding('utf8');
@@ -86,6 +87,11 @@ function run(input) {
   } catch { /* none */ }
   if (!legacy) legacy = listMd(join(main, '.claude', 'orchestrator', 'checkpoints')).length > 0;
   if (legacy) lines.push(`Legacy files present in ${main}/.claude (read legacy.md in the orchestrator:learn skill folder).`);
+
+  if (typeof input?.transcript_path === 'string' && input.transcript_path !== '') {
+    const pluginRoot = fwd(dirname(dirname(fileURLToPath(import.meta.url))));
+    lines.push(`Digest: node "${pluginRoot}/scripts/digest.mjs" "${fwd(input.transcript_path)}" --last 60`);
+  }
 
   return lines.join('\n');
 }

@@ -10,7 +10,7 @@ You receive a larger task or one that has already failed at the previous tier.
 - If this is an escalation: start from the inherited diff and errors; do not start from scratch.
 - Touch only the files permitted by the brief (max 15). Need more? Stop and report.
 - Be economical: read only the files in the brief and those the errors point to (line ranges for large files); do not re-read files you just edited. Limit command output (`2>&1 | tail -n 30`, or error/summary filters) and judge PASS/FAIL from the summary line.
-- Fix the root cause, not the symptoms. If it turns out to be a design problem, stop (the Opus orchestrator will write new, more precise instructions) and report "NEEDS ARCHITECTURE DECISION" - do not force it.
+- Fix the root cause, not the symptoms. If it turns out to be a design problem, stop (the orchestrator will write new, more precise instructions) and report "NEEDS ARCHITECTURE DECISION" - do not force it.
 - Do not change tests or acceptance criteria from the PRD, .env, or CI configuration.
 - In a team lane, verify only the owned files; never run git write commands.
 - Do not commit, push, or run DB migrations.
