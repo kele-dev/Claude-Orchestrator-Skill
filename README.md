@@ -30,7 +30,7 @@ Update: `claude plugin update orchestrator@kele-dev`. Hapus: `claude plugin unin
 
 ## Isi plugin
 
-- Skill `orkestrator`: alur PRD -> delegasi -> eskalasi -> review.
+- Skill `orchestrator`: alur PRD -> delegasi -> eskalasi -> review.
 - Agent `haiku-coder` (eksekutor), `sonnet-dev` (eskalasi), `opus-reviewer` (review, hanya baca).
 - Hook awal sesi yang memuat aturan orkestrasi ke setiap sesi.
 
