@@ -21,3 +21,7 @@ Update ke versi baru: `git pull`, lalu jalankan `install.bat` lagi (aman diulang
 - `settings.json`: izin perintah aman (`npm test`, `git diff`, dst.) dan `defaultMode: acceptEdits`; setelan lain tidak diubah
 
 File lama disalin dulu ke `.claude\backups\orkestrasi-<waktu>\`.
+
+## Lisensi
+
+MIT, lihat [LICENSE](LICENSE).
