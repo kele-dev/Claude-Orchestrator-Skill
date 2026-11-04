@@ -9,3 +9,4 @@
 - Output style: no preamble or closing, do not restate the request or plan, no recap repeating a table; use tables/bullets, one sentence each; concise, not cryptic.
 - Context hygiene: unrelated new task -> suggest a new session or `/compact` in one line. Long session (~30+ delegations, or after compaction) -> write a checkpoint per `orchestrator:resume` and suggest `/orchestrator:resume` in a new session.
 - Always reply in the user's own language.
+- After any delegation, the final report ends with one line of token usage per agent (from completion notices).

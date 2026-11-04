@@ -14,7 +14,7 @@ Arguments: $ARGUMENTS
 - `<store>/checkpoints/<slug>.md`, slug = kebab-case task name, max 5 words.
 - One file per task, overwritten each time. No history.
 - Never write checkpoints inside the repo or a worktree.
-- Legacy checkpoints are also read (see `legacy.md` in the `orchestrator:learn` skill folder (read it only when legacy files are present)); new ones always go to `<store>`.
+- Legacy checkpoints are also read (`legacy.md` in the `orchestrator:learn` folder; only if legacy files exist); new ones always go to `<store>`.
 
 ## When to write
 - At every stop that is not DONE: BLOCKED, DECISION NEEDED, cap or batch limit reached.

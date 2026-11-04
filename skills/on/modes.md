@@ -13,6 +13,6 @@
 - NEEDS ARCHITECTURE DECISION: sonnet-dev reports in its own format and may report this status; handle it per `orchestrator:on` step 4 (the main session, or `opus-planner` if not Opus-class, decides and rewrites; if it cannot decide safely -> DECISION NEEDED stop).
 - `commit=batch`: after each group is verified (and, in team isolate mode, after APPLY), delegate one `haiku-coder` `TYPE: COMMIT` listing the exact paths of that group's PASS units and a conventional commit message (trailer rule: `orchestrator:on`). Files of BLOCKED units stay uncommitted and are listed in the checkpoint. Never push. Without this argument nothing is committed.
 - Checkpoint: write one per `orchestrator:resume` at the timing the mode file gives, and at every stop that is not DONE.
-- Report: table (unit -> files/tasks -> executor -> attempts -> status PASS / BLOCKED); verification commands run and their results; tokens and delegations per `orchestrator:on` step 6, and caps used vs. caps allowed (including any automatic raises); assumptions and open items.
+- Report: table (unit -> files/tasks -> executor -> attempts -> status PASS / BLOCKED); verification commands run and their results; tokens per agent and delegations per `orchestrator:on` step 6, and caps used vs. caps allowed (including any automatic raises); assumptions and open items.
 - Lessons out: save per `orchestrator:on` step 6 (automatic, one delegation, one report line).
 - Hard rules: same as `orchestrator:on`. No commit unless `commit=batch`; never push.

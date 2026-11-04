@@ -36,8 +36,25 @@ function run(input) {
   const size = statSync(path).size;
   let delegations = 0;
   if (size >= 256 * 1024) {
-    const text = readFileSync(path, 'utf8');
-    delegations = text.split('"subagent_type":"').length - 1;
+    try {
+      let count = 0;
+      for (const line of readFileSync(path, 'utf8').split('\n')) {
+        if (!line.includes('"subagent_type"')) continue;
+        let entry;
+        try {
+          entry = JSON.parse(line);
+        } catch {
+          continue;
+        }
+        if (entry?.type !== 'assistant' || entry.isSidechain) continue;
+        const content = entry.message?.content;
+        if (!Array.isArray(content)) continue;
+        count += content.filter((p) => p?.type === 'tool_use' && (p.name === 'Agent' || p.name === 'Task')).length;
+      }
+      delegations = count;
+    } catch {
+      delegations = 0;
+    }
   }
   if (size < bytesLimit && delegations < delegLimit) return '';
 
