@@ -18,7 +18,7 @@ process.stdin.on('end', () => {
     const text = [strip(response.stdout), strip(response.stderr)].filter((s) => s !== '').join('\n');
     if (text === '') return;
     const noLines = (typeof command === 'string' && /(^|[|;&(]\s*)(git\s+(diff|show|log\b[^|]*-p)|cat|jq|Get-Content|type)\b/.test(command))
-      || /^(\{|\[\s*($|[{"\d\]]))/.test((text.split('\n').find((l) => l.trim() !== '') ?? '').trimStart());
+      || /^(\{|\[\s*($|[{"\]]))/.test((text.split('\n').find((l) => l.trim() !== '') ?? '').trimStart());
     const stdout = trim(text, noLines);
     if (stdout === null) return;
 
