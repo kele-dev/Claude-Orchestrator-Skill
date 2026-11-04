@@ -1,0 +1,75 @@
+name: eval
+
+on:
+  workflow_dispatch:
+    inputs:
+      case:
+        description: "case name glob"
+        type: string
+        default: "*"
+      runs:
+        description: "runs per case"
+        type: string
+        default: "1"
+      model:
+        description: "main-session model"
+        type: string
+        default: "claude-opus-5-5"
+      max_cost_usd:
+        description: "cost cap in USD"
+        type: string
+        default: "3"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: eval
+  cancel-in-progress: false
+
+jobs:
+  eval:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install sandbox backend
+        run: |
+          sudo apt-get update && sudo apt-get install -y bubblewrap socat
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true
+
+      - name: Install Claude Code
+        run: npm install -g @anthropic-ai/claude-code
+
+      - name: Check secret
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          if [ -z "$ANTHROPIC_API_KEY" ]; then
+            echo "::error::Add the ANTHROPIC_API_KEY repository secret"
+            exit 1
+          fi
+
+      - name: Run eval
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          CASE: ${{ inputs.case }}
+          RUNS: ${{ inputs.runs }}
+          MODEL: ${{ inputs.model }}
+          MAX_COST: ${{ inputs.max_cost_usd }}
+        run: |
+          claude plugin eval . --case "$CASE" --runs "$RUNS" --ablation none --scaffold --trust-plugin --allow-tools Bash Edit Write --model "$MODEL" --judge-model claude-haiku-5-5 --max-cost-usd "$MAX_COST" --no-publish --json evals/ci-result.json
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: eval-results
+          path: |
+            evals/ci-result.json
+            evals/results/
+          if-no-files-found: ignore
