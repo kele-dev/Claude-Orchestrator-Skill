@@ -6,10 +6,10 @@ Opus tidak pernah mengedit kode sendiri.
 ## Instalasi (Windows)
 
 ```bash
-git clone https://github.com/marketingboedjang-dev/claude-orkestrasi.git
+git clone https://github.com/kele-dev/Claude-Orchestrator-Skill.git
 ```
 
-Lalu klik dua kali `install.bat` di folder `claude-orkestrasi`, dan buka sesi Claude Code baru dengan model Opus.
+Lalu klik dua kali `install.bat` di folder `Claude-Orchestrator-Skill`, dan buka sesi Claude Code baru dengan model Opus.
 
 Update ke versi baru: `git pull`, lalu jalankan `install.bat` lagi (aman diulang).
 
