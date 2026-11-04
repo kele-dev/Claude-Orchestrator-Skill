@@ -46,8 +46,14 @@ Delegate the write to `orchestrator:haiku-coder` in one brief with the exact tex
 - At most 15 lessons per file. When a file is full, prune it in the same delegation (see `prune`) and mention it in the report line.
 - Keep it local: in a git repo, append the line `.claude/skills/learned-*/` to `<git-common-dir>/info/exclude` if it is not there yet. In a worktree `.git` is a file, so never use `.git/info/exclude` directly; the common-dir file covers every worktree. Do not edit `.gitignore`.
 
+## Project map (`learned-map`)
+One special lesson file, `learned-map`, saves re-exploring the project in every session:
+- At most 20 lines: key folders and what lives there, entry points, test/build/lint commands, generated or do-not-edit paths.
+- Create it at the end of the first task that had to explore the project; update it when a task finds it wrong or incomplete. Same save rules as other lessons (automatic, verified facts only, one report line).
+- It counts toward the 6-folder limit, but not toward the 3-lessons-per-task limit.
+
 ## Using lessons (start of a task)
-- Find lessons with one Glob on `<main>/.claude/skills/learned-*/SKILL.md` (required in a worktree, where they are not loaded automatically), then read the ones whose description matches the task, before planning.
+- Find lessons with one Glob on `<main>/.claude/skills/learned-*/SKILL.md` (required in a worktree, where they are not loaded automatically), then read the ones whose description matches the task, before planning. Read `learned-map` first when it exists.
 - Paste the relevant lesson lines into every subagent brief: subagents cannot see them otherwise.
 - A lesson that turned out wrong or outdated in this task: fix or remove it automatically in the end-of-task save delegation.
 

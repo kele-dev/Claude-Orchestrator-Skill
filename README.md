@@ -39,6 +39,15 @@ Orchestration mode is active automatically in every session. Manual commands:
 - Claude suggests `team` or `autopilot` when a task fits, but always starts in `on` mode; you decide whether to switch.
 - `/orchestrator:learn [list | add <lesson> | prune]` - project lessons: at the end of a task Claude decides by itself whether to save up to 3 verified lessons (working test commands, root causes, pitfalls) and fixes or removes outdated ones, as local `learned-*` skills in the main checkout's `.claude/skills/` (also when a session runs in a git worktree), so every later session in that project can read them. They stay out of git via the repo's shared `info/exclude`.
 
+### Token-saving defaults
+- Concise answers: no preamble, no restated plan, tables or bullets; detail only when you ask.
+- Test/build output is trimmed before it reaches Opus; large suites are run by Haiku, which reports only PASS/FAIL and the first error.
+- Opus dictates exact text only for small edits; for long content it writes a spec and the executor writes the file.
+- One self-review pass before every report, so you need fewer review rounds.
+- A `learned-map` lesson (max 20 lines) remembers the project layout and commands, so new sessions skip re-exploring.
+- Claude suggests a new session or `/compact` when you switch to an unrelated task.
+- Every report ends with one token line, e.g. `Tokens: haiku 45k · sonnet 0 · 6 delegations`.
+
 ## Plugin contents
 
 - Skills `on` and `off`: the PRD -> delegate -> escalate -> review flow, and the switch to turn it off.
@@ -71,6 +80,7 @@ If you previously installed via `install.ps1`, delete `haiku-coder.md`, `sonnet-
 - Tambahkan `--dry-run` untuk melihat rencananya dulu.
 - Claude akan menyarankan team/autopilot kalau tugasnya cocok, tapi default tetap `on`. Batas iterasi naik otomatis (maks 4 putaran fix) hanya selama perbaikannya ada kemajuan.
 - Belajar: di akhir tugas Claude sendiri yang memutuskan pelajaran mana yang disimpan (maks 3, hanya yang sudah terbukti), serta memperbaiki atau menghapus yang usang, sebagai skill lokal `learned-*` di project. Satu baris di laporan memberi tahu apa yang berubah. `/orchestrator:learn list` untuk melihat, `prune` untuk merapikan.
+- Hemat token: jawaban ringkas, output test dipotong, Opus tidak mendikte file panjang, self-review sebelum lapor, `learned-map` untuk peta project, saran sesi baru saat ganti topik, dan satu baris laporan token di akhir.
 - Mode orkestrasi aktif otomatis di setiap sesi.
 
 ## Maintainers

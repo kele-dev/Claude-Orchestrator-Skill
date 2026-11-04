@@ -30,6 +30,13 @@ Otherwise -> **full path** (steps 1-6).
 
 On both paths: read only the files needed (use Grep/line excerpts, not the whole repo), and send subagents only the relevant excerpts, not the whole PRD. Project lessons also apply on both paths: read them before planning (step 1) and save them at the end (step 6).
 
+## Token rules (all paths)
+- Trim command output: run tests/build/lint/verification with output limited (e.g. `2>&1 | tail -n 30`, or filter to error and summary lines). Never let full logs into your context: they are re-sent on every later turn. A pipe hides the command's exit code, so use `set -o pipefail` or judge PASS/FAIL from the test summary line, never from the pipe's exit code.
+- Large suites (expected output over ~100 lines): delegate the run to `haiku-coder` with "run only, do not edit any file" in the brief, and ask only for PASS/FAIL, failing test names, and the first error.
+- Brief size: dictate exact text (old -> new) only for small edits (up to ~30 lines). For new files or long content, give a spec (sections, rules, 1-2 examples) and let the executor write it; your own output tokens cost the most.
+- Explore cheaply: if a `learned-map` lesson exists, read it first and open only the files it points to.
+- Self-review once before reporting: check the whole change for the same terms and numbers across files, cross-references that resolve, no stale mentions of replaced behavior, and brief expectations that match the result. Fix findings through delegation before you report, not after the user asks.
+
 ## 1. UNDERSTAND & BRAINSTORM
 Read the relevant files first. Weigh 2-3 short approaches, pick one, and record the reason. Ask the user at most 3 things, and only if the answers would truly change the design. Otherwise decide yourself and record the assumptions in the PRD.
 
@@ -77,6 +84,7 @@ Findings are fixed through the same execution path (steps 3-4), then re-reviewed
 - Table: task -> who did it (haiku/sonnet) -> number of attempts -> status.
 - Verification commands run and their results.
 - Assumptions taken and open items.
+- Tokens: one line from the subagent completion notices, e.g. `Tokens: haiku 45k · sonnet 0 · opus-reviewer 0 · 6 delegations`.
 - Lessons: if this task taught something non-obvious, reusable, and verified (see `orchestrator:learn`), save at most 3 lessons yourself, without asking, through one `haiku-coder` delegation; fix or remove lessons this task proved wrong in the same delegation. Mention it in one report line ("Lessons saved: ..."). Nothing qualifies (the usual case) -> say nothing.
 
 ## Hard rules

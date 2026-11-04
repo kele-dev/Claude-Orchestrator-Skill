@@ -44,7 +44,7 @@ Opus may raise a cap on its own, without asking, only while the work is clearly 
 - Wait for the completion notifications. Do not poll.
 
 ## 3. VERIFY (Opus)
-- Per lane: run `git status --porcelain` and `git diff -- <owned files>`, confirm that no file outside the lane's owned list changed, and run the lane's verification command yourself.
+- Per lane: run `git status --porcelain` and `git diff -- <owned files>`, confirm that no file outside the lane's owned list changed, and run the lane's verification command yourself, with output trimmed per the token rules in `orchestrator:on`.
 - Read diffs and summaries, not whole files, unless a diff is ambiguous.
 - After the last wave passes, run the project-level check once (full test/build/lint, if the project has one).
 
@@ -59,7 +59,7 @@ Opus may raise a cap on its own, without asking, only while the work is clearly 
 ## 5. REPORT
 - Table: lane -> owned files -> executor -> attempts -> status (PASS / BLOCKED).
 - Verification commands run and their results.
-- Delegations used, and caps used vs. caps allowed (including any automatic raises).
+- Tokens and delegations per `orchestrator:on` step 6, and caps used vs. caps allowed (including any automatic raises).
 - Assumptions and open items.
 - Lessons: save per `orchestrator:on` step 6 (automatic, one delegation, one report line).
 

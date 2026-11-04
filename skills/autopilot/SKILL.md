@@ -38,7 +38,7 @@ Ask the questions (if any) in one go. After the answers, do not ask again until 
 
 ## 3. LOOP, per batch
 1. Delegate: per `orchestrator:on` step 3. Tasks inside a batch run sequentially, or in parallel only when they touch disjoint files.
-2. Verify: `git diff` plus the batch's verification command, run by you. Read diffs and summaries, not whole files.
+2. Verify: `git diff` plus the batch's verification command, run by you with output trimmed per the token rules in `orchestrator:on`. Read diffs and summaries, not whole files.
 3. Fix: re-run only the failed tasks, at most 2 rounds (or up to 4 per "Raising the caps"), with exact error + diff + suspected cause in the brief.
 4. Batch passed: go straight to the next batch. Do not ask the user for confirmation between batches.
 
@@ -51,7 +51,7 @@ Ask the questions (if any) in one go. After the answers, do not ask again until 
 ## 5. REPORT
 - Table: batch -> tasks -> executor -> attempts -> status (PASS / BLOCKED).
 - Verification commands run and their results.
-- Delegations used, and caps used vs. caps allowed (including any automatic raises).
+- Tokens and delegations per `orchestrator:on` step 6, and caps used vs. caps allowed (including any automatic raises).
 - Assumptions and open items.
 - Lessons: save per `orchestrator:on` step 6 (automatic, one delegation, one report line).
 
