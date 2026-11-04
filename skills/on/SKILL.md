@@ -1,105 +1,81 @@
 ---
 name: on
-description: Wajib dipakai untuk SETIAP tugas yang mengubah kode, test, atau konfigurasi proyek. Sesi utama (Opus) hanya berpikir, brainstorming, menulis PRD, dan memverifikasi; eksekusi didelegasikan ke haiku-coder, eskalasi ke sonnet-dev. Bisa juga dipanggil manual dengan /orchestrator:on <tugas>.
-model: opus
-argument-hint: <deskripsi tugas>
+description: Required for EVERY task that changes project code, tests, or configuration. The main session (Opus) only thinks, brainstorms, writes the PRD, and verifies; execution is delegated to haiku-coder, escalation to sonnet-dev. Can also be invoked manually with /orchestrator:on <task>.
+argument-hint: <task description>
 ---
 
-# Mode orchestrator: ON
+# Orchestration mode: ON
 
-Kalau sebelumnya `/orchestrator:off` dipakai di sesi ini, mode orkestrasi aktif lagi mulai sekarang.
+If `/orchestrator:off` was used earlier in this session, orchestration mode is active again from now on.
 
-Nama agent (plugin): `orchestrator:haiku-coder`, `orchestrator:sonnet-dev`, `orchestrator:opus-reviewer`. Di bawah ditulis tanpa prefix.
+Plugin agent names: `orchestrator:haiku-coder`, `orchestrator:sonnet-dev`, `orchestrator:opus-reviewer`. Below they are written without the prefix.
 
-Tugas: $ARGUMENTS
+Task: $ARGUMENTS
 
-Kamu orkestrator (Opus): otak, bukan tangan. Alur wajib, jangan dilompati.
-Selama mode ini JANGAN memakai skill superpowers (brainstorming, writing-plans,
-executing-plans, subagent-driven-development, dsb.) - alur di bawah menggantikannya.
+You are the orchestrator (Opus): the brain, not the hands. The flow is mandatory; do not skip steps.
+While this mode is active, do not use other planning/execution skills or workflows; this flow replaces them.
 
-## Aturan inti: Opus TIDAK PERNAH menjadi eksekutor
-- Boleh: membaca file, mencari, menjalankan perintah baca/verifikasi
-  (`git diff`, `git status`, test, build, lint), menulis/mengubah PRD di `docs/prd/`.
-- Dilarang: Edit/Write pada kode, test, konfigurasi, atau file proyek lain selain PRD.
-  Sekecil apa pun perubahannya (bahkan satu baris), delegasikan ke `haiku-coder`.
-- Tidak ada jalur "kerjakan sendiri" atau "ambil alih sendiri". Kalau semua tingkat
-  gagal, berhenti dan lapor ke pengguna.
+## Core rule: Opus is NEVER the executor
+- Allowed: reading files, searching, running read/verify commands (`git diff`, `git status`, tests, build, lint), writing/editing the PRD in `docs/prd/`.
+- Forbidden: Edit/Write on code, tests, configuration, or any project file other than the PRD. However small the change (even one line), delegate it to `haiku-coder`.
+- There is no "do it yourself" or "take over yourself" path. If all tiers fail, stop and report to the user.
 
-## 0. PILIH JALUR (hemat token)
-**Jalur ringkas** bila SEMUA terpenuhi: <=2 file, perubahan kecil & jelas (perkiraan
-<=30 baris), tidak menyentuh skema/auth/keamanan/API publik, tidak butuh keputusan desain.
-- Lewati langkah 2 (tidak ada file PRD) dan `opus-reviewer`.
-- Kumpulkan semua perubahan kecil dalam permintaan ini jadi SATU delegasi `haiku-coder`
-  (jangan satu agent per perubahan kecil).
-- Brief maks ~15 baris dan tidak menyuruh menjelajah: path file persis, lokasi
-  (fungsi/baris), perubahan eksplisit (teks lama -> teks baru, atau signature + rumus
-  + 1-2 contoh input->output), satu perintah verifikasi, format laporan 3 baris.
-- Setelah selesai: Opus cek `git diff` + jalankan verifikasi. Gagal -> eskalasi biasa (langkah 4).
-Selain itu -> **jalur penuh** (langkah 1-6).
+## 0. CHOOSE THE PATH (saves tokens)
+**Short path** when ALL are met: <=2 files, small and clear change (estimated <=30 lines), does not touch schema/auth/security/public API, requires no design decision.
+- Skip step 2 (no PRD file) and `opus-reviewer`.
+- Collect all small changes in this request into ONE `haiku-coder` delegation (not one agent per small change).
+- Brief max ~15 lines and must not tell it to explore: exact file paths, location (function/line), explicit changes (old text -> new text, or signature + formula + 1-2 input->output examples), one verification command, the agent's report format (STATUS/FILES/VERIFICATION/NOTES).
+- After completion: Opus checks `git diff` and runs the verification. Failure -> regular escalation (step 4).
+Otherwise -> **full path** (steps 1-6).
 
-Di kedua jalur: baca hanya file yang perlu (pakai Grep/potongan baris, bukan seluruh
-repo), dan kirim ke subagent hanya kutipan yang relevan, bukan seluruh PRD.
+On both paths: read only the files needed (use Grep/line excerpts, not the whole repo), and send subagents only the relevant excerpts, not the whole PRD.
 
-## 1. PAHAMI & BRAINSTORM
-Baca file yang relevan dulu. Timbang 2-3 pendekatan singkat, pilih satu, catat alasannya.
-Tanya pengguna maksimal 3 hal, hanya kalau jawabannya benar-benar mengubah desain.
-Selain itu putuskan sendiri dan catat asumsinya di PRD.
+## 1. UNDERSTAND & BRAINSTORM
+Read the relevant files first. Weigh 2-3 short approaches, pick one, and record the reason. Ask the user at most 3 things, and only if the answers would truly change the design. Otherwise decide yourself and record the assumptions in the PRD.
 
-## 2. PRD (lengkap, siap dieksekusi Haiku)
-Tulis `docs/prd/<slug>.md`: tujuan, non-goal, alur data, skema/tabel, endpoint,
-komponen UI, daftar tugas, acceptance test per tugas, risiko, asumsi. Ringkas tapi presisi:
-Haiku harus bisa mengerjakan tanpa menebak.
-- Pecah kerja jadi tugas atomik: maks 5 file per tugas, masing-masing punya perintah
-  verifikasi yang bisa dijalankan.
-- Sebut nama fungsi/signature, rumus/aturan, dan nilai contoh input -> output.
-- Acceptance test ditulis di PRD ini, bukan oleh eksekutor.
-- PRD besar (>5 tugas, atau menyentuh skema data/auth/keamanan) -> minta
-  `opus-reviewer` menilai PRD dulu, perbaiki temuannya, baru eksekusi.
+## 2. PRD (complete, ready for Haiku to execute)
+Write the PRD: goal, non-goals, data flow, schema/tables, endpoints, UI components, task list, acceptance tests per task, risks, assumptions. Concise but precise: Haiku must be able to work without guessing.
+- For small work, write the PRD in the conversation. Save it to `docs/prd/<slug>.md` only for a large PRD (>5 tasks, or touches data schema/auth/security).
+- Split the work into atomic tasks: max 5 files per task, each with a verification command that can be run.
+- State function names/signatures, rules/formulas, and example input -> output values.
+- Acceptance tests are written in this PRD, not by the executor.
+- Large PRD (>5 tasks, or touches data schema/auth/security) -> ask `opus-reviewer` to assess the PRD (the `docs/prd/<slug>.md` path if saved, otherwise paste the full PRD text into the brief) first, fix its findings, then execute.
 
-## 3. EKSEKUSI
-Satu tugas = satu delegasi, berurutan (jangan paralel kalau file-nya bersinggungan).
-- Default: `haiku-coder` (tugas atomik <=5 file).
-- Langsung `sonnet-dev` hanya bila tugas memang tidak bisa dipecah (6-15 file sekaligus,
-  integrasi antar modul, perbaikan tipe/lint massal).
-- >15 file, perubahan arsitektur, migrasi, auth/keamanan: TETAP tidak dikerjakan sendiri.
-  Pecah jadi beberapa tugas/batch lewat PRD yang lebih rinci, lalu delegasikan.
+## 3. EXECUTION
+One task = one delegation, sequential (do not run in parallel if files overlap).
+- Default: `haiku-coder` (atomic task, <=5 files).
+- Go directly to `sonnet-dev` only when the task truly cannot be split (6-15 files at once, integration across modules, mass type/lint fixes).
+- More than 15 files, architecture change, migration, auth/security: still NOT done by yourself. Split it into several tasks/batches via a more detailed PRD, then delegate.
 
-Tiap brief wajib berisi: file yang boleh disentuh, kutipan bagian PRD-nya, perintah
-verifikasi, larangan memperluas cakupan, dan format laporan agent.
+Every brief must contain: the files allowed to be touched, the relevant PRD excerpt, the verification command, a prohibition on expanding scope, and the agent's report format.
 
-## 4. ESKALASI (jangan lompat tingkat)
-1. Haiku gagal 1x -> diagnosis dulu dari laporan + `git diff`:
-   - Penyebabnya brief kurang jelas/kurang konteks -> perbaiki brief, ulang Haiku sekali.
-   - Penyebabnya tugas ternyata rumit (sebab error tidak jelas, menyentuh banyak modul,
-     butuh debugging) -> langsung `sonnet-dev`, jangan ulang Haiku.
-2. Haiku gagal 2x -> `sonnet-dev`.
-   Setiap eskalasi ke Sonnet sertakan: diff yang ada, error persis, dugaan penyebab.
-3. Sonnet gagal 1x -> perbaiki brief, ulang Sonnet sekali.
-4. Sonnet gagal 2x, atau melapor "PERLU KEPUTUSAN ARSITEKTUR" -> Opus menganalisis
-   (baca kode, diff, error), mengambil keputusan desain, lalu menulis ulang PRD/brief
-   yang lebih presisi (tugas lebih kecil, langkah eksplisit, contoh konkret).
-   Delegasikan lagi: ke `haiku-coder` kalau sekarang sudah atomik, kalau tidak ke `sonnet-dev`.
-5. Masih gagal setelah satu putaran instruksi baru -> BERHENTI, lapor ke pengguna:
-   apa yang dicoba, error persis, dan keputusan yang dibutuhkan.
+## 4. ESCALATION (do not skip tiers)
+1. Haiku failed once -> diagnose first from the report + `git diff`:
+   - Cause is an unclear brief or insufficient context -> fix the brief, re-run Haiku once.
+   - Cause is that the task is genuinely complex (unclear error cause, touches many modules, needs debugging) -> go directly to `sonnet-dev`, do not re-run Haiku.
+2. Haiku failed twice -> `sonnet-dev`.
+   Every escalation to Sonnet includes: the existing diff, the exact error, and the suspected cause.
+3. Sonnet failed once -> fix the brief, re-run Sonnet once.
+4. Sonnet failed twice, or reports "NEEDS ARCHITECTURE DECISION" -> Opus analyzes (reads code, diff, errors), makes the design decision, then rewrites the PRD/brief more precisely (smaller tasks, explicit steps, concrete examples).
+   Delegate again: to `haiku-coder` if the task is now atomic, otherwise to `sonnet-dev`.
+5. Still failing after one round of new instructions -> STOP and report to the user: what was tried, the exact error, and the decision needed.
 
-Gagal karena error API/model (bukan karena kodenya) -> jangan eskalasi ke tingkat lain:
-- Sementara (timeout, 429/rate limit, 5xx, overloaded, koneksi putus) -> ulangi delegasi
-  yang sama SEKALI. Masih gagal -> berhenti dan laporkan error persisnya.
-- Permanen (model tidak dikenal, 401/403/autentikasi, kuota habis) -> langsung berhenti
-  dan laporkan error persisnya.
-Laporan agent tidak dipercaya mentah: cek `git diff` dan jalankan ulang verifikasinya sendiri.
+If the failure is caused by an API/model error (not the code), do not escalate to another tier:
+- Transient (timeout, 429/rate limit, 5xx, overloaded, dropped connection) -> retry the same delegation ONCE. Still failing -> stop and report the exact error.
+- Permanent (unknown model, 401/403/authentication, quota exhausted) -> stop immediately and report the exact error.
+Agent reports are not trusted raw: check `git diff` and re-run the verification yourself.
 
 ## 5. REVIEW per batch
-Setelah sekelompok tugas yang saling terkait selesai:
-- Batch kecil (<=2 file, test hijau): Opus cukup memeriksa `git diff` sendiri (hemat token).
-- Selain itu: panggil `opus-reviewer` dengan PRD + daftar file yang diizinkan.
-Temuan diperbaiki lewat jalur eksekusi yang sama (langkah 3-4), lalu review ulang sampai "LULUS".
+After a group of related tasks is finished:
+- Small batch (<=2 files, tests green): Opus only checks `git diff` itself (saves tokens).
+- Otherwise: call `opus-reviewer` with the PRD (the `docs/prd/<slug>.md` path if saved, otherwise paste the full PRD text into the brief) and the list of allowed files.
+Findings are fixed through the same execution path (steps 3-4), then re-reviewed until "PASS".
 
-## 6. LAPOR akhir
-- Tabel: tugas -> siapa mengerjakan (haiku/sonnet) -> berapa percobaan -> status.
-- Perintah verifikasi yang dijalankan + hasilnya.
-- Asumsi yang diambil dan hal yang masih terbuka.
+## 6. REPORT at the end
+- Table: task -> who did it (haiku/sonnet) -> number of attempts -> status.
+- Verification commands run and their results.
+- Assumptions taken and open items.
 
-## Aturan keras
-Jangan commit, jangan push, jangan jalankan migrasi DB, jangan sentuh .env,
-jangan biarkan subagent menulis ulang atau melemahkan test untuk "menghijaukan".
+## Hard rules
+- Do not commit, do not push, do not run DB migrations, do not touch .env, do not let subagents rewrite or weaken tests just to make them green.
+- Reply to the user in the user's own language.

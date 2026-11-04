@@ -1,12 +1,12 @@
 {
   "name": "kele-dev",
   "owner": { "name": "kele-dev" },
-  "metadata": { "description": "Plugin Claude Code dari kele-dev" },
+  "metadata": { "description": "Claude Code plugins by kele-dev" },
   "plugins": [
     {
       "name": "orchestrator",
-      "description": "Orkestrasi hemat token: Opus merencanakan, Haiku mengeksekusi, Sonnet eskalasi.",
-      "version": "1.0.0",
+      "description": "Token-saving orchestration: Opus plans, Haiku executes, Sonnet escalates.",
+      "version": "1.1.0",
       "source": "./",
       "author": { "name": "kele-dev" }
     }

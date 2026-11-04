@@ -1,24 +1,13 @@
-# Aturan global: orkestrasi wajib
+# Global rule: mandatory orchestration
 
-Setiap sesi yang akan mengubah kode, test, atau konfigurasi proyek WAJIB memakai
-skill `orchestrator:on` (muat di awal tugas, sebelum menyentuh file apa pun).
+Every session that will change code, tests, or project configuration MUST use the skill `orchestrator:on` (load it at the start of the task, before touching any file).
 
-- Sesi utama (Opus) hanya berpikir, brainstorming, menulis PRD di `docs/prd/`,
-  dan memverifikasi (baca file, `git diff`, jalankan test). Sesi utama TIDAK BOLEH
-  mengedit kode/test/konfigurasi sendiri, sekecil apa pun perubahannya.
-- Eksekusi: `haiku-coder` dulu. Haiku gagal karena brief kurang jelas -> ulang sekali
-  dengan brief diperbaiki; gagal karena tugasnya rumit, atau gagal 2x -> `sonnet-dev`. Sonnet gagal 2x ->
-  Opus menulis instruksi/PRD baru yang lebih presisi lalu mendelegasikan lagi.
-  Masih gagal -> berhenti dan lapor ke pengguna. Opus tidak pernah mengambil alih eksekusi.
-- Perubahan kecil (<=2 file, jelas, tanpa keputusan desain): jalur ringkas - tanpa file
-  PRD dan tanpa opus-reviewer, semua perubahan kecil digabung jadi satu delegasi Haiku
-  dengan brief eksplisit (teks lama -> baru). Tetap bukan Opus yang mengedit.
-- Error API/model pada subagent bukan alasan eskalasi. Error sementara (timeout, 429, 5xx)
-  -> ulangi sekali; error permanen atau masih gagal -> berhenti dan laporkan.
-- Nama lengkap agent di plugin ini: `orchestrator:haiku-coder`, `orchestrator:sonnet-dev`,
-  `orchestrator:opus-reviewer`. Jangan membuat salinan agent ini di `.claude/agents`.
-- Aturan ini mengalahkan skill superpowers untuk perencanaan/eksekusi
-  (brainstorming, writing-plans, executing-plans, subagent-driven-development).
-- Pertanyaan, penjelasan, atau riset tanpa perubahan file tidak perlu orkestrasi.
-- Pengguna bisa mematikan aturan ini untuk satu sesi dengan `/orchestrator:off` dan menyalakannya
-  lagi dengan `/orchestrator:on`. Setelah off, jangan memuat skill `orchestrator:on` secara otomatis.
+- The main session (Opus) only thinks, brainstorms, writes the PRD (in the conversation for small work; saved to `docs/prd/<slug>.md` only for large PRDs), and verifies (reads files, `git diff`, runs tests). The main session MUST NOT edit code/tests/configuration itself, however small the change.
+- Execution: `haiku-coder` first. Haiku fails because the brief is unclear -> retry once with a corrected brief; fails because the task is complex, or fails 2x -> `sonnet-dev`. Sonnet fails 2x -> Opus writes new, more precise instructions/PRD and delegates again. Still failing -> stop and report to the user. Opus never takes over execution.
+- Small changes (<=2 files, clear, no design decisions): shortcut path - no PRD file and no opus-reviewer; all small changes are combined into one Haiku delegation with an explicit brief (old text -> new text). Still, Opus does not do the editing.
+- API/model errors on subagents are not a reason to escalate. Temporary errors (timeout, 429, 5xx) -> retry once; permanent errors or still failing -> stop and report.
+- Full agent names in this plugin: `orchestrator:haiku-coder`, `orchestrator:sonnet-dev`, `orchestrator:opus-reviewer`. Do not create copies of these agents in `.claude/agents`.
+- These rules take precedence over any other planning or execution skill/workflow.
+- Questions, explanations, or research without file changes do not need orchestration.
+- The user can turn this rule off for one session with `/orchestrator:off` and turn it back on with `/orchestrator:on`. After off, do not automatically load the skill `orchestrator:on`.
+- Always reply to the user in the user's own language.

@@ -1,15 +1,15 @@
 ---
 name: off
-description: Matikan mode orkestrasi untuk sisa sesi ini. Hanya dipakai saat pengguna mengetik /orchestrator:off.
+description: Turn off orchestration mode for the rest of this session. Only used when the user types /orchestrator:off.
 disable-model-invocation: true
 ---
 
-# Mode orchestrator: OFF
+# Orchestration mode: OFF
 
-Mode orkestrasi NONAKTIF untuk sisa sesi ini, sampai pengguna mengetik `/orchestrator:on`.
+Orchestration mode is INACTIVE for the rest of this session, until the user types `/orchestrator:on`.
 
-- Abaikan aturan "orkestrasi wajib" yang dimuat di awal sesi, dan jangan memuat skill `orchestrator:on` secara otomatis.
-- Kerjakan tugas langsung seperti biasa (boleh mengedit sendiri), tanpa PRD dan tanpa delegasi wajib ke subagent.
-- Tetap berlaku: jangan commit/push tanpa diminta, jangan sentuh .env, jangan jalankan migrasi DB.
+- Ignore the "mandatory orchestration" rules loaded at the start of the session, and do not automatically load the `orchestrator:on` skill.
+- Handle tasks directly as usual (you may edit yourself), without a PRD and without mandatory delegation to subagents.
+- Still in effect: do not commit/push without being asked, do not touch .env, do not run DB migrations.
 
-Balas pengguna singkat: "Mode orkestrasi dimatikan untuk sesi ini. Ketik /orchestrator:on untuk mengaktifkan lagi."
+Reply briefly, in the user's language: "Orchestration mode is off for this session. Type /orchestrator:on to turn it back on."
