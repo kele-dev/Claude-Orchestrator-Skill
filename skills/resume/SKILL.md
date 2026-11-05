@@ -17,14 +17,14 @@ Arguments: $ARGUMENTS
 - Legacy checkpoints are also read (`legacy.md` in the `orchestrator:learn` folder; only if legacy files exist); new ones always go to `<store>`.
 
 ## When to write
-- At every stop that is not DONE: BLOCKED, DECISION NEEDED, cap or batch limit reached.
+- At every stop that is not DONE: BLOCKED, DECISION NEEDED, BUDGET, cap or batch limit reached.
 - After each team wave when more waves remain.
 - After every 3rd autopilot batch.
 - Before suggesting a new session for a long conversation.
 
 ## Content (max 40 lines)
 - Task: one line.
-- Mode: on / team / autopilot, with its arguments (caps, commit=batch).
+- Mode: on / team / autopilot, with its arguments (caps, commit=batch, budget=<N>k, spent <X>k).
 - Branch and last verified commit (or a `git diff --stat` summary).
 - PRD: path under docs/prd, or a summary of at most 10 lines.
 - Plan table: lane or batch -> files -> PASS / BLOCKED / TODO.

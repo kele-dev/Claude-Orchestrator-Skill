@@ -1,7 +1,7 @@
 ---
 name: team
 description: Parallel multi-lane execution under the orchestrator cost rules. The main session plans and splits the work into file-disjoint lanes, haiku-coder lanes run in parallel, the main session verifies, and only failed lanes loop through fixes, with hard caps. Only runs when the user types /orchestrator:team.
-argument-hint: "[lanes=N] [commit=batch] [isolate=worktree] [--dry-run] <task description>"
+argument-hint: "[lanes=N] [commit=batch] [isolate=worktree] [budget=<N>k] [--dry-run] <task description>"
 disable-model-invocation: true
 ---
 
@@ -21,6 +21,7 @@ Team mode is `orchestrator:on` with parallel execution (the main session never e
 - `isolate=worktree` (opt-in): launch each lane with `isolation: "worktree"`. Before wave 1 check that `worktree.baseRef` is `"head"` in settings, there are no uncommitted tracked changes outside `docs/prd/` (lanes branch from HEAD), and `commit=batch` is on (later waves branch from committed earlier waves); otherwise warn in one line and use the shared tree (note the caveat if the project needs installed deps a fresh worktree lacks).
 - Wave order under `isolate=worktree`, in this sequence: baseline -> launch lanes (brief: report your worktree path, the output of `pwd`, in NOTES) -> per lane verify INSIDE its worktree (`git -C <wt> status --porcelain` shows only owned files; run its check with cwd = the worktree) -> fix rounds for failed lanes reuse the same worktree: re-delegate WITHOUT `isolation`, brief says "work only in <wt path>" -> `TYPE: APPLY` for each PASS lane, run from the main tree root -> union check vs baseline and full suite in the main tree -> COMMIT if `commit=batch` -> next wave. Take each lane's worktree path from its report.
 - Checkpoint timing: after each wave when more waves remain.
+- `budget=<N>k` (optional): token budget over all delegations; rules in `modes.md` (Budget).
 
 ## 1. PLAN (main session)
 - Read only the files you need.

@@ -34,7 +34,7 @@ Both paths: read only needed files, send subagents only relevant excerpts.
 - Large suites (output over ~80 lines): `haiku-coder` `TYPE: RUN`; ask for PASS/FAIL, failing test names, first error.
 - Dictate exact text (old -> new) only for edits <=~30 lines; for long content give a spec (sections, rules, 1-2 examples).
 - Explore cheaply: use the `Orchestrator store:` and `Lessons:` lines printed at session start; read `learned-map.md` first, open only files it points to. Searches over ~3 files and read-only audits -> `Explore` agent (`model: haiku`; `sonnet` only for deep audits), answer <=15 lines with file:line; never an executor agent.
-- Failing test/build: trimmed failure to `haiku-coder` `TYPE: TRIAGE`; read only its report.
+- Failing test/build: first check Known errors (below); if no match, trimmed failure to `haiku-coder` `TYPE: TRIAGE`; read only its report.
 - Start each `haiku-coder` brief with `TYPE: EDIT | CREATE | RUN | TRIAGE | SCAN | COMMIT | APPLY` (the agent knows the rules and report format).
 - Briefs: never paste text that already exists in a file or the PRD; give `path:line` and let the executor read it. Keep a full-path brief <= ~25 lines (short path: ~15).
 - COMMIT brief: the message is subject and body only, never with trailers in it; if your own instructions give a commit attribution line (e.g. Co-Authored-By), add it as a separate brief line `TRAILER: <that line>` so the commit credits the main session, not the executor.
@@ -42,6 +42,8 @@ Both paths: read only needed files, send subagents only relevant excerpts.
 - Turn economy: every main-session turn re-reads the whole context, so spend fewer turns. Put the diff review and the verify command in ONE shell call; send the next delegation in the same message as the passing verification's follow-up (plan update, housekeeping); never spend a turn on a status-only message; after launching background agents end the turn with one line and do not poll.
 - Reuse finished agents: a fix brief (fix round, or a small finding from review) for a unit whose agent finished in this session goes to that agent with `SendMessage` (it keeps its files and context, saving ~10k startup); a new agent only when moving up a tier, when `SendMessage` is unavailable, or when the agent was stopped. It still counts as one fix round.
 - Incremental review: after a group passes, snapshot it (Bash): `export GIT_INDEX_FILE="$(git rev-parse --git-path orch-review-index)"; git read-tree HEAD && git add -A && git write-tree` and keep the printed tree id; the next group's review reads `git diff --stat <tree>` and `git diff -U1 <tree>` (plus `git status --short` for new files), never the earlier groups' hunks again. Reset after a commit (diff against HEAD).
+- Cache-friendly briefs: order every brief fixed parts first (TYPE, report format, relevant lesson lines, verification command), variable parts last (files, PRD excerpt, error, diff), so the shared prefix is cached across delegations.
+- Known errors: before a `TYPE: TRIAGE` delegation, Grep `<store>/lessons/learned-errors.md` for the failure's key text; on a match put its CAUSE/FIX in the fix brief and skip TRIAGE (see `orchestrator:learn`).
 
 ## 1. UNDERSTAND & BRAINSTORM
 Read relevant files. Weigh 2-3 short approaches, pick one, record why. Ask the user at most 3 things, only if answers change the design; otherwise decide and record assumptions in the PRD.
