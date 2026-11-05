@@ -10,15 +10,7 @@ Arguments: $ARGUMENTS
 
 ## Store
 `<store>` = `~/.claude/orchestrator/<key>/`: one folder per project, the same from the main checkout and every git worktree, outside the repo. It is never committed (no `info/exclude` or `.gitignore` lines needed) and is writable from worktree sessions, which cannot write to the main checkout. `resume` and `status` use the same `<store>`.
-- Get it with exactly this one Bash command (prints an absolute path, `C:/...` on Windows Git Bash). Run it once per task and paste the result into every brief:
-  ```bash
-  m=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null) && m=$(dirname "$m") || m=$(pwd -W 2>/dev/null || pwd); h=$(cygpath -m ~ 2>/dev/null || echo ~); k=$(printf %s "$m" | tr A-Z a-z | sed 's/[^a-z0-9][^a-z0-9]*/-/g' | tr -d '\n' | tail -c 80); echo "$h/.claude/orchestrator/$k"
-  ```
-- Without Bash (PowerShell only), run this instead; it prints the same path:
-  ```powershell
-  $m = $null; try { $m = git rev-parse --path-format=absolute --git-common-dir 2>$null } catch {}; if ($LASTEXITCODE -eq 0 -and $m) { $m = Split-Path $m -Parent } else { $m = (Get-Location).Path }; $k = $m.ToLower() -replace '[^a-z0-9]+','-'; if ($k.Length -gt 80) { $k = $k.Substring($k.Length - 80) }; ($HOME -replace '\\','/') + '/.claude/orchestrator/' + $k
-  ```
-- Key rule (both shells): main checkout = parent of the absolute git-common-dir (outside git: the current folder); lowercase; every run of characters outside `[a-z0-9]` becomes one `-`; keep the last 80 characters (Windows path limit). Needs git 2.31+. Example: `C:/Users/me/Projects/My App` -> `C:/Users/me/.claude/orchestrator/c-users-me-projects-my-app`.
+- Store command (Bash or PowerShell, prints the absolute path) and key rule: `## Store command` in `reference.md` in this skill's folder; read it only when the session-start `Orchestrator store:` line is missing. Put the absolute `<store>` path into every brief that writes to it.
 - Layout: `<store>/lessons/learned-<topic>.md` (including `learned-map`), `<store>/verify.sh`, `<store>/checkpoints/<slug>.md`.
 - Writes go to `<store>` only, delegated to `orchestrator:haiku-coder` with the absolute path from the command. Never write lessons or checkpoints inside the repo or a worktree.
 - Lessons are not auto-loaded skills: the orchestrator reads `<store>/lessons/` explicitly (see "Using lessons"). Full text is read only when relevant, so they cost few tokens.
@@ -74,7 +66,4 @@ One special lesson file, `learned-map`, saves re-exploring the project in every 
 - A lesson that turned out wrong or outdated in this task: fix or remove it automatically in the end-of-task save delegation.
 
 ## Manual commands
-- `list`: show every `learned-*` lesson file with its lesson count and the lesson lines, in one compact block.
-- `add <lesson>`: check it against "What counts as a lesson", then save it as above.
-- `prune`: check every lesson against the current project (commands and files still exist, no duplicates, nothing contradicted by recent work), then merge, fix, or remove automatically and report what changed in one short block.
-- These commands are optional: the agent keeps the lessons up to date by itself.
+- `list`, `add <lesson>`, `prune`: when $ARGUMENTS starts with one of these, read `## Manual commands` in `reference.md` in this skill's folder. Optional: the agent keeps the lessons up to date by itself.

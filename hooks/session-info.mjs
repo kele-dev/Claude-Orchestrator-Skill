@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // SessionStart hook: prints the per-project orchestrator store path, lesson index, checkpoints and digest command.
-// Store computation mirrors skills/learn/SKILL.md "## Store". Fails open: any error prints nothing.
+// Store computation mirrors skills/learn/reference.md "## Store command". Fails open: any error prints nothing.
 import { execFileSync } from 'node:child_process';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { homedir } from 'node:os';
