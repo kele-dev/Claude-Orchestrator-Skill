@@ -2,7 +2,7 @@
 // Digest a Claude Code transcript (JSONL) into a short U:/A: text view.
 // Usage: node scripts/digest.mjs <transcript.jsonl> [--last N]   (default N = 60)
 // Keeps only user/assistant text; drops tool calls/results, sidechains, meta lines and system wrappers.
-import { readFileSync } from 'node:fs';
+import { readTranscript, entries, textOf } from './transcript.mjs';
 
 const args = process.argv.slice(2);
 const file = args.find((a, i) => !a.startsWith('--') && args[i - 1] !== '--last');
@@ -13,19 +13,13 @@ const MAX = 2000;
 
 let lines;
 try {
-  lines = readFileSync(file, 'utf8').split('\n');
+  lines = readTranscript(file);
 } catch (e) {
   process.stderr.write(`digest: cannot read ${file ?? '(no file)'}: ${e.message}\n`);
   process.exit(1);
 }
 
 const WRAPPERS = ['command-message', 'command-name', 'local-command-stdout', 'local-command-stderr', 'local-command-caveat'];
-
-function textOf(content) {
-  if (typeof content === 'string') return content;
-  if (!Array.isArray(content)) return '';
-  return content.filter((c) => c && c.type === 'text' && typeof c.text === 'string').map((c) => c.text).join('\n');
-}
 
 function clean(text) {
   let t = text.replace(/<system-reminder>[\s\S]*?<\/system-reminder>/g, '');
@@ -34,13 +28,8 @@ function clean(text) {
 }
 
 const msgs = []; // { role, id, text }
-for (const line of lines) {
-  if (!line.trim()) continue;
-  if (!line.includes('"type":"user"') && !line.includes('"type":"assistant"')) continue;
-  let o;
-  try { o = JSON.parse(line); } catch { continue; }
-  if (!o || o.isSidechain === true || o.isMeta === true) continue;
-  if (o.type !== 'user' && o.type !== 'assistant') continue;
+for (const o of entries(lines, ['user', 'assistant'])) {
+  if (o.isMeta === true) continue;
   const m = o.message || {};
   const raw = textOf(m.content).replace(/\r\n?/g, '\n');
   const bare = raw.replace(/<system-reminder>[\s\S]*?<\/system-reminder>/g, '');

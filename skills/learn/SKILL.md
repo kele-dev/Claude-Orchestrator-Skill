@@ -63,9 +63,10 @@ One special lesson file, `learned-map`, saves re-exploring the project in every 
 
 ## Known errors (learned-errors)
 One special lesson file, `<store>/lessons/learned-errors.md`, so a repeated error skips the TRIAGE delegation. Frontmatter as other lessons, with `name: learned-errors` and `description: Verified error patterns of this project (error text, cause, fix). Read when a test/build fails, before TRIAGE.`
-- Entry format, one line each: `- [YYYY-MM-DD] ERROR: <short normalized key text, no paths/line numbers> -> CAUSE: <cause> -> FIX: <fix>. Source: <few words>.`
-- Save only when the fix was verified (the check passed after it). It counts toward the 6-file limit and the 3-lessons-per-task limit; max 15 entries (prune oldest first, since each entry is short and self-contained).
+- Entry format, one line each: `- [YYYY-MM-DD] ERROR: <short normalized key text, no paths/line numbers> -> CAUSE: <cause> -> FIX: <fix>. Source: <few words>. hits: <N>` (`hits:` optional; missing means 0).
+- Save only when the fix was verified (the check passed after it). It counts toward the 6-file limit and the 3-lessons-per-task limit; max 15 entries. When full, prune the entry with the fewest hits first (missing = 0); ties: oldest date first.
 - Use: on a failing test/build, before delegating `TYPE: TRIAGE`, Grep `<store>/lessons/learned-errors.md` for the error's key text. On a match, put CAUSE/FIX in the fix brief directly and skip TRIAGE. If that fix does not work, remove or correct the entry in the end-of-task save delegation.
+- When a matched entry's fix passed, add 1 to its `hits:` (or add `hits: 1`) in the end-of-task save delegation; this update does not count toward the 3-lessons limit.
 
 ## Using lessons (start of a task)
 - On step 1, use the session-start `Orchestrator store:` and `Lessons:` lines (file + description) when present; run the Store command and one Glob of `<store>/lessons/learned-*.md` (frontmatter descriptions only) only if they are missing. Then read the full text of those whose description matches the task, before planning. Read `learned-map` first when it exists. Legacy topics: see `legacy.md` in the `orchestrator:learn` folder; only if legacy files exist.

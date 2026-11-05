@@ -22,6 +22,7 @@ Each case is a directory `<case>/` containing:
 2. Go to Actions -> eval -> Run workflow, or run `gh workflow run eval.yml -f case='*'`.
 3. Results are in the `eval-results` artifact.
 4. Case `on-sonnet-guardrails` checks the rules for a non-Opus-class main session. Its `prompt.md` pins `model: claude-sonnet-5-5`; whether that overrides `--model` is not documented, so also run it with `gh workflow run eval.yml -f case='on-sonnet-*' -f model=claude-sonnet-5-5`.
+5. Case `autopilot-budget-stop` and case `on-learned-errors` need Bash. Case `on-learned-errors` writes a lesson into the runner's `$HOME/.claude/orchestrator/<key>/`; delete it after a local run. Run `on-sonnet-prd-save` with `-f model=claude-sonnet-5-5`. Reviewer-after-PRD ordering is enforced by `hooks/guard-review.mjs` and smoke-tested in `scripts/validate.mjs`; it cannot be graded with `tool_used` or `regex`.
 
 ## Run locally (Linux/macOS)
 
@@ -43,3 +44,11 @@ Run the suite on Linux, macOS or WSL.
 Every run makes real model calls. `--max-cost-usd` caps spend. Keep `--runs 1` while iterating.
 
 Results under `evals/results/` are git-ignored.
+
+## Token log per plugin version
+
+Rows are filled from `evals/ci-result.json` after a run. A token-saving claim in skills or the README needs a before and an after row for the same case and model.
+
+| Plugin version | Date | Case | Main model | Runs | Total tokens | Cost USD | Notes |
+|---|---|---|---|---|---|---|---|
+| 1.9.0 | - | - | - | - | not measured | - | baseline missing |

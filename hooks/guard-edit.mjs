@@ -15,7 +15,7 @@ process.stdin.on('end', () => {
         hookSpecificOutput: {
           hookEventName: 'PreToolUse',
           permissionDecision: 'deny',
-          permissionDecisionReason: 'orchestrator: the main session must not edit project files. Delegate this change to orchestrator:haiku-coder (PRD files under docs/prd/ are allowed). /orchestrator:off disables this guard.',
+          permissionDecisionReason: 'orchestrator: the main session must not edit project files. Delegate this change to orchestrator:haiku-coder. docs/prd/ is writable: the main session may Write/Edit PRD files there itself (e.g. a PRD from orchestrator:opus-planner). /orchestrator:off disables this guard.',
         },
       }));
     }

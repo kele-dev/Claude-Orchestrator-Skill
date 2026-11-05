@@ -232,6 +232,54 @@ if (exists(path.join(root, 'README.md')) && plugin && !readText(path.join(root, 
   err('README.md', `missing "Baru di ${plugin.version}"`);
 }
 
+// 7b. Stop names in skills/on/modes.md must be listed in autopilot's STOP section and resume's "When to write" section
+const sectionOf = (text, pred) => {
+  const lines = text.split(/\r?\n/);
+  const start = lines.findIndex((l) => l.startsWith('## ') && pred(l));
+  if (start === -1) return { heading: '## (section not found)', body: '' };
+  const next = lines.findIndex((l, i) => i > start && l.startsWith('## '));
+  return { heading: lines[start], body: lines.slice(start + 1, next === -1 ? undefined : next).join('\n') };
+};
+const modesFile = 'skills/on/modes.md';
+if (exists(path.join(root, modesFile))) {
+  const modes = readText(path.join(root, modesFile));
+  const stopNames = new Set();
+  for (const re of [/\bstatus ([A-Z]{4,}(?: [A-Z]{4,})*)\b/g, /\b([A-Z]{4,}(?: [A-Z]{4,})*) stop\b/g, /\bis ([A-Z]{4,}(?: [A-Z]{4,})*)\b/g]) {
+    for (const m of modes.matchAll(re)) {
+      // PASS is a unit status, not a stop
+      if (m[1] !== 'PASS') stopNames.add(m[1]);
+    }
+  }
+  const apFile = 'skills/autopilot/SKILL.md';
+  if (exists(path.join(root, apFile))) {
+    const sec = sectionOf(readText(path.join(root, apFile)), (l) => l.includes('STOP'));
+    for (const name of stopNames) {
+      if (!new RegExp(`^- ${name}:`, 'm').test(sec.body)) err(apFile, `stop status "${name}" from ${modesFile} missing in ${sec.heading}`);
+    }
+  }
+  const resumeFile = 'skills/resume/SKILL.md';
+  if (exists(path.join(root, resumeFile))) {
+    const sec = sectionOf(readText(path.join(root, resumeFile)), (l) => l.startsWith('## When to write'));
+    for (const name of stopNames) {
+      if (name !== 'DONE' && !new RegExp(`\\b${name}\\b`).test(sec.body)) err(resumeFile, `stop status "${name}" from ${modesFile} missing in ${sec.heading}`);
+    }
+  }
+}
+
+// 7c. README "Baru di" lines must be in strictly ascending version order (numeric: 1.10 > 1.9); "Juga di" lines are ignored
+if (exists(path.join(root, 'README.md'))) {
+  let prev = null;
+  readText(path.join(root, 'README.md')).split(/\r?\n/).forEach((line, i) => {
+    const m = /^- Baru di (\d+(?:\.\d+){1,2})\b/.exec(line);
+    if (!m) return;
+    const cur = [...m[1].split('.').map(Number), 0].slice(0, 3);
+    if (prev && (cur[0] - prev.n[0] || cur[1] - prev.n[1] || cur[2] - prev.n[2]) <= 0) {
+      err('README.md', `"Baru di ${m[1]}" must come after "Baru di ${prev.v}" (ascending order)`, i + 1);
+    }
+    prev = { v: m[1], n: cur };
+  });
+}
+
 // 8. Hook smoke tests
 function runHook(name, payload, extraEnv = {}) {
   const hookPath = path.join(root, 'hooks', name);
@@ -319,6 +367,12 @@ function runHook(name, payload, extraEnv = {}) {
     const denied = g.stdout.includes('"permissionDecision":"deny"');
     if (deny && !denied) err('hooks/guard-edit.mjs', `smoke "${name}": expected deny`);
     if (!deny && g.stdout.trim() !== '') err('hooks/guard-edit.mjs', `smoke "${name}": expected empty stdout`);
+  }
+  {
+    const g = guard(path.join(root, 'agents', 'x.md'));
+    if (g && !g.stdout.includes('docs/prd/ is writable')) {
+      err('hooks/guard-edit.mjs', 'smoke "guard agents/x.md main thread denied": expected "docs/prd/ is writable" in deny reason');
+    }
   }
 
   r = runHook('session-info.mjs', { hook_event_name: 'SessionStart', source: 'startup', cwd: root });
@@ -415,6 +469,82 @@ function runHook(name, payload, extraEnv = {}) {
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
     for (const m of markers) fs.rmSync(m, { force: true });
+  }
+}
+
+// 8c. Smoke tests: scripts/budget.mjs and hooks/guard-review.mjs
+{
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'orch-budget-'));
+  try {
+    const budgetPath = path.join(root, 'scripts', 'budget.mjs');
+    if (!exists(budgetPath)) {
+      err('scripts/budget.mjs', 'missing, cannot smoke test');
+    } else {
+      const J = JSON.stringify;
+      const launch = (id, name) => J({ type: 'assistant', message: { id: 'm' + id, content: [{ type: 'tool_use', id, name: name || 'Agent', input: { subagent_type: 'orchestrator:haiku-coder', prompt: 'p' } }] } });
+      const result = (id, tur) => J({ type: 'user', message: { content: [{ type: 'tool_result', tool_use_id: id, content: 'r' }] }, toolUseResult: tur });
+      const block = (a, n) => '<task-notification>\n<task-id>' + a + '</task-id>\n<status>completed</status>\n<usage><subagent_tokens>' + n + '</subagent_tokens><tool_uses>3</tool_uses></usage>\n</task-notification>';
+      const qop = (a, n) => J({ type: 'queue-operation', operation: 'enqueue', content: block(a, n) });
+      const unote = (a, n) => J({ type: 'user', message: { content: block(a, n) } });
+      const A = [launch('tu1'), result('tu1', { status: 'async_launched', agentId: 'ag1' }), qop('ag1', 12000), unote('ag1', 12000), launch('tu2', 'Task'), result('tu2', { status: 'completed', agentId: 'ag2', totalTokens: 30500 }), J({ type: 'assistant', isSidechain: true, message: { content: [{ type: 'tool_use', id: 'tu9', name: 'Agent', input: {} }] } }), unote('agX', 99999), unote('ag1', 15000)];
+      const U = [launch('tu3'), result('tu3', { status: 'async_launched', agentId: 'ag3' })];
+      const w = (f, L) => fs.writeFileSync(path.join(tmp, f), L.length ? L.join('\n') + '\n' : '');
+      w('known.jsonl', A);
+      w('mixed.jsonl', A.concat(U));
+      w('m.jsonl', A);
+      const bud = (args) => {
+        const r = spawnSync(process.execPath, [budgetPath, ...args], { encoding: 'utf8', cwd: root });
+        return { out: (r.stdout ?? '').trim(), status: r.status };
+      };
+      const chk = (name, got, want) => {
+        if (got !== want) err('scripts/budget.mjs', `smoke "${name}": expected "${want}", got "${got}"`);
+      };
+      const known = path.join(tmp, 'known.jsonl');
+      const mixed = path.join(tmp, 'mixed.jsonl');
+      const m = path.join(tmp, 'm.jsonl');
+      chk('known', bud([known]).out, 'BUDGET: spent 46k (2 agents)');
+      chk('mixed limit 40k', bud([mixed, '--limit', '40k']).out, 'BUDGET: spent 46k+? (3 agents, 1 without usage) of 40k: OVER');
+      const missingRes = bud([path.join(tmp, 'none.jsonl')]);
+      chk('missing file', missingRes.out, 'BUDGET: spent ? (transcript unreadable)');
+      chk('missing file exit', String(missingRes.status), '0');
+      const size = fs.statSync(m).size;
+      chk('mark', bud([m, '--mark']).out, `BUDGET: mark ${size}`);
+      fs.appendFileSync(m, U.join('\n') + '\n');
+      chk('from mark', bud([m, '--from', String(size)]).out, 'BUDGET: spent ? (1 agent, 1 without usage)');
+    }
+
+    // guard-review smoke
+    fs.mkdirSync(path.join(tmp, 'docs', 'prd'), { recursive: true });
+    fs.writeFileSync(path.join(tmp, 'docs', 'prd', 'exists.md'), '# x\n');
+    const review = (agent, prompt, extraEnv = {}) =>
+      runHook('guard-review.mjs', {
+        hook_event_name: 'PreToolUse',
+        tool_name: 'Agent',
+        tool_input: { subagent_type: agent, prompt },
+        cwd: tmp,
+      }, { CLAUDE_PROJECT_DIR: tmp, ...extraEnv });
+    const reviewCases = [
+      ['review missing path denied', 'orchestrator:opus-reviewer', 'Review docs/prd/no-such-prd-xyz.md', {}, true],
+      ['review existing path allowed', 'orchestrator:opus-reviewer', 'Review docs/prd/exists.md', {}, false],
+      ['review haiku-coder missing path allowed', 'orchestrator:haiku-coder', 'Review docs/prd/no-such-prd-xyz.md', {}, false],
+      ['review glob only allowed', 'orchestrator:opus-reviewer', 'Review docs/prd/*.md', {}, false],
+      ['review url only allowed', 'orchestrator:opus-reviewer', 'Review https://example.com/docs/prd/x.md', {}, false],
+      ['review ORCH_GUARD=off allowed', 'orchestrator:opus-reviewer', 'Review docs/prd/no-such-prd-xyz.md', { ORCH_GUARD: 'off' }, false],
+    ];
+    for (const [name, agent, prompt, env, deny] of reviewCases) {
+      const g = review(agent, prompt, env);
+      if (!g) continue;
+      const denied = g.stdout.includes('"permissionDecision":"deny"');
+      if (deny && !denied) err('hooks/guard-review.mjs', `smoke "${name}": expected deny`);
+      if (!deny && g.stdout.trim() !== '') err('hooks/guard-review.mjs', `smoke "${name}": expected empty stdout`);
+    }
+    const hp = path.join(root, 'hooks', 'guard-review.mjs');
+    if (exists(hp)) {
+      const bad = spawnSync(process.execPath, [hp], { input: 'not json', encoding: 'utf8', cwd: root, env: { ...process.env, ORCH_GUARD: '' } });
+      if (bad.status !== 0 || bad.stdout.trim() !== '') err('hooks/guard-review.mjs', 'smoke "review invalid json": expected empty stdout and exit 0');
+    }
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
   }
 }
 

@@ -1,6 +1,6 @@
 # Token-saving ideas (backlog, from v1.4.0 review, rechecked on v1.5.0)
 
-Status: implemented 1-5 (v1.6.0), 7 (v1.7.1), 9-10 (v1.7.1, partly), 12 (evals/), 6, 8 (team/autopilot only, v1.9.0), 11 (v1.9.0); open: none.
+Status: implemented 1-5 (v1.6.0), 7 (v1.7.1), 9-10 (v1.7.1, partly), 12 (evals/), 6 (implemented v1.9.0, saving not measured (see evals/README.md token log)), 8 (team/autopilot only, v1.9.0), 11 (v1.9.0); open: none.
 
 Since v1.5.0: `rules.md` is also injected on resume (idea 3 matters more), and every change must pass `node scripts/validate.mjs` (idea 4 must keep its cross-references valid).
 

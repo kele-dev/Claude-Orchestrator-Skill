@@ -14,4 +14,4 @@
 ## Manual commands
 - `list`: show every `learned-*` lesson file with its lesson count and the lesson lines, in one compact block.
 - `add <lesson>`: check it against "What counts as a lesson", then save it per SKILL.md (What counts as a lesson / save rules).
-- `prune`: check every lesson against the current project (commands and files still exist, no duplicates, nothing contradicted by recent work), then merge, fix, or remove automatically and report what changed in one short block.
+- `prune`: check every lesson against the current project (commands and files still exist, no duplicates, nothing contradicted by recent work), then merge, fix, or remove automatically and report what changed in one short block. `learned-errors` over 15 entries: remove the fewest-hit entries first (missing `hits:` = 0; ties: oldest date).
