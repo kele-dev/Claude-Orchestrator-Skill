@@ -1,6 +1,6 @@
 ---
 name: resume
-description: Writes and reads orchestrator checkpoints so long work continues in a new session after a context limit, rate limit, compaction, or crash. Use when the user types /orchestrator:resume, or when the on/team/autopilot rules say to write a checkpoint.
+description: "Writes and reads orchestrator checkpoints so long work continues in a new session after a context or rate limit, compaction, or crash. Use on /orchestrator:resume or when on/team/autopilot say to write a checkpoint."
 argument-hint: "[<checkpoint name>]"
 ---
 

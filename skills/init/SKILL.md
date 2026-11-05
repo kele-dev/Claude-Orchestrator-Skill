@@ -1,6 +1,6 @@
 ---
 name: init
-description: Maps a project for the orchestrator in one cheap pass. Haiku reads manifest and config files and writes the learned-map lesson with verified test/build/lint commands. Use when the user types /orchestrator:init, or at the start of the first task in a project that has no learned-map.
+description: "Maps a project in one cheap Haiku pass and writes the learned-map lesson with verified test/build/lint commands. Use on /orchestrator:init or at the first task in a project without a learned-map."
 argument-hint: "[--refresh]"
 ---
 

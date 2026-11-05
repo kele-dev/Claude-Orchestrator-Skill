@@ -1,6 +1,6 @@
 ---
 name: on
-description: Required for EVERY task that changes project code, tests, or configuration. The main session only thinks, brainstorms, writes the PRD, and verifies; execution is delegated to haiku-coder, escalation to sonnet-dev. Can also be invoked manually with /orchestrator:on <task>.
+description: "Required for EVERY task that changes project code, tests, or config: the main session plans and verifies, haiku-coder executes, sonnet-dev takes escalations. Manual: /orchestrator:on <task>."
 argument-hint: "<task description>"
 ---
 
@@ -39,6 +39,9 @@ Both paths: read only needed files, send subagents only relevant excerpts.
 - Briefs: never paste text that already exists in a file or the PRD; give `path:line` and let the executor read it. Keep a full-path brief <= ~25 lines (short path: ~15).
 - COMMIT brief: the message is subject and body only, never with trailers in it; if your own instructions give a commit attribution line (e.g. Co-Authored-By), add it as a separate brief line `TRAILER: <that line>` so the commit credits the main session, not the executor.
 - Housekeeping due at the same time (COMMIT, checkpoint write or delete, lessons save) goes in ONE `haiku-coder` brief as ordered typed steps (e.g. `1. TYPE: COMMIT ...` `2. TYPE: RUN rm "<checkpoint>"`); each step keeps its own rules. Never one delegation per step: each costs ~10k tokens of startup.
+- Turn economy: every main-session turn re-reads the whole context, so spend fewer turns. Put the diff review and the verify command in ONE shell call; send the next delegation in the same message as the passing verification's follow-up (plan update, housekeeping); never spend a turn on a status-only message; after launching background agents end the turn with one line and do not poll.
+- Reuse finished agents: a fix brief (fix round, or a small finding from review) for a unit whose agent finished in this session goes to that agent with `SendMessage` (it keeps its files and context, saving ~10k startup); a new agent only when moving up a tier, when `SendMessage` is unavailable, or when the agent was stopped. It still counts as one fix round.
+- Incremental review: after a group passes, snapshot it (Bash): `export GIT_INDEX_FILE="$(git rev-parse --git-path orch-review-index)"; git read-tree HEAD && git add -A && git write-tree` and keep the printed tree id; the next group's review reads `git diff --stat <tree>` and `git diff -U1 <tree>` (plus `git status --short` for new files), never the earlier groups' hunks again. Reset after a commit (diff against HEAD).
 
 ## 1. UNDERSTAND & BRAINSTORM
 Read relevant files. Weigh 2-3 short approaches, pick one, record why. Ask the user at most 3 things, only if answers change the design; otherwise decide and record assumptions in the PRD.
