@@ -1,0 +1,5 @@
+# Caps (mirror of the `## Budget` bullets in team and autopilot; scripts/validate.mjs fails if they differ)
+- team lanes per wave: 3 (ceiling 4)
+- team fix rounds per lane: 2 (ceiling 4)
+- autopilot batches: 5 (ceiling 8)
+- autopilot fix rounds per batch: 2 (ceiling 4)

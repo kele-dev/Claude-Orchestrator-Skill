@@ -192,17 +192,35 @@ if (!exists(path.join(root, 'README.md'))) {
 }
 
 // 7. Required files, headings, frontmatter flags, README version note
-for (const f of ['skills/on/modes.md', 'skills/on/reference.md', 'skills/learn/legacy.md']) {
+for (const f of ['skills/on/modes.md', 'skills/on/reference.md', 'skills/learn/legacy.md', 'skills/status/caps.md', 'skills/learn/reference.md']) {
   if (!exists(path.join(root, f))) err(f, 'required file missing');
 }
 const headingChecks = [
   ['skills/team/SKILL.md', '## Budget'],
   ['skills/autopilot/SKILL.md', '## Budget'],
   ['skills/learn/SKILL.md', '## Store'],
+  ['skills/learn/reference.md', '## Store command'],
+  ['skills/learn/reference.md', '## Manual commands'],
 ];
 for (const [f, h] of headingChecks) {
   if (!exists(path.join(root, f))) continue;
   if (!readText(path.join(root, f)).split(/\r?\n/).some((l) => l.startsWith(h))) err(f, `missing heading "${h}"`);
+}
+// Caps mirror: skills/status/caps.md must match the ## Budget bullets of team and autopilot.
+const capPairs = [
+  ['skills/team/SKILL.md', /Max parallel lanes per wave: (\d+)[^\n]*Hard ceiling: (\d+)/, /team lanes per wave: (\d+) \(ceiling (\d+)\)/, 'team'],
+  ['skills/team/SKILL.md', /Max fix rounds per lane: (\d+), raised automatically up to (\d+)/, /team fix rounds per lane: (\d+) \(ceiling (\d+)\)/, 'team'],
+  ['skills/autopilot/SKILL.md', /Max batches: (\d+), raised automatically up to (\d+)/, /autopilot batches: (\d+) \(ceiling (\d+)\)/, 'autopilot'],
+  ['skills/autopilot/SKILL.md', /Max fix rounds per batch: (\d+), raised automatically up to (\d+)/, /autopilot fix rounds per batch: (\d+) \(ceiling (\d+)\)/, 'autopilot'],
+];
+if (exists(path.join(root, 'skills/status/caps.md'))) {
+  const caps = readText(path.join(root, 'skills/status/caps.md'));
+  for (const [src, srcRe, capRe, name] of capPairs) {
+    if (!exists(path.join(root, src))) continue;
+    const s = readText(path.join(root, src)).match(srcRe);
+    const c = caps.match(capRe);
+    if (!s || !c || s[1] !== c[1] || s[2] !== c[2]) err('skills/status/caps.md', `caps differ from ${name} ## Budget: ${capRe.source}`);
+  }
 }
 for (const s of ['off', 'team', 'autopilot', 'status']) {
   const f = `skills/${s}/SKILL.md`;

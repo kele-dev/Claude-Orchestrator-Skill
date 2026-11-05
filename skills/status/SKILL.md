@@ -18,7 +18,7 @@ disable-model-invocation: true
 - Session: delegations so far per agent (haiku-coder, sonnet-dev, opus-reviewer), counted from this conversation; "unknown" after a compaction.
 
 ## Caps
-- Show the defaults and ceilings from the `## Budget` bullets of the `team` and `autopilot` SKILL.md files (sibling skill folders); never restate numbers from memory. A cap the user sets (`lanes=N`, `batches=N`) is never raised.
+- Show the defaults and ceilings from `caps.md` in this skill's folder (it mirrors the `## Budget` bullets of `team` and `autopilot`; read those only if `caps.md` is missing); never restate numbers from memory. A cap the user sets (`lanes=N`, `batches=N`) is never raised.
 
 ## Report
 - One table `Item | Value`, max 12 rows, then at most 2 suggestion lines (init / resume / legacy).
