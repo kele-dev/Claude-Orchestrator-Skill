@@ -59,7 +59,7 @@ function run(input) {
     return `${f}: ${desc.slice(0, 100)}`;
   });
   if (allLessons.length > 20) lessons.push(`+${allLessons.length - 20} more (see ${store}/lessons)`);
-  lines.push(lessons.length ? `Lessons: ${lessons.join('; ')}` : 'Lessons: none');
+  lines.push(lessons.length ? `Lessons: [${store}/lessons] ${lessons.join('; ')}` : 'Lessons: none');
 
   const cpDir = join(store, 'checkpoints');
   const allCps = listMd(cpDir)

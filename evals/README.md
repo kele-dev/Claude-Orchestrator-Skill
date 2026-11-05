@@ -21,6 +21,7 @@ Each case is a directory `<case>/` containing:
 1. Add the repository secret `ANTHROPIC_API_KEY`.
 2. Go to Actions -> eval -> Run workflow, or run `gh workflow run eval.yml -f case='*'`.
 3. Results are in the `eval-results` artifact.
+4. Case `on-sonnet-guardrails` checks the rules for a non-Opus-class main session. Its `prompt.md` pins `model: claude-sonnet-5-5`; whether that overrides `--model` is not documented, so also run it with `gh workflow run eval.yml -f case='on-sonnet-*' -f model=claude-sonnet-5-5`.
 
 ## Run locally (Linux/macOS)
 

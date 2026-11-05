@@ -37,7 +37,8 @@ Both paths: read only needed files, send subagents only relevant excerpts.
 - Failing test/build: trimmed failure to `haiku-coder` `TYPE: TRIAGE`; read only its report.
 - Start each `haiku-coder` brief with `TYPE: EDIT | CREATE | RUN | TRIAGE | SCAN | COMMIT | APPLY` (the agent knows the rules and report format).
 - Briefs: never paste text that already exists in a file or the PRD; give `path:line` and let the executor read it. Keep a full-path brief <= ~25 lines (short path: ~15).
-- COMMIT brief: the message is subject and body only; never put Co-Authored-By or other trailers in it: the executor appends the attribution trailer from its own instructions.
+- COMMIT brief: the message is subject and body only, never with trailers in it; if your own instructions give a commit attribution line (e.g. Co-Authored-By), add it as a separate brief line `TRAILER: <that line>` so the commit credits the main session, not the executor.
+- Housekeeping due at the same time (COMMIT, checkpoint write or delete, lessons save) goes in ONE `haiku-coder` brief as ordered typed steps (e.g. `1. TYPE: COMMIT ...` `2. TYPE: RUN rm "<checkpoint>"`); each step keeps its own rules. Never one delegation per step: each costs ~10k tokens of startup.
 
 ## 1. UNDERSTAND & BRAINSTORM
 Read relevant files. Weigh 2-3 short approaches, pick one, record why. Ask the user at most 3 things, only if answers change the design; otherwise decide and record assumptions in the PRD.
@@ -67,7 +68,7 @@ Both paths.
 - Tokens: always, when any delegation happened: one line with usage per agent from the completion notices (e.g. `Tokens: audit Explore 96k · batch1 haiku-coder 12k · batch2 haiku-coder 17k · 3 delegations, total ≈125k`); if a notice shows no usage, write `?` for that agent; never omit the line. If multi-batch work stops before DONE, write a checkpoint per `orchestrator:resume`.
 - Report check (not Opus-class): more than 1 file changed without an `opus-reviewer` pass means the task is not DONE; the report says so and names the missing review.
 - Self-review (same terms/numbers across files, references resolve, no stale mentions): only on the full path or multi-file doc/config changes; fix via delegation first.
-- Lessons: save only if this task had a failure, escalation, fix round, or user correction, or the learned-map is missing/wrong; a clean task saves nothing (no delegation). Then at most 3 non-obvious, verified ones (see `orchestrator:learn`) via one `haiku-coder` delegation (also fix wrong ones), no approval; one line "Lessons saved: ...".
+- Lessons: save only if this task had a failure, escalation, fix round, or user correction, or the learned-map is missing/wrong; a clean task saves nothing (no delegation). Then at most 3 non-obvious, verified ones (see `orchestrator:learn`) via one `haiku-coder` delegation, bundled with other housekeeping due at the same time (also fix wrong ones), no approval; one line "Lessons saved: ...".
 
 ## Hard rules
 - Reply in the user's own language. Do not commit (unless `commit=batch` was passed to team/autopilot), push, run DB migrations, or touch .env; do not let subagents rewrite or weaken tests to make them green.

@@ -39,11 +39,11 @@ Arguments: $ARGUMENTS
 - No argument: list checkpoints from `<store>/checkpoints/` plus legacy `<main>/.claude/orchestrator/checkpoints/*.md` (legacy ones marked "(legacy)"): name, task, updated. Load the only or most recent one if unambiguous, else ask which.
 - With an argument: load the checkpoint with that name; if none matches, treat the argument as keywords and match them against each checkpoint's `Task:` line (load a single match, else list the candidates and ask).
 - No checkpoints found: say so in one line, search no further, and offer to start the task fresh with `orchestrator:on`.
-- Verify cheaply: current branch matches, `git log --oneline -5`, `git status --porcelain`.
+- Verify cheaply: current branch matches, `git log --oneline -5`, `git status --porcelain`. Then `git fetch -q` and `git log --oneline <recorded base or last verified commit>..origin/<main branch>`: if new commits there touch files the checkpoint names (`git diff --stat <that commit> origin/<main branch>`), say in max 3 lines which plan items may already be done, and ask before continuing.
 - Trust PASS items unless git contradicts them.
 - Do not re-plan and do not re-read the project. Continue at Next step. If the recorded mode is team or autopilot, those modes are user-invoked only: do not continue in that mode; tell the user in one line to run `/orchestrator:team ...` or `/orchestrator:autopilot ...` with the remaining task and caps from the checkpoint. Otherwise continue in `on`.
 - If git contradicts the checkpoint, report the mismatch in max 3 lines and ask.
 
 ## Finishing
-- When the task reaches DONE, delete only its checkpoint in `<store>`, via `orchestrator:haiku-coder` `TYPE: RUN` with `rm "<absolute path>"` (RUN may delete only the file named in the brief), and say so in the report line.
+- When the task reaches DONE, delete only its checkpoint in `<store>` with `rm "<absolute path>"` (RUN may delete only the file named in the brief): as a step in the same `haiku-coder` brief as the final COMMIT, if one is due, else a lone `TYPE: RUN`. Say so in the report line.
 - A finished legacy checkpoint: tell the user its path; never delete it yourself.
