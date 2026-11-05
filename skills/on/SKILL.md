@@ -14,7 +14,7 @@ You are the orchestrator (the main session): the brain, not the hands. The flow 
 
 ## Main-session model
 - Opus-class (Opus or at least as capable, e.g. Fable): flow as written. Not Opus-class (Sonnet, Haiku, others): you know your model from your system prompt.
-- Short path: only for 1 file with a clearly specified text change (old -> new known); anything else, including multi-file doc/config changes, takes the full path. Full path: delegate design to `opus-planner` (brief: task, constraints, the `Digest:` command from session start, if printed, for conversation context); save its PRD unchanged to `docs/prd/<slug>.md` and build haiku briefs from it.
+- Short path: only for 1 file with a clearly specified text change (old -> new known); anything else, including multi-file doc/config changes, takes the full path. Full path: delegate design to `opus-planner` (brief: task, constraints, the `Digest:` command from session start, if printed, for conversation context); the main session saves its PRD unchanged to `docs/prd/<slug>.md` itself with Write (the guard hook allows `docs/prd/`; the planner is read-only); only if that Write is denied, delegate a `haiku-coder` `TYPE: CREATE` and wait for its report. Then build haiku briefs from it.
 - Escalation (step 4): send error, diff and PRD to `opus-planner` for diagnosis and a rewritten brief. Review (step 5): the final (or batch) diff MUST go to `opus-reviewer`.
 - Ambiguous target: if a request could land in more than one place (memory, skill/docs, config, code), ask the user one question naming the options before acting; never pick one silently (e.g. saving a memory instead of changing the skill).
 - Haiku main session: for a file-changing task, first say in one line that a stronger main model (Opus recommended, Sonnet minimum) is advised, then continue.
@@ -50,7 +50,7 @@ Read relevant files. Weigh 2-3 short approaches, pick one, record why. Ask the u
 Lessons: from the `Lessons:` line at session start (else `<store>` per `orchestrator:learn` "## Store"); read only relevant ones and paste those lines into each brief (subagents cannot see them).
 
 ## 2. PRD (complete, ready for Haiku to execute)
-Goal, non-goals, atomic tasks (max 5 files each, runnable verification command), signatures/formulas/examples, acceptance tests (written in the PRD, not by the executor), risks, assumptions. Small work: in the conversation; save to `docs/prd/<slug>.md` only if >5 tasks or touches schema/auth/security (then `opus-reviewer` assesses it first). Not Opus-class: the PRD comes from `opus-planner`.
+Goal, non-goals, atomic tasks (max 5 files each, runnable verification command), signatures/formulas/examples, acceptance tests (written in the PRD, not by the executor), risks, assumptions. Small work: in the conversation; save to `docs/prd/<slug>.md` only if >5 tasks or touches schema/auth/security (then `opus-reviewer` assesses it first). Not Opus-class: the PRD comes from `opus-planner`. Never launch `opus-reviewer` on a PRD file before the file exists: confirm with `ls` (and, if a CREATE agent saved it, after that agent reported) first.
 Details: `reference.md` (only when writing a large PRD).
 
 ## 3. EXECUTION
