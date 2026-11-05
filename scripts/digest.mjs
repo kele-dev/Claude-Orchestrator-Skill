@@ -36,6 +36,7 @@ function clean(text) {
 const msgs = []; // { role, id, text }
 for (const line of lines) {
   if (!line.trim()) continue;
+  if (!line.includes('"type":"user"') && !line.includes('"type":"assistant"')) continue;
   let o;
   try { o = JSON.parse(line); } catch { continue; }
   if (!o || o.isSidechain === true || o.isMeta === true) continue;
