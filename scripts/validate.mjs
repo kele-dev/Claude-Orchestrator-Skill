@@ -268,6 +268,33 @@ function runHook(name, payload, extraEnv = {}) {
     ['guard docs/prd allowed', path.join(root, 'docs', 'prd', 'x.md'), {}, false],
     ['guard worktree docs/prd allowed', path.join(root, '.claude', 'worktrees', 'w1', 'docs', 'prd', 'x.md'), {}, false],
   ];
+  const tdir = fs.mkdtempSync(path.join(os.tmpdir(), 'orch-guard-'));
+  try {
+    const writeT = (name, lines) => {
+      const p = path.join(tdir, name);
+      fs.writeFileSync(p, lines.map((e) => JSON.stringify(e)).join('\n') + '\n');
+      return p;
+    };
+    const offEntry = { type: 'user', message: { content: '<command-message>orchestrator:off</command-message>\n<command-name>/orchestrator:off</command-name>' } };
+    const onSkill = { type: 'assistant', message: { content: [{ type: 'tool_use', name: 'Skill', input: { skill: 'orchestrator:on' } }] } };
+    const reminderOff = { type: 'user', message: { content: [{ type: 'text', text: '<system-reminder>x</system-reminder><command-message>orchestrator:off</command-message><command-name>/orchestrator:off</command-name>' }] } };
+    const plainMention = { type: 'user', message: { content: 'please run /orchestrator:off later' } };
+    const tCases = [
+      ['guard transcript off allowed', writeT('off.jsonl', [offEntry]), false],
+      ['guard transcript off then on via Skill denied', writeT('off-on.jsonl', [offEntry, onSkill]), true],
+      ['guard transcript reminder-prefixed off allowed', writeT('reminder-off.jsonl', [reminderOff]), false],
+      ['guard transcript plain mention denied', writeT('mention.jsonl', [plainMention]), true],
+    ];
+    for (const [name, tp, deny] of tCases) {
+      const g = guard(path.join(root, 'agents', 'x.md'), { transcript_path: tp });
+      if (!g) continue;
+      const denied = g.stdout.includes('"permissionDecision":"deny"');
+      if (deny && !denied) err('hooks/guard-edit.mjs', `smoke "${name}": expected deny`);
+      if (!deny && g.stdout.trim() !== '') err('hooks/guard-edit.mjs', `smoke "${name}": expected empty stdout`);
+    }
+  } finally {
+    fs.rmSync(tdir, { recursive: true, force: true });
+  }
   for (const [name, file, extra, deny] of guardCases) {
     const g = guard(file, extra);
     if (!g) continue;
@@ -287,7 +314,10 @@ function runHook(name, payload, extraEnv = {}) {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'orch-validate-'));
   const sidA = `validate-${process.pid}-${Date.now()}`;
   const sidB = `${sidA}-b`;
-  const markers = [sidA, sidB].map((s) => path.join(os.tmpdir(), `orchestrator-long-${s}`));
+  const sidC = `${sidA}-c`;
+  const sidD = `${sidA}-d`;
+  const sidE = `${sidA}-e`;
+  const markers = [sidA, sidB, sidC, sidD, sidE, `${sidA}-f`].flatMap((s) => [path.join(os.tmpdir(), `orchestrator-long-${s}`), path.join(os.tmpdir(), `orchestrator-long-${s}.count`)]);
   try {
     const digestPath = path.join(root, 'scripts', 'digest.mjs');
     if (!exists(digestPath)) {
@@ -325,6 +355,45 @@ function runHook(name, payload, extraEnv = {}) {
     if (r2 && !r2.stdout.includes('systemMessage')) err('hooks/long-session.mjs', 'smoke "long limit 5": expected systemMessage in stdout');
     let r3 = runHook('long-session.mjs', longPayload(sidB), { ORCH_LONG: '', ORCH_LONG_DELEGATIONS: '', ORCH_LONG_BYTES: '5' });
     if (r3 && r3.stdout.trim() !== '') err('hooks/long-session.mjs', 'smoke "long repeat": expected empty stdout (marker exists)');
+    const delegTranscript = path.join(tmp, 'deleg.jsonl');
+    const delegLines = [
+      { type: 'user', message: { content: 'x'.repeat(300 * 1024) } },
+      { type: 'assistant', message: { id: 'm', content: [{ type: 'tool_use', name: 'Agent', input: { subagent_type: 'x', prompt: 'p' } }] } },
+      { type: 'assistant', message: { id: 'm', content: [{ type: 'tool_use', name: 'Agent', input: { subagent_type: 'x', prompt: 'p' } }] } },
+    ];
+    fs.writeFileSync(delegTranscript, delegLines.map((l) => JSON.stringify(l)).join('\n') + '\n');
+    const r6 = runHook('long-session.mjs', { hook_event_name: 'UserPromptSubmit', session_id: sidE, transcript_path: delegTranscript, cwd: root }, { ORCH_LONG: '', ORCH_LONG_TOKENS: '', ORCH_LONG_BYTES: '999999999', ORCH_LONG_DELEGATIONS: '2' });
+    if (r6 && !r6.stdout.includes('2 delegations')) err('hooks/long-session.mjs', 'smoke "long delegations": expected "2 delegations" in stdout');
+    const sidF = `${sidA}-f`;
+    const sidFCount = path.join(os.tmpdir(), `orchestrator-long-${sidF}.count`);
+    const incTranscript = path.join(tmp, 'inc.jsonl');
+    const incLine = JSON.stringify({ type: 'assistant', message: { id: 'm', content: [{ type: 'tool_use', name: 'Agent', input: { subagent_type: 'x', prompt: 'p' } }] } }) + '\n';
+    fs.writeFileSync(incTranscript, incLine);
+    const incPayload = { hook_event_name: 'UserPromptSubmit', session_id: sidF, transcript_path: incTranscript, cwd: root };
+    const incEnv = { ORCH_LONG: '', ORCH_LONG_TOKENS: '', ORCH_LONG_BYTES: '999999999', ORCH_LONG_DELEGATIONS: '2' };
+    const r7 = runHook('long-session.mjs', incPayload, incEnv);
+    if (r7 && r7.stdout.trim() !== '') err('hooks/long-session.mjs', 'smoke "long incremental 1": expected empty stdout');
+    if (!fs.existsSync(sidFCount)) err('hooks/long-session.mjs', 'smoke "long incremental 1": expected .count file');
+    fs.appendFileSync(incTranscript, incLine);
+    const r8 = runHook('long-session.mjs', incPayload, incEnv);
+    if (r8 && !r8.stdout.includes('2 delegations')) err('hooks/long-session.mjs', 'smoke "long incremental 2": expected "2 delegations" in stdout');
+    if (fs.existsSync(sidFCount)) err('hooks/long-session.mjs', 'smoke "long incremental 2": expected .count file removed');
+
+    const usageTranscript = (cacheRead2) => {
+      const usageLines = [
+        { type: 'assistant', message: { usage: { input_tokens: 10, cache_read_input_tokens: 1000 } } },
+        { type: 'assistant', message: { usage: { input_tokens: 10, cache_read_input_tokens: cacheRead2 } } },
+      ];
+      return usageLines.map((l) => JSON.stringify(l)).join('\n') + '\n';
+    };
+    const growthPath = path.join(tmp, 'growth.jsonl');
+    fs.writeFileSync(growthPath, usageTranscript(131000));
+    const r4 = runHook('long-session.mjs', { hook_event_name: 'UserPromptSubmit', session_id: sidC, transcript_path: growthPath, cwd: root }, { ORCH_LONG: '', ORCH_LONG_DELEGATIONS: '', ORCH_LONG_BYTES: '999999999', ORCH_LONG_TOKENS: '' });
+    if (r4 && (!r4.stdout.includes('systemMessage') || !r4.stdout.includes('+130k'))) err('hooks/long-session.mjs', 'smoke "long usage growth": expected systemMessage with "+130k" in stdout');
+    const flatPath = path.join(tmp, 'flat.jsonl');
+    fs.writeFileSync(flatPath, usageTranscript(11000));
+    const r5 = runHook('long-session.mjs', { hook_event_name: 'UserPromptSubmit', session_id: sidD, transcript_path: flatPath, cwd: root }, { ORCH_LONG: '', ORCH_LONG_DELEGATIONS: '', ORCH_LONG_BYTES: '5', ORCH_LONG_TOKENS: '' });
+    if (r5 && r5.stdout.trim() !== '') err('hooks/long-session.mjs', 'smoke "long usage flat": expected empty stdout (usage present overrides bytes)');
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
     for (const m of markers) fs.rmSync(m, { force: true });

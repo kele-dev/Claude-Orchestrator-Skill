@@ -110,7 +110,8 @@ function orchestrationOff(transcriptPath) {
 function lastMode(text) {
   const lines = text.split('\n');
   for (let i = lines.length - 1; i >= 0; i--) {
-    if (!lines[i].includes('orchestrator:')) continue;
+    const l = lines[i];
+    if (!(l.includes('<command-name>/orchestrator:') || (l.includes('"Skill"') && l.includes('orchestrator:')))) continue;
     let entry;
     try {
       entry = JSON.parse(lines[i]);
@@ -132,7 +133,9 @@ function modeOf(entry) {
       const first = content.find((p) => p?.type === 'text');
       if (typeof first?.text === 'string') s = first.text;
     }
-    if (s === null || !s.trimStart().startsWith('<command-message>')) return null;
+    if (s === null) return null;
+    s = s.replace(/<system-reminder>[\s\S]*?<\/system-reminder>/g, '');
+    if (!s.trimStart().startsWith('<command-message>')) return null;
     const m = /<command-name>\/orchestrator:(on|off|team|autopilot)<\/command-name>/.exec(s);
     return m ? m[1] : null;
   }
