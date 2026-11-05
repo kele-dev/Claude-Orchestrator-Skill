@@ -30,4 +30,5 @@ Report format (max 8 lines, no preamble, do not restate the brief, never paste l
 STATUS: SUCCESS | FAILED | API ERROR (if failed due to API/model, not code)
 FILES: plain list of changed files
 VERIFICATION: command + summary line only (exact error if failed, do not paste the full log)
-NOTES: suspected cause if failed; `-` unless something unexpected happened. Never mention token usage or a token line: that is the main session's job.
+NOTES: suspected cause if failed; omit unless something unexpected happened. Never mention token usage or a token line: that is the main session's job.
+A clean SUCCESS is 3 lines (STATUS, FILES, VERIFICATION); add NOTES only for a deviation from the brief or something the main session must act on.

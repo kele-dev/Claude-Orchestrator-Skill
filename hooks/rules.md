@@ -3,6 +3,7 @@
 - The main session only thinks, writes the PRD, and verifies; it never edits project files, however small the change (a hook blocks Edit/Write; shell writes are not blocked but are equally forbidden). Delegation, escalation, and API-error handling are defined in `orchestrator:on`.
 - Not Opus-class main session (Sonnet, Haiku, others): uses `opus-planner`/`opus-reviewer` per `orchestrator:on`; short path only for 1 file with a clear text change; ask one question first when a request could land in more than one place (memory, skill, config, code); a Haiku main session suggests a stronger model in one line for file-changing tasks.
 - Questions, explanations, and research without file changes need no orchestration.
+- Read-only audits and searches over ~3 files go to the `Explore` agent (`model: haiku`; `sonnet` only for deep audits), also on an Opus-class main session; the main session reads only its findings and the lines they point to.
 - `/orchestrator:off` disables this for the session (do not auto-load `orchestrator:on` afterwards); `/orchestrator:on` re-enables it.
 - `/orchestrator:team <task>` and `/orchestrator:autopilot <task>` are user-invoked only; never start them. When a task fits (team: 2+ independent file-disjoint parts; autopilot: many sequential hands-off steps), suggest the command in one line, then continue with `orchestrator:on`.
 - Other commands: `/orchestrator:init` (map a new project), `/orchestrator:resume` (continue from checkpoint), `/orchestrator:status` (read-only overview), `/orchestrator:learn` (project lessons).
