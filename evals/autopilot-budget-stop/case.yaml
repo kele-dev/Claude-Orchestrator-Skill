@@ -1,0 +1,5 @@
+schema_version: "1.1"
+name: autopilot-budget-stop
+tags: [autopilot, budget]
+context:
+  scaffold_script: fixture.sh

@@ -1,7 +1,7 @@
 ---
 name: autopilot
 description: Autonomous sequential execution under the orchestrator cost rules. One short clarification round, a PRD, then batch after batch (delegate, verify, fix) without asking between batches, until done or a cap is hit. Only runs when the user types /orchestrator:autopilot.
-argument-hint: "[batches=N] [commit=batch] [--dry-run] <task description>"
+argument-hint: "[batches=N] [commit=batch] [budget=<N>k] [--dry-run] <task description>"
 disable-model-invocation: true
 ---
 
@@ -19,6 +19,7 @@ Autopilot is `orchestrator:on` without stopping between batches (the main sessio
 - `--dry-run`: stop after stage 2 and show the PRD and batch plan.
 - `commit=batch` scope: per batch, after it passes verification.
 - Checkpoint timing: after every 3rd batch.
+- `budget=<N>k` (optional): token budget over all delegations; rules in `modes.md` (Budget).
 
 ## 1. CLARIFY
 Ask the questions (if any) in one go. After the answers, do not ask again until a stop condition.
@@ -39,6 +40,7 @@ Ask the questions (if any) in one go. After the answers, do not ask again until 
 - BLOCKED: a batch hit its fix cap. Do not start later batches that depend on it; report.
 - DECISION NEEDED: an architecture decision or user input that cannot be safely assumed. Stop and ask.
 - BATCH LIMIT: the batch cap was reached with work left. Report and ask whether to continue.
+- BUDGET: budget=<N>k reached; checkpoint and report per modes.md (Budget).
 
 ## 5. REPORT
 Per `modes.md`: report. Unit = batch; status PASS / BLOCKED.

@@ -1,6 +1,6 @@
 # Token-saving ideas (backlog, from v1.4.0 review, rechecked on v1.5.0)
 
-Status: implemented 1-5 (v1.6.0), 7 (v1.7.1), 9-10 (v1.7.1, partly), 12 (evals/); open: 6, 8, 11.
+Status: implemented 1-5 (v1.6.0), 7 (v1.7.1), 9-10 (v1.7.1, partly), 12 (evals/), 6 (implemented v1.9.0, saving not measured (see evals/README.md token log)), 8 (team/autopilot only, v1.9.0), 11 (v1.9.0), 13 (delegation startup measured v1.11.0: no change, see below); open: none.
 
 Since v1.5.0: `rules.md` is also injected on resume (idea 3 matters more), and every change must pass `node scripts/validate.mjs` (idea 4 must keep its cross-references valid).
 
@@ -35,3 +35,10 @@ Since v1.5.0: `rules.md` is also injected on resume (idea 3 matters more), and e
 - Guard reads only the last 512 KB of the transcript.
 - Leaner flow: no COMMIT trailers, SCAN only for diffs over 5 files, small fixes batched into one delegation, agent reports max 8 lines, no background executors, lesson saves gated on a failure/escalation/correction.
 - Agent `effort` levels (idea 7 done).
+
+## Measured in v1.11.0: per-delegation startup
+
+- R3 (2 runs): haiku-coder empty-task call 10,567 / 10,820 tokens (startup 10.56k, cached prefix 6,258); 1-3 tool task call 10,843 / 11,246; the task part of a 1-file CREATE (call2 - call1) is 276 and 426 tokens (about 0.3-0.4k). The 10.56k startup comes from call 2 (call 1 startup is not in the trace). opus-reviewer is 9.08k in R3; planner evidence is 9.2-9.3k for opus-planner/reviewer.
+- Plugin-controlled share: the agent file body, about 0.9k for `haiku-coder` (under 10%).
+- Decision: no reduction. Trimming `agents/haiku-coder.md` saves under 1k per delegation and risks TYPE-rule regressions. The real lever is fewer delegations: `SendMessage` reuse, the short path. Bundling was removed in 1.11.0 (no measured effect). Cost is in Opus (main session turns and opus-planner/opus-reviewer), not in haiku-coder delegations; report cost by model (scripts/trace-tokens.mjs), not raw tokens.
+- Revisit only if R3 shows the plugin-controlled share above 3k.
