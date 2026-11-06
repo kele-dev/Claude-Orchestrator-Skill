@@ -1,8 +1,41 @@
 #!/usr/bin/env node
 // Sum sub-agent token usage from a Claude Code transcript (JSONL). Always exits 0.
-// Usage: node scripts/budget.mjs <transcript.jsonl> [--mark] [--from <bytes>] [--limit <N>k]
-import { statSync } from 'node:fs';
+// Usage: node scripts/budget.mjs <transcript.jsonl|auto> [--mark] [--from <bytes>] [--limit <N>k]
+import { statSync, readdirSync, realpathSync } from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { readTranscript, entries } from './transcript.mjs';
+
+// Newest *.jsonl in one project transcript dir; undefined if missing or without jsonl.
+function newestJsonl(dir) {
+  let best, bt = -1;
+  try {
+    for (const f of readdirSync(dir)) {
+      if (!f.endsWith('.jsonl')) continue;
+      try {
+        const t = statSync(path.join(dir, f)).mtimeMs;
+        if (t > bt) { bt = t; best = path.join(dir, f); }
+      } catch { continue; }
+    }
+  } catch { return undefined; }
+  return best;
+}
+
+// Newest *.jsonl of this project's transcript dir: cwd (and its realpath), then each parent up to root.
+// undefined if nothing found (treated as unreadable).
+function newestTranscript() {
+  const base = process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), '.claude');
+  const starts = [process.cwd()];
+  try { const real = realpathSync(process.cwd()); if (real !== starts[0]) starts.push(real); } catch { /* cwd only */ }
+  for (const start of starts) {
+    for (let dir = start; ; dir = path.dirname(dir)) {
+      const found = newestJsonl(path.join(base, 'projects', dir.replace(/[^A-Za-z0-9]/g, '-')));
+      if (found) return found;
+      if (path.dirname(dir) === dir) break;
+    }
+  }
+  return undefined;
+}
 
 function main() {
   const args = process.argv.slice(2);
@@ -11,7 +44,8 @@ function main() {
     if (i < 0) return undefined;
     return args[i].includes('=') ? args[i].slice(name.length + 1) : args[i + 1];
   };
-  const file = args.find((a, i) => !a.startsWith('--') && args[i - 1] !== '--from' && args[i - 1] !== '--limit');
+  let file = args.find((a, i) => !a.startsWith('--') && args[i - 1] !== '--from' && args[i - 1] !== '--limit');
+  if (file === 'auto') file = newestTranscript();
   if (args.includes('--mark')) {
     let size = 0;
     try { size = statSync(file).size; } catch { size = 0; }
