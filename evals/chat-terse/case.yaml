@@ -1,0 +1,5 @@
+schema_version: "1.1"
+name: chat-terse
+tags: [style, tokens]
+context:
+  scaffold_script: fixture.sh

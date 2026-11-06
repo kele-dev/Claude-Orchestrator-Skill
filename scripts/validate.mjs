@@ -264,6 +264,19 @@ if (exists(path.join(root, modesFile))) {
       if (name !== 'DONE' && !new RegExp(`\\b${name}\\b`).test(sec.body)) err(resumeFile, `stop status "${name}" from ${modesFile} missing in ${sec.heading}`);
     }
   }
+  // 7d. orchestrator:on budget argument: hint, pointer to modes.md Budget, and only stop names known to modes.md
+  const onFile = 'skills/on/SKILL.md';
+  if (exists(path.join(root, onFile))) {
+    const onText = readText(path.join(root, onFile));
+    if (onText.includes('budget=')) {
+      const hint = /^argument-hint:\s*(.*)$/m.exec(onText)?.[1] ?? '';
+      if (!hint.includes('budget=<N>k')) err(onFile, 'argument-hint must include "budget=<N>k" when the body uses budget=');
+      if (!/Budget[^\n]*modes\.md|modes\.md[^\n]*Budget/.test(onText)) err(onFile, 'budget= rule must point to the Budget bullet in modes.md');
+    }
+    for (const m of onText.matchAll(/\bstatus ([A-Z]{4,}(?: [A-Z]{4,})*)\b/g)) {
+      if (m[1] !== 'PASS' && !stopNames.has(m[1])) err(onFile, `stop status "${m[1]}" is not defined in ${modesFile}`);
+    }
+  }
 }
 
 // 7c. README "Baru di" lines must be in strictly ascending version order (numeric: 1.10 > 1.9); "Juga di" lines are ignored
@@ -390,6 +403,7 @@ function runHook(name, payload, extraEnv = {}) {
   const sidD = `${sidA}-d`;
   const sidE = `${sidA}-e`;
   const markers = [sidA, sidB, sidC, sidD, sidE, `${sidA}-f`].flatMap((s) => [path.join(os.tmpdir(), `orchestrator-long-${s}`), path.join(os.tmpdir(), `orchestrator-long-${s}.count`)]);
+  markers.push(...['g', 'h', 'i', 'j', 'k'].flatMap((s) => [path.join(os.tmpdir(), `orchestrator-long-${sidA}-${s}`), path.join(os.tmpdir(), `orchestrator-long-${sidA}-${s}.count`)]));
   try {
     const digestPath = path.join(root, 'scripts', 'digest.mjs');
     if (!exists(digestPath)) {
@@ -466,6 +480,29 @@ function runHook(name, payload, extraEnv = {}) {
     fs.writeFileSync(flatPath, usageTranscript(11000));
     const r5 = runHook('long-session.mjs', { hook_event_name: 'UserPromptSubmit', session_id: sidD, transcript_path: flatPath, cwd: root }, { ORCH_LONG: '', ORCH_LONG_DELEGATIONS: '', ORCH_LONG_BYTES: '5', ORCH_LONG_TOKENS: '' });
     if (r5 && r5.stdout.trim() !== '') err('hooks/long-session.mjs', 'smoke "long usage flat": expected empty stdout (usage present overrides bytes)');
+
+    // long repeat smoke: [suffix, ORCH_LONG_REPEAT, write marker first, [growth, expect ('' = empty stdout), noReminder]]
+    const repeatSteps = [
+      ['g', '', false, [[130000, '+130k', true], [130000, '', false], [260000, 'reminder 1 of 2', false], [260000, '', false], [400000, 'reminder 2 of 2', false], [900000, '', false]]],
+      ['h', 'off', false, [[260000, '+260k', true], [500000, '', false]]],
+      ['i', '', true, [[130000, '', false], [260000, 'reminder 1 of 2', false]]],
+      ['j', '', false, [[450000, '+450k', true], [460000, '', false]]],
+      ['k', '200000,abc,50000', false, [[130000, '+130k', false], [210000, 'reminder 1 of 1', false], [999000, '', false]]],
+    ];
+    const repeatPath = path.join(tmp, 'repeat.jsonl');
+    for (const [sfx, rep, pre, steps] of repeatSteps) {
+      if (pre) fs.writeFileSync(path.join(os.tmpdir(), `orchestrator-long-${sidA}-${sfx}`), '');
+      steps.forEach(([growth, want, noReminder], idx) => {
+        const n = idx + 1;
+        fs.writeFileSync(repeatPath, usageTranscript(growth + 1000));
+        const rr = runHook('long-session.mjs', { hook_event_name: 'UserPromptSubmit', session_id: `${sidA}-${sfx}`, transcript_path: repeatPath, cwd: root }, { ORCH_LONG: '', ORCH_LONG_DELEGATIONS: '', ORCH_LONG_BYTES: '999999999', ORCH_LONG_TOKENS: '', ORCH_LONG_REPEAT: rep });
+        if (!rr) return;
+        const o = rr.stdout ?? '';
+        const okWant = want === '' ? o.trim() === '' : o.includes(want);
+        const okRem = !noReminder || !o.includes('reminder');
+        if (!okWant || !okRem) err('hooks/long-session.mjs', `smoke "long repeat ${sfx} step ${n}": expected ${want === '' ? 'empty stdout' : `"${want}"`}${noReminder ? ' without "reminder"' : ''}`);
+      });
+    }
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
     for (const m of markers) fs.rmSync(m, { force: true });
@@ -511,6 +548,39 @@ function runHook(name, payload, extraEnv = {}) {
       chk('mark', bud([m, '--mark']).out, `BUDGET: mark ${size}`);
       fs.appendFileSync(m, U.join('\n') + '\n');
       chk('from mark', bud([m, '--from', String(size)]).out, 'BUDGET: spent ? (1 agent, 1 without usage)');
+
+      // auto mode: newest transcript of the project dir
+      const autoCwd = fs.realpathSync(fs.mkdtempSync(path.join(tmp, 'auto-cwd-')));
+      const autoCfg = path.join(tmp, 'auto-cfg');
+      const autoDir = path.join(autoCfg, 'projects', autoCwd.replace(/[^A-Za-z0-9]/g, '-'));
+      fs.mkdirSync(autoDir, { recursive: true });
+      const one = (n) => [launch('tu1'), result('tu1', { status: 'completed', agentId: 'ag1', totalTokens: n })].join('\n') + '\n';
+      fs.writeFileSync(path.join(autoDir, 'old.jsonl'), one(5000));
+      fs.writeFileSync(path.join(autoDir, 'new.jsonl'), one(12000));
+      fs.utimesSync(path.join(autoDir, 'old.jsonl'), new Date(Date.now() - 60000), new Date(Date.now() - 60000));
+      fs.utimesSync(path.join(autoDir, 'new.jsonl'), new Date(), new Date());
+      const auto = (cfg, extra = [], cwd = autoCwd) => {
+        const r = spawnSync(process.execPath, [budgetPath, 'auto', ...extra], { encoding: 'utf8', cwd, env: { ...process.env, CLAUDE_CONFIG_DIR: cfg } });
+        return (r.stdout ?? '').trim();
+      };
+      chk('auto newest', auto(autoCfg), 'BUDGET: spent 12k (1 agent)');
+      const emptyCfg = path.join(tmp, 'empty-cfg');
+      fs.mkdirSync(emptyCfg, { recursive: true });
+      chk('auto empty', auto(emptyCfg), 'BUDGET: spent ? (transcript unreadable)');
+      // a newer non-jsonl file in the project dir is ignored
+      fs.writeFileSync(path.join(autoDir, 'notes.txt'), 'not a transcript\n');
+      fs.utimesSync(path.join(autoDir, 'notes.txt'), new Date(Date.now() + 60000), new Date(Date.now() + 60000));
+      chk('auto ignores non-jsonl', auto(autoCfg), 'BUDGET: spent 12k (1 agent)');
+      // existing but empty project dir (no jsonl)
+      const emptyProjCfg = path.join(tmp, 'empty-proj-cfg');
+      fs.mkdirSync(path.join(emptyProjCfg, 'projects', autoCwd.replace(/[^A-Za-z0-9]/g, '-')), { recursive: true });
+      chk('auto empty project dir', auto(emptyProjCfg), 'BUDGET: spent ? (transcript unreadable)');
+      // --mark prints the size of the newest jsonl
+      chk('auto mark', auto(autoCfg, ['--mark']), `BUDGET: mark ${fs.statSync(path.join(autoDir, 'new.jsonl')).size}`);
+      // cwd in a subfolder of the keyed project folder walks up to it
+      const autoSub = path.join(autoCwd, 'sub');
+      fs.mkdirSync(autoSub, { recursive: true });
+      chk('auto from subfolder', auto(autoCfg, [], autoSub), 'BUDGET: spent 12k (1 agent)');
     }
 
     // guard-review smoke
@@ -545,6 +615,67 @@ function runHook(name, payload, extraEnv = {}) {
     }
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
+  }
+}
+// 8d. Smoke tests: scripts/trace-tokens.mjs
+{
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'orch-trace-'));
+  try {
+    const tracePath = path.join(root, 'scripts', 'trace-tokens.mjs');
+    if (!exists(tracePath)) {
+      err('scripts/trace-tokens.mjs', 'missing, cannot smoke test');
+    } else {
+      const J = JSON.stringify;
+      const d = tmp;
+      const L = [{type:'system',subtype:'init',model:'m-main'},{type:'system',subtype:'task_started',tool_use_id:'tu1',subagent_type:'orchestrator:haiku-coder',prompt:'abc'},{type:'assistant',parent_tool_use_id:'tu1',uuid:'u1',message:{id:'s1',content:[{type:'tool_use',id:'x',name:'Bash',input:{}}],usage:{input_tokens:2,cache_creation_input_tokens:4000,cache_read_input_tokens:6000,output_tokens:5}}},{type:'assistant',parent_tool_use_id:'tu1',uuid:'u2',message:{id:'s2',content:[{type:'text',text:'sub text'}],usage:{input_tokens:2,cache_creation_input_tokens:100,cache_read_input_tokens:10000,output_tokens:5}}},{type:'system',subtype:'task_notification',tool_use_id:'tu1',usage:{total_tokens:10900,tool_uses:1}},{type:'result',num_turns:1,total_cost_usd:0.01,result:'x',modelUsage:{'m-main':{inputTokens:1,outputTokens:1,cacheReadInputTokens:1,cacheCreationInputTokens:1}}},{type:'assistant',parent_tool_use_id:null,uuid:'u3',message:{id:'m1',content:[{type:'text',text:'hello'}],usage:{input_tokens:1,output_tokens:1}}},{type:'result',num_turns:3,total_cost_usd:0.1234,result:'done!',modelUsage:{'m-main':{inputTokens:10,outputTokens:500,cacheReadInputTokens:20000,cacheCreationInputTokens:5000},'m-sub':{inputTokens:2,outputTokens:100,cacheReadInputTokens:6000,cacheCreationInputTokens:4000}}}];
+      fs.writeFileSync(path.join(d, 't.jsonl'), L.slice(0, 6).map((x) => J(x)).join('\n') + '\nnot json\n' + L.slice(6).map((x) => J(x)).join('\n') + '\n');
+      fs.writeFileSync(path.join(d, 'r.json'), J({ startedAt: '2026-11-05T01:02:03Z', suite: { modelOverride: 'm-main', plugins: [{ version: '9.9.9' }] }, cases: [{ name: 'c1', arms: { with: [{ passed: true, costUsd: 0.5, tracePath: path.join(d, 't.jsonl') }], without: [{ passed: false, tracePath: path.join(d, 'none.jsonl') }] } }] }));
+      const trace = (file, extra = []) => {
+        const r = spawnSync(process.execPath, [tracePath, file, ...extra], { encoding: 'utf8', cwd: root });
+        return { out: (r.stdout ?? '').trim(), status: r.status };
+      };
+      const chk = (name, got, want) => {
+        if (got !== want) err('scripts/trace-tokens.mjs', `smoke "${name}": expected "${want}", got "${got}"`);
+      };
+      chk('trace lines', trace(path.join(d, 't.jsonl')).out, [
+        'TRACE: total 36k tokens, cost $0.1234, turns 3, main m-main out 500, reply 5 chars, main text 5 chars',
+        'AGENT: orchestrator:haiku-coder startup 10002 cached 6000 total 10900 tools 1 brief 3',
+      ].join('\n'));
+      chk('md rows', trace(path.join(d, 'r.json'), ['--md']).out, [
+        '| 9.9.9 | 2026-11-05 | c1 | m-main | 1 | 36k | 0.5000 | arm with; pass 1/1; agent startup 10.0-10.0k; reply 5 chars |',
+        '| 9.9.9 | 2026-11-05 | c1 | m-main | 1 | ? | ? | arm without; pass 0/1; agent startup -; reply ? chars |',
+      ].join('\n'));
+      const missing = spawnSync(process.execPath, [tracePath, path.join(d, 'none.jsonl')], { encoding: 'utf8', cwd: root });
+      chk('missing file', (missing.stdout ?? '').trim(), 'TRACE: unreadable');
+      chk('missing file exit', String(missing.status), '0');
+    }
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+}
+
+// 9. Eval cases: case.yaml name matches folder, prompt.md and scaffold script exist, graders use a known type with required keys
+const GRADER_TYPES = new Set(['regex', 'tool_order', 'tool_used', 'file_exists', 'llm', 'baseline']);
+const REQUIRED = { regex: ['pattern'], tool_order: ['before', 'after'], tool_used: ['tool'], file_exists: ['path'], llm: [], baseline: ['baseline_file'] };
+for (const c of listDirs('evals').filter((d) => d !== 'results')) {
+  const dir = `evals/${c}`, caseFile = `${dir}/case.yaml`;
+  if (!exists(path.join(root, caseFile))) { err(caseFile, 'missing'); continue; }
+  const cy = readText(path.join(root, caseFile));
+  const name = /^name:\s*(\S+)\s*$/m.exec(cy)?.[1];
+  if (name !== c) err(caseFile, `name "${name ?? ''}" must match folder "${c}"`);
+  const scaffold = /^\s*scaffold_script:\s*(\S+)\s*$/m.exec(cy)?.[1];
+  if (scaffold && !exists(path.join(root, dir, scaffold))) err(caseFile, `scaffold_script "${scaffold}" missing`);
+  if (!exists(path.join(root, dir, 'prompt.md'))) err(`${dir}/prompt.md`, 'missing');
+  const graders = listMd(`${dir}/graders`);
+  if (!graders.length) err(`${dir}/graders`, 'no grader files');
+  for (const g of graders) {
+    const gf = `${dir}/graders/${g}`, fm = frontmatter(gf);
+    if (!fm) continue;
+    if (!GRADER_TYPES.has(fm.type)) { err(gf, `type "${fm.type ?? ''}" must be one of ${[...GRADER_TYPES].join(', ')}`); continue; }
+    for (const k of REQUIRED[fm.type]) if (!fm[k]) err(gf, `${fm.type} grader needs "${k}"`);
+    for (const [k, fl] of [['pattern', fm.flags ?? ''], ['input_match', '']]) {
+      if (fm[k] && fm[k] !== '(block)') { try { new RegExp(fm[k], fl); } catch (e) { err(gf, `${k} is not a valid RegExp (${e.message})`); } }
+    }
   }
 }
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// UserPromptSubmit hook: warns once per session when the context has grown (assistant message.usage tokens),
+// UserPromptSubmit hook: warns when the context has grown (assistant message.usage tokens), then again at higher thresholds (ORCH_LONG_REPEAT),
 // or, without usage data, when the transcript is large; also warns on delegation count.
 // Delegation count is incremental: the byte offset and count are cached in a tmp .count file, and only new bytes are read.
 // Fails open: on any error or unexpected input it prints nothing and exits 0.
@@ -136,6 +136,18 @@ function countDelegations(path, size, cachePath) {
   return next.count;
 }
 
+// Extra growth thresholds after the first warning: ORCH_LONG_REPEAT = comma list (default 250000,400000) or "off".
+function repeatLevels(v, first) {
+  if (v === 'off') return [];
+  const raw = v === undefined || v === '' ? '250000,400000' : v;
+  const nums = raw.split(',').map((s) => s.trim()).filter((s) => /^[1-9]\d*$/.test(s)).map(Number).filter((n) => n > first);
+  return [...new Set(nums)].sort((a, b) => a - b).slice(0, 5);
+}
+// Highest warning level already shown (marker content); an empty or invalid marker (older versions) counts as 1.
+function readLevel(marker) {
+  try { const s = readFileSync(marker, 'utf8').trim(); return /^[1-9]\d*$/.test(s) ? Number(s) : 1; } catch { return 1; }
+}
+
 function run(input) {
   if (process.env.ORCH_LONG === 'off') return '';
 
@@ -143,23 +155,33 @@ function run(input) {
   if (id === '') return '';
   const marker = join(tmpdir(), `orchestrator-long-${id}`);
   const countPath = `${marker}.count`;
-  if (existsSync(marker)) return '';
-
   const path = input?.transcript_path;
   if (typeof path !== 'string' || path === '') return '';
 
   const tokensLimit = posInt(process.env.ORCH_LONG_TOKENS, 120000);
+  const levels = [tokensLimit, ...repeatLevels(process.env.ORCH_LONG_REPEAT, tokensLimit)];
+  const warned = existsSync(marker) ? readLevel(marker) : 0;
+  if (warned >= levels.length) return '';
+  const size = statSync(path).size;
+  const g = contextGrowth(path, size);
+  const growth = g ? g.last - g.first : 0;
+  const level = levels.filter((t) => growth >= t).length;
+  const say = (line) => JSON.stringify({ systemMessage: line, hookSpecificOutput: { hookEventName: 'UserPromptSubmit', additionalContext: line } });
+  if (warned > 0) {
+    if (!g || level <= warned) return '';
+    writeFileSync(marker, String(level));
+    return say(`orchestrator: this session is very long (+${Math.round(growth / 1000)}k context tokens; reminder ${level - 1} of ${levels.length - 1}). Every turn re-reads the whole context. If a multi-step task is in progress, write a checkpoint per orchestrator:resume now (one haiku-coder delegation, bundled with any due housekeeping) and continue in a new session with /orchestrator:resume; otherwise suggest a new session or /compact in one line.`);
+  }
+
   const bytesLimit = posInt(process.env.ORCH_LONG_BYTES, 2 * 1024 * 1024);
   const delegLimit = posInt(process.env.ORCH_LONG_DELEGATIONS, 30);
 
-  const size = statSync(path).size;
-  const g = contextGrowth(path, size);
-  const tokensLong = g && g.last - g.first >= tokensLimit;
+  const tokensLong = level >= 1;
   const delegations = tokensLong ? 0 : countDelegations(path, size, countPath);
   const isLong = tokensLong || delegations >= delegLimit || (!g && size >= bytesLimit);
   if (!isLong) return '';
 
-  writeFileSync(marker, '');
+  writeFileSync(marker, String(g ? Math.max(1, level) : levels.length));
   try {
     rmSync(countPath, { force: true });
   } catch {
@@ -169,8 +191,5 @@ function run(input) {
   const line = g
     ? `orchestrator: this session is long (+${Math.round((g.last - g.first) / 1000)}k context tokens${tokensLong ? '' : `, ${delegations} delegations`}).${tail}`
     : `orchestrator: this session is long (${(size / 1048576).toFixed(1)} MB, ${delegations} delegations).${tail}`;
-  return JSON.stringify({
-    systemMessage: line,
-    hookSpecificOutput: { hookEventName: 'UserPromptSubmit', additionalContext: line },
-  });
+  return say(line);
 }

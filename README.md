@@ -32,7 +32,7 @@ Update: `claude plugin update orchestrator@kele-dev`. Uninstall: `claude plugin 
 
 Orchestration mode is active automatically in every session. Manual commands:
 
-- `/orchestrator:on` - turn on (or `/orchestrator:on <task>` to give a task directly)
+- `/orchestrator:on` - turn on (or `/orchestrator:on <task>` to give a task directly); optional `budget=<N>k` (e.g. `/orchestrator:on budget=50k <task>`) stops with status BUDGET and a checkpoint once the agents' total tokens reach it
 - `/orchestrator:off` - turn off for the rest of this session (Claude works directly as usual)
 - `/orchestrator:team <task>` - parallel mode: the main session splits the work into lanes that own separate files, Haiku lanes run at the same time, only failed lanes are retried. Caps: 3 lanes, 2 fix rounds per lane, raised automatically up to 4 lanes / 4 rounds only while fixes make progress (a cap you set, e.g. `lanes=N`, is never raised; optional `budget=<N>k` stops with status BUDGET and a checkpoint once the agents' total tokens reach it). Lanes that need each other's files cooperate through the main session. Add `--dry-run` to see the lane plan first. `isolate=worktree` (opt-in) runs each lane in its own git worktree; needs `worktree.baseRef` set to `"head"` in settings, a clean working tree, and `commit=batch`, otherwise it warns and uses the shared tree; passed lanes are copied back into the main tree.
 - `/orchestrator:autopilot <task>` - autonomous mode: one short clarification round, a PRD, then batch after batch without asking in between, until done or a cap is hit. Caps: 5 batches, 2 fix rounds per batch, raised automatically up to 8 batches / 4 rounds only while work keeps passing (a cap you set, e.g. `batches=N`, is never raised; optional `budget=<N>k` stops with status BUDGET and a checkpoint once the agents' total tokens reach it). Add `--dry-run` to see the plan first.
@@ -58,7 +58,7 @@ Orchestration mode is active automatically in every session. Manual commands:
 - Before verifying a larger change, Haiku scans the diff for mechanical mistakes; the main session reads only the flagged hunks and the main logic.
 - In a long conversation Claude writes a checkpoint and suggests continuing in a new session.
 - Always-loaded rules are smaller: `hooks/rules.md` is shortened, and `orchestrator:on` is split into a core plus an on-demand `reference.md`.
-- A long-session warning appears once when the context grows by 120k tokens (from message usage; 2 MB transcript size if usage is missing) or after 30 delegations (`ORCH_LONG=off`, `ORCH_LONG_TOKENS`, `ORCH_LONG_BYTES`, `ORCH_LONG_DELEGATIONS`); `scripts/digest.mjs` gives planners a compact conversation summary.
+- A long-session warning appears when the context grows by 120k tokens, again at +250k and +400k (`ORCH_LONG_REPEAT`: comma list or `off`), suggesting a checkpoint and a new session (from message usage; 2 MB transcript size if usage is missing) or after 30 delegations (`ORCH_LONG=off`, `ORCH_LONG_TOKENS`, `ORCH_LONG_BYTES`, `ORCH_LONG_DELEGATIONS`); `scripts/digest.mjs` gives planners a compact conversation summary.
 
 ### Hooks
 
@@ -69,6 +69,18 @@ Orchestration mode is active automatically in every session. Manual commands:
 - Review guard (`guard-review`): a PreToolUse hook on Agent/Task that denies `orchestrator:opus-reviewer` when its prompt names a `docs/prd/*.md` file that does not exist. It fails open when Node is missing or the check cannot run. Turn it off with env `ORCH_GUARD=off`.
 
 ## What's new (1.9.0 and later)
+
+### 1.11.0
+- Long-session reminders repeat at +250k and +400k tokens (`ORCH_LONG_REPEAT`), suggesting a checkpoint and a new session.
+- `budget=<N>k` now also works for plain `/orchestrator:on`.
+- New `scripts/trace-tokens.mjs` plus the measured startup cost: about 10.6k fixed tokens per haiku-coder delegation (no reduction made).
+- Honest graders: trace-based main-session and write-success checks, and `tool_order` review ordering.
+- 5 new evals plus the filled token log.
+- Validator checks eval structure, the `on` budget rule, and new smoke tests.
+
+### 1.10.1
+- `budget.mjs auto` finds its own transcript when no `Digest:` line is printed (the newest transcript for this project).
+- Non-Opus PRD rule aligned: the planner's PRD is saved to `docs/prd/` only when step 2 requires it.
 
 ### 1.10.0
 - New `scripts/budget.mjs` that sums agent tokens from the transcript; it prints a `BUDGET: spent <X>k (...) of <N>k: UNDER|OVER|UNKNOWN` output line for team/autopilot.
@@ -90,7 +102,7 @@ Orchestration mode is active automatically in every session. Manual commands:
 - Skill `learn`: project lessons saved and maintained automatically as local files in the project store; one report line tells you what changed, and the manual commands are optional.
 - Skills `init`, `resume`, and `status`: one-pass project map, checkpoints to continue in a new session, and a read-only state summary.
 - Agents `haiku-coder` (executor), `sonnet-dev` (escalation), `opus-reviewer` (review, read-only; now runs on Opus), `opus-planner` (PRD and diagnosis when the main session is not Opus-class, read-only).
-- Hooks: SessionStart rules (loads the orchestration rules into every session), SessionStart session info (store path, lesson index, open checkpoints), edit guard (PreToolUse), review guard (PreToolUse, Agent/Task), output trim (PostToolUse).
+- Hooks: SessionStart rules (loads the orchestration rules into every session), SessionStart session info (store path, lesson index, open checkpoints), edit guard (PreToolUse), review guard (PreToolUse, Agent/Task), output trim (PostToolUse), long-session reminder (UserPromptSubmit).
 
 ## Optional: reduce permission prompts
 
@@ -135,6 +147,8 @@ If you previously installed via `install.ps1`, delete `haiku-coder.md`, `sonnet-
 - Baru di 1.8.5: hemat token per sesi dan per tugas: `/orchestrator:status` membaca `skills/status/caps.md` yang kecil (dicek validator terhadap Budget team/autopilot), `learn` memindahkan perintah Store dan manual ke `skills/learn/reference.md`, teks COMMIT/APPLY di `haiku-coder` dan tiga baris aturan sesi dipersingkat.
 - Baru di 1.9.0: argumen opsional `budget=<N>k` untuk team/autopilot (berhenti dengan status BUDGET dan checkpoint bila total token agent mencapai batas), lesson khusus `learned-errors` (pola error terverifikasi -> penyebab -> perbaikan, dipakai sebelum TRIAGE), dan urutan brief yang ramah cache (bagian tetap dulu, bagian variabel terakhir).
 - Baru di 1.10.0: skrip `scripts/budget.mjs` (ringkasan token agent, baris `BUDGET: spent <X>k (...) of <N>k: UNDER|OVER|UNKNOWN` untuk team/autopilot), review guard `guard-review` (memblokir `opus-reviewer` bila prompt menyebut `docs/prd/*.md` yang tidak ada; fail open; `ORCH_GUARD=off`), pesan guard-edit kini menyebut `docs/prd/` boleh ditulis, `learned-errors` punya penghitung `hits:` dan pemangkasan yang paling sedikit dipakai (maks 15), validator memeriksa nama status stop dan urutan "Baru di", 3 eval baru dan log token, serta klaim cache dilunakkan.
+- Baru di 1.10.1: `budget.mjs auto` menemukan transcript sendiri bila tidak ada baris `Digest:` (transkrip terbaru proyek ini), dan aturan PRD non-Opus diselaraskan: PRD planner hanya disimpan ke `docs/prd/` bila langkah 2 mewajibkannya.
+- Baru di 1.11.0: pengingat sesi panjang berulang di +250k dan +400k token konteks (`ORCH_LONG_REPEAT`) dengan saran checkpoint, `budget=<N>k` juga untuk `/orchestrator:on` biasa, skrip `scripts/trace-tokens.mjs` (total token dan biaya startup per agent dari trace eval), grader yang lebih jujur (cek trace khusus sesi utama dan keberhasilan tulis checkpoint, urutan review dengan `tool_order`), 5 eval baru dan log token berisi hasil terukur, serta validator memeriksa struktur eval.
 - Mode orkestrasi aktif otomatis di setiap sesi.
 
 ## Maintainers

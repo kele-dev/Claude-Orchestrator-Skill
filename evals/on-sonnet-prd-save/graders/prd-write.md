@@ -4,4 +4,4 @@ tool: Write
 input_match: '"file_path"\s*:\s*"[^"]*docs/prd/[^"]+\.md"'
 min: 1
 ---
-The main session saved the planner PRD itself; reviewer ordering is enforced by `hooks/guard-review.mjs` and is not gradable here.
+A Write to docs/prd/*.md happened (tool_used may also count subagent calls; prd-write-main checks the main session). Reviewer ordering: review-after-prd.
