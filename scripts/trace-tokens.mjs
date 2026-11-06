@@ -57,6 +57,10 @@ function analyzeTrace(text) {
         (u?.cacheCreationInputTokens ?? 0);
     }
   }
+  const byModel = [];
+  for (const [m, u] of Object.entries(r?.modelUsage ?? {})) {
+    if (isNum(u?.costUSD)) byModel.push({ model: m, cost: u.costUSD });
+  }
   const model = init?.model ?? '?';
 
   const seen = new Set();
@@ -105,6 +109,7 @@ function analyzeTrace(text) {
   return {
     sum,
     cost: isNum(r?.total_cost_usd) ? r.total_cost_usd : null,
+    byModel,
     turns: r?.num_turns ?? '?',
     model,
     out: r?.modelUsage?.[model]?.outputTokens ?? '?',
@@ -114,13 +119,26 @@ function analyzeTrace(text) {
   };
 }
 
+// Cost per model, sorted by cost, averaged over the given per-run lists.
+function costByModel(lists) {
+  const acc = new Map();
+  for (const l of lists) for (const x of l) acc.set(x.model, (acc.get(x.model) ?? 0) + x.cost);
+  const n = lists.length;
+  const rows = [...acc].map(([model, c]) => ({ model, cost: c / n })).sort((a, b) => b.cost - a.cost);
+  const total = rows.reduce((s, x) => s + x.cost, 0);
+  return rows
+    .map((x) => `${x.model} $${x.cost.toFixed(4)} (${total > 0 ? Math.round((100 * x.cost) / total) : 0}%)`)
+    .join(' ; ');
+}
+
 function traceLines(text) {
   const a = analyzeTrace(text);
   if (!a) return [UNREADABLE];
   const T = a.sum == null ? '?' : Math.round(a.sum / 1000) + 'k';
   const C = a.cost == null ? '?' : '$' + a.cost.toFixed(4);
+  const bm = a.byModel.length ? ` | by model: ${costByModel([a.byModel])}` : '';
   const lines = [
-    `TRACE: total ${T} tokens, cost ${C}, turns ${a.turns}, main ${a.model} out ${a.out}, reply ${a.reply ?? '?'} chars, main text ${a.main} chars`,
+    `TRACE: total ${T} tokens, cost ${C}, turns ${a.turns}, main ${a.model} out ${a.out}, reply ${a.reply ?? '?'} chars, main text ${a.main} chars${bm}`,
   ];
   for (const g of a.agents) {
     lines.push(`AGENT: ${g.type} startup ${g.startup} cached ${g.cached} total ${g.total} tools ${g.tools} brief ${g.brief}`);
@@ -187,8 +205,11 @@ function main() {
       const replies = analyses.filter((a) => a && a.reply != null).map((a) => a.reply);
       const meanReply = replies.length ? Math.round(mean(replies)) : '?';
 
+      const byModelLists = analyses.filter((a) => a && a.byModel.length).map((a) => a.byModel);
+      const bmStr = byModelLists.length ? `; cost by model ${costByModel(byModelLists)}` : '';
+
       out.push(
-        `| ${version} | ${date} | ${c.name} | ${model} | ${n} | ${meanTotal} | ${meanCost} | arm ${arm}; pass ${passed}/${n}; agent startup ${agentStr}; reply ${meanReply} chars |`,
+        `| ${version} | ${date} | ${c.name} | ${model} | ${n} | ${meanTotal} | ${meanCost} | arm ${arm}; pass ${passed}/${n}; agent startup ${agentStr}; reply ${meanReply} chars${bmStr} |`,
       );
     }
   }

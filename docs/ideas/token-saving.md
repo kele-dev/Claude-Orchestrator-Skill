@@ -40,5 +40,5 @@ Since v1.5.0: `rules.md` is also injected on resume (idea 3 matters more), and e
 
 - R3 (2 runs): haiku-coder empty-task call 10,567 / 10,820 tokens (startup 10.56k, cached prefix 6,258); 1-3 tool task call 10,843 / 11,246; the task part of a 1-file CREATE (call2 - call1) is 276 and 426 tokens (about 0.3-0.4k). The 10.56k startup comes from call 2 (call 1 startup is not in the trace). opus-reviewer is 9.08k in R3; planner evidence is 9.2-9.3k for opus-planner/reviewer.
 - Plugin-controlled share: the agent file body, about 0.9k for `haiku-coder` (under 10%).
-- Decision: no reduction. Trimming `agents/haiku-coder.md` saves under 1k per delegation and risks TYPE-rule regressions. The real lever is fewer delegations: bundling, `SendMessage` reuse, the short path. All of these are already rules.
+- Decision: no reduction. Trimming `agents/haiku-coder.md` saves under 1k per delegation and risks TYPE-rule regressions. The real lever is fewer delegations: `SendMessage` reuse, the short path. Bundling was removed in 1.11.0 (no measured effect). Cost is in Opus (main session turns and opus-planner/opus-reviewer), not in haiku-coder delegations; report cost by model (scripts/trace-tokens.mjs), not raw tokens.
 - Revisit only if R3 shows the plugin-controlled share above 3k.

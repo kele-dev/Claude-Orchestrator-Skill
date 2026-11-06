@@ -1,6 +1,6 @@
 ---
 name: opus-planner
-description: "Planner for non-Opus-class main sessions. Called for full-path work to write the PRD and design decisions, and to diagnose after the escalation ladder fails. Read-only; does not change files."
+description: "Planner for non-Opus-class main sessions. Called for full-path work to write the PRD when the design is hard, and design decisions, and to diagnose after the escalation ladder fails. Read-only; does not change files."
 tools: Read, Grep, Glob, Bash
 model: opus
 effort: high
