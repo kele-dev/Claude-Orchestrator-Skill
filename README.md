@@ -71,7 +71,7 @@ Orchestration mode is active automatically in every session. Manual commands:
 ## What's new (1.9.0 and later)
 
 ### 1.11.0
-- Long-session reminders repeat at +250k and +400k tokens (`ORCH_LONG_REPEAT`), suggesting a checkpoint and a new session.
+- Long-session reminders repeat at +250k and +400k tokens (`ORCH_LONG_REPEAT`), suggesting a checkpoint and a new session (offers a new session link where the app supports it).
 - `budget=<N>k` now also works for plain `/orchestrator:on`.
 - New `scripts/trace-tokens.mjs` plus the measured startup cost: about 10.6k fixed tokens per haiku-coder delegation (no reduction made).
 - Honest graders: trace-based main-session and write-success checks, and `tool_order` review ordering.

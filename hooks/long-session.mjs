@@ -170,7 +170,8 @@ function run(input) {
   if (warned > 0) {
     if (!g || level <= warned) return '';
     writeFileSync(marker, String(level));
-    return say(`orchestrator: this session is very long (+${Math.round(growth / 1000)}k context tokens; reminder ${level - 1} of ${levels.length - 1}). Every turn re-reads the whole context. If a multi-step task is in progress, write a checkpoint per orchestrator:resume now (one haiku-coder delegation, bundled with any due housekeeping) and continue in a new session with /orchestrator:resume; otherwise suggest a new session or /compact in one line.`);
+    const last = level === levels.length ? ' This is the last reminder: stop taking new work in this session.' : '';
+    return say(`orchestrator: this session is very long (+${Math.round(growth / 1000)}k context tokens; reminder ${level - 1} of ${levels.length - 1}). Every turn re-reads the whole context. Write a checkpoint now per orchestrator:resume (one haiku-coder delegation, bundled with any due housekeeping). Then, if a tool that starts a new session is available in this environment (e.g. the desktop app's start_session), offer a new session whose first message is /orchestrator:resume (ask the user first; never start one unasked); otherwise tell the user in one line to open a new session and run /orchestrator:resume.${last}`);
   }
 
   const bytesLimit = posInt(process.env.ORCH_LONG_BYTES, 2 * 1024 * 1024);
