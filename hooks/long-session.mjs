@@ -170,7 +170,7 @@ function run(input) {
   if (warned > 0) {
     if (!g || level <= warned) return '';
     writeFileSync(marker, String(level));
-    return say(`orchestrator: this session is very long (+${Math.round(growth / 1000)}k context tokens; reminder ${level - 1} of ${levels.length - 1}). Every turn re-reads the whole context. If a multi-step task is in progress, write a checkpoint per orchestrator:resume now (one haiku-coder delegation, bundled with any due housekeeping) and continue in a new session with /orchestrator:resume; otherwise suggest a new session or /compact in one line.`);
+    return say(`orchestrator: this session is very long (+${Math.round(growth / 1000)}k context tokens; reminder ${level - 1} of ${levels.length - 1}). Every turn re-reads the whole context. If a multi-step task is in progress, write a checkpoint per orchestrator:resume now (one haiku-coder delegation, bundled with any due housekeeping) and hand off per orchestrator:resume (summary plus a new-session card running /orchestrator:resume <slug>); otherwise suggest a new session or /compact in one line.`);
   }
 
   const bytesLimit = posInt(process.env.ORCH_LONG_BYTES, 2 * 1024 * 1024);
@@ -187,7 +187,7 @@ function run(input) {
   } catch {
     // ignore cleanup errors
   }
-  const tail = ' Write a checkpoint per orchestrator:resume and continue in a new session with /orchestrator:resume.';
+  const tail = ' Write a checkpoint per orchestrator:resume and hand off per orchestrator:resume (summary plus a new-session card running /orchestrator:resume <slug>).';
   const line = g
     ? `orchestrator: this session is long (+${Math.round((g.last - g.first) / 1000)}k context tokens${tokensLong ? '' : `, ${delegations} delegations`}).${tail}`
     : `orchestrator: this session is long (${(size / 1048576).toFixed(1)} MB, ${delegations} delegations).${tail}`;
