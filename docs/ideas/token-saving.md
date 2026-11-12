@@ -42,3 +42,12 @@ Since v1.5.0: `rules.md` is also injected on resume (idea 3 matters more), and e
 - Plugin-controlled share: the agent file body, about 0.9k for `haiku-coder` (under 10%).
 - Decision: no reduction. Trimming `agents/haiku-coder.md` saves under 1k per delegation and risks TYPE-rule regressions. The real lever is fewer delegations: `SendMessage` reuse, the short path. Bundling was removed in 1.11.0 (no measured effect). Cost is in Opus (main session turns and opus-planner/opus-reviewer), not in haiku-coder delegations; report cost by model (scripts/trace-tokens.mjs), not raw tokens.
 - Revisit only if R3 shows the plugin-controlled share above 3k.
+
+## Proposed after v1.11.1 (not implemented)
+
+13. Direct-edit lane when the main model is already cheap (Haiku/Sonnet main) for 1-3 line edits: a Haiku -> Haiku delegation is pure overhead (~10k startup). Changes the core "main session never edits" rule: needs an owner decision.
+14. Read guard hook: warn or deny a main-session Read of a large file without `offset`/`limit`; whole-file reads are the largest token sink no hook guards yet.
+15. Trim-hook statistics: log lines/chars saved per call to the store and show totals in `/orchestrator:status`, so trim thresholds are tuned from data.
+16. Token regression gate in CI: run the eval suite on pull requests and fail when tokens rise more than X% over the stored baseline (builds on the plugin-eval-suite work).
+17. Store key from repo identity (remote URL or first-commit hash) instead of the folder path, so lessons survive a moved or re-cloned repo; keep the path key as fallback and migrate.
+18. Checkpoint expiry: mark checkpoints older than N days in the session-info line and offer deletion; stale ones are printed at every session start.
