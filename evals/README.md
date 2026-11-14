@@ -93,3 +93,19 @@ Total tokens and Cost USD are means per run over all models (final `modelUsage`)
 - Team lanes (R4, 1 run): PASS; 2 background Agent calls, no main edit, both modules done; 267k tokens, $0.272. Learned-errors write (R5, 1 run): FAIL; no lesson-save delegation ran because the task had no failure or escalation, so nothing was saved ($0.069).
 - Sonnet main (R9 family): the planner skip failed `planner-used` in 7/7 finished runs (HEAD v1.10.0 2, current before option A: R9 1 + R9c 1, option A R9d 3; R9b timed out, not counted). Sonnet wrote the PRD itself; `prd-write-main` and `review-after-prd` passed there. `prd-write-main` proves a main-thread PRD save, not that it came from the planner. Option A (stronger "never draft the PRD yourself" wording) failed 0/3 ($1.16). 1.11.0 adopts option C: a non-Opus main may write the PRD itself but it MUST be reviewed by `opus-reviewer` before the first executor delegation (`prd-reviewed` grader, renamed from `planner-used`). R9e (option C, 2 runs): 1 PASS (reviewer ran before haiku), 1 FAIL (reviewer skipped, 6 turns; `prd-reviewed` and `review-after-prd` failed); $0.618. n=2, so compliance is about 50% and unproven. R9b runs timed out at 1200s; the case timeout was raised to 2700s in `prompt.md`. R9c trace: the Sonnet main wrote `docs/prd/*.md` itself and used opus-reviewer to review it; cause = Sonnet chooses to self-write the PRD, not a timeout (thinking not recorded).
 - Honest checkpoint grader (R8, 1 run): `checkpoint-written` FAIL (sandbox denied the write) while the old `checkpoint` grader PASSED, confirming the old grader was weak.
+
+## Token regression gate (eval-compare)
+
+`scripts/eval-compare.mjs` compares the mean total tokens per case and arm against a committed baseline.
+
+Create a baseline: download `ci-result.json` from a CI eval run together with its trace files (keep them in the same folder), then run:
+
+    node scripts/eval-compare.mjs ci-result.json --write evals/baseline.json
+
+and commit `evals/baseline.json`. It exits 2 and writes nothing when no trace was readable. If a `tracePath` in the result file no longer exists, the script also tries the same file name inside the result file's own folder.
+
+Compare: `node scripts/eval-compare.mjs <current.json> [baseline.json] [--threshold 15]`. A pair is OVER when now is strictly greater than base * (1 + threshold/100). NEW (not in baseline) and SKIP (no readable trace) never fail. If both files name a model and the models differ, the compare is skipped.
+
+Exit codes: 0 pass (or skipped), 1 at least one pair is OVER, 2 unreadable file or bad arguments.
+
+The CI step runs only when `evals/baseline.json` exists. There is no schedule trigger. To opt in, add this under `on:` in `.github/workflows/eval.yml`: `schedule: [{cron: '0 3 * * 1'}]`. Warning: this spends the API key every week (the run uses the default inputs); it is the owner's decision.

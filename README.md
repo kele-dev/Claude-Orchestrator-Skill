@@ -70,6 +70,12 @@ Orchestration mode is active automatically in every session. Manual commands:
 
 ## What's new (1.9.0 and later)
 
+### 1.12.0
+- Always-loaded rules are split: non-Opus PRD rules moved to `skills/on/non-opus.md`, and situational token rules moved to `skills/on/reference.md` (read on demand, so they may be followed less often).
+- Validator size budget: `CONTEXT_BUDGET_BYTES` caps `hooks/rules.md` + `skills/on/SKILL.md`.
+- `scripts/eval-compare.mjs` compares eval token totals with a stored baseline; the scheduled run is opt-in. The eval baseline is not committed yet, so the CI compare step stays inactive until the owner runs the eval once and commits the `--write` output.
+- Stale checkpoints (older than `ORCH_STALE_DAYS`, default 14) are marked in the session-info line.
+
 ### 1.11.0
 - Long-session reminders repeat at +250k and +400k tokens (`ORCH_LONG_REPEAT`), suggesting a checkpoint and a new session.
 - `budget=<N>k` now also works for plain `/orchestrator:on`.
@@ -150,6 +156,7 @@ If you previously installed via `install.ps1`, delete `haiku-coder.md`, `sonnet-
 - Baru di 1.10.1: `budget.mjs auto` menemukan transcript sendiri bila tidak ada baris `Digest:` (transkrip terbaru proyek ini), dan aturan PRD non-Opus diselaraskan: PRD planner hanya disimpan ke `docs/prd/` bila langkah 2 mewajibkannya.
 - Baru di 1.11.0: pengingat sesi panjang berulang di +250k dan +400k token konteks (`ORCH_LONG_REPEAT`) dengan saran checkpoint, `budget=<N>k` juga untuk `/orchestrator:on` biasa, skrip `scripts/trace-tokens.mjs` (total token dan biaya startup per agent dari trace eval), grader yang lebih jujur (cek trace khusus sesi utama dan keberhasilan tulis checkpoint, urutan review dengan `tool_order`), 5 eval baru dan log token berisi hasil terukur, serta validator memeriksa struktur eval.
 - Baru di 1.11.1: saat sesi panjang atau tugas berhenti, Claude menulis checkpoint, memberi ringkasan maks 5 baris, lalu langsung menawarkan card sesi baru yang menjalankan `/orchestrator:resume <slug>` (bila tool sesi tersedia, mis. desktop app); selain itu perintahnya dicetak untuk dijalankan di sesi baru.
+- Baru di 1.12.0: aturan dipisah (aturan non-Opus di `non-opus.md`, aturan token situasional di `reference.md` dibaca bila perlu), validator punya batas ukuran konteks, `scripts/eval-compare.mjs` membandingkan token eval dengan baseline (jadwal CI opsional; baseline belum di-commit, jadi langkah compare di CI tetap nonaktif sampai pemilik repo menjalankan eval dan meng-commit output `--write`), dan checkpoint basi ditandai sesuai `ORCH_STALE_DAYS` (default 14).
 - Mode orkestrasi aktif otomatis di setiap sesi.
 
 ## Maintainers

@@ -192,7 +192,7 @@ if (!exists(path.join(root, 'README.md'))) {
 }
 
 // 7. Required files, headings, frontmatter flags, README version note
-for (const f of ['skills/on/modes.md', 'skills/on/reference.md', 'skills/learn/legacy.md', 'skills/status/caps.md', 'skills/learn/reference.md']) {
+for (const f of ['skills/on/modes.md', 'skills/on/reference.md', 'skills/learn/legacy.md', 'skills/status/caps.md', 'skills/learn/reference.md', 'skills/on/non-opus.md']) {
   if (!exists(path.join(root, f))) err(f, 'required file missing');
 }
 const headingChecks = [
@@ -201,11 +201,25 @@ const headingChecks = [
   ['skills/learn/SKILL.md', '## Store'],
   ['skills/learn/reference.md', '## Store command'],
   ['skills/learn/reference.md', '## Manual commands'],
+  ['skills/on/reference.md', '## Token rules (situational)'],
+  ['skills/on/SKILL.md', '## Main-session model'],
+  ['skills/on/SKILL.md', '## Token rules'],
+  ...[0, 1, 2, 3, 4, 5, 6].map((n) => ['skills/on/SKILL.md', `## ${n}.`]),
 ];
 for (const [f, h] of headingChecks) {
   if (!exists(path.join(root, f))) continue;
   if (!readText(path.join(root, f)).split(/\r?\n/).some((l) => l.startsWith(h))) err(f, `missing heading "${h}"`);
 }
+// Always-loaded context budget (hooks/rules.md + skills/on/SKILL.md, LF-normalized bytes).
+// Raising it is a deliberate decision: state the release and reason in this comment.
+// v1.12.0: measured 13146 B after the non-opus.md / situational split, plus about 1 KB headroom.
+const CONTEXT_BUDGET_BYTES = 14200;
+const lfBytes = (t) => Buffer.byteLength(t.replace(/\r\n/g, '\n'));
+if (exists(path.join(root, 'hooks/rules.md')) && exists(path.join(root, 'skills/on/SKILL.md'))) {
+  const n = lfBytes(readText(path.join(root, 'hooks/rules.md'))) + lfBytes(readText(path.join(root, 'skills/on/SKILL.md')));
+  if (n > CONTEXT_BUDGET_BYTES) err('skills/on/SKILL.md', `always-loaded context ${n} B exceeds budget ${CONTEXT_BUDGET_BYTES} B (hooks/rules.md + skills/on/SKILL.md)`);
+}
+if (lfBytes('a\r\nb') !== 3) err('scripts/validate.mjs', 'smoke "lfBytes": expected 3');
 // Caps mirror: skills/status/caps.md must match the ## Budget bullets of team and autopilot.
 const capPairs = [
   ['skills/team/SKILL.md', /Max parallel lanes per wave: (\d+)[^\n]*Hard ceiling: (\d+)/, /team lanes per wave: (\d+) \(ceiling (\d+)\)/, 'team'],
@@ -391,6 +405,32 @@ function runHook(name, payload, extraEnv = {}) {
   r = runHook('session-info.mjs', { hook_event_name: 'SessionStart', source: 'startup', cwd: root });
   if (r && (r.status !== 0 || !r.stdout.includes('Orchestrator store:'))) {
     err('hooks/session-info.mjs', `smoke "session-info": exit ${r.status}, expected "Orchestrator store:" in stdout`);
+  }
+
+  // session-info stale checkpoints (fake HOME and cwd in temp dirs)
+  const sh = fs.mkdtempSync(path.join(os.tmpdir(), 'orch-st-'));
+  const scwd = fs.mkdtempSync(path.join(os.tmpdir(), 'orch-cwd-'));
+  try {
+    const sess = (e) => runHook('session-info.mjs', { hook_event_name: 'SessionStart', source: 'startup', cwd: scwd }, { HOME: sh, USERPROFILE: sh, ORCH_STALE_DAYS: '', ...e })?.stdout ?? '';
+    const store = /Orchestrator store: (.*)/.exec(sess({}))?.[1]?.trim();
+    if (!store) {
+      err('hooks/session-info.mjs', 'smoke "session-info stale": no "Orchestrator store:" line');
+    } else {
+      const cd = path.join(store, 'checkpoints');
+      fs.mkdirSync(cd, { recursive: true });
+      fs.writeFileSync(path.join(cd, 'old.md'), 'Task: old one\n');
+      fs.writeFileSync(path.join(cd, 'new.md'), 'Task: new one\n');
+      const t = (Date.now() - 20 * 864e5) / 1000;
+      fs.utimesSync(path.join(cd, 'old.md'), t, t);
+      const a = sess({});
+      const b = sess({ ORCH_STALE_DAYS: '30' });
+      if (!(a.includes('old (old one) (stale 20d)') && a.includes('new (new one)') && !a.includes('new (new one) (stale') && a.includes('offer the user to delete') && !b.includes('stale'))) {
+        err('hooks/session-info.mjs', 'smoke "session-info stale": expected stale marker for 20d-old checkpoint only, none with ORCH_STALE_DAYS=30');
+      }
+    }
+  } finally {
+    fs.rmSync(sh, { recursive: true, force: true });
+    fs.rmSync(scwd, { recursive: true, force: true });
   }
 }
 
@@ -651,6 +691,58 @@ function runHook(name, payload, extraEnv = {}) {
     }
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
+  }
+}
+
+// 8e. Smoke tests: scripts/eval-compare.mjs round trip (temp dirs only)
+{
+  const d = fs.mkdtempSync(path.join(os.tmpdir(), 'orch-cmp-'));
+  try {
+    const cmpPath = path.join(root, 'scripts', 'eval-compare.mjs');
+    if (!exists(cmpPath)) {
+      err('scripts/eval-compare.mjs', 'missing, cannot smoke test');
+    } else {
+      const J = JSON.stringify;
+      const tr = path.join(d, 't.jsonl');
+      fs.writeFileSync(tr, [{ type: 'system', subtype: 'init', model: 'm' }, { type: 'result', num_turns: 1, total_cost_usd: 0.1, result: 'x', modelUsage: { m: { inputTokens: 1000, outputTokens: 1000, cacheReadInputTokens: 50000, cacheCreationInputTokens: 48000 } } }].map((x) => J(x)).join('\n') + '\n');
+      const res = path.join(d, 'r.json');
+      fs.writeFileSync(res, J({ suite: { modelOverride: 'm' }, cases: [{ name: 'c1', arms: { with: [{ passed: true, tracePath: tr }] } }] }));
+      const run = (...a) => spawnSync(process.execPath, [cmpPath, ...a], { encoding: 'utf8', cwd: root });
+      const b = path.join(d, 'b.json');
+      const w = run(res, '--write', b);
+      let n = 0;
+      let base = null;
+      try {
+        base = JSON.parse(fs.readFileSync(b, 'utf8'));
+        n = base.cases.c1.with;
+      } catch {
+        // reported below
+      }
+      if (!base || !(n > 0) || w.status !== 0) {
+        err('scripts/eval-compare.mjs', `smoke "compare write": exit ${w.status}, expected a baseline with tokens > 0`);
+      } else {
+        const same = run(res, b);
+        base.cases.c1.with = Math.round(n / 1.2);
+        fs.writeFileSync(b, J(base));
+        const over = run(res, b);
+        const loose = run(res, b, '--threshold', '25');
+        const bad = run(path.join(d, 'none.json'), b);
+        if (same.status !== 0) err('scripts/eval-compare.mjs', `smoke "compare same": expected exit 0, got ${same.status}`);
+        if (over.status !== 1 || !/OVER/.test(over.stdout)) err('scripts/eval-compare.mjs', `smoke "compare over": expected exit 1 with OVER, got ${over.status}`);
+        if (loose.status !== 0) err('scripts/eval-compare.mjs', `smoke "compare threshold 25": expected exit 0, got ${loose.status}`);
+        if (bad.status !== 2) err('scripts/eval-compare.mjs', `smoke "compare unreadable": expected exit 2, got ${bad.status}`);
+        const tr2 = path.join(d, 't2.jsonl');
+        fs.writeFileSync(tr2, [{ type: 'system', subtype: 'init', model: 'm' }, { type: 'result', num_turns: 1, total_cost_usd: 0.1, result: 'x', modelUsage: { m: { inputTokens: 1000, outputTokens: 1000, cacheReadInputTokens: 50000, cacheCreationInputTokens: 63000 } } }].map((x) => J(x)).join('\n') + '\n');
+        const res2 = path.join(d, 'r2.json');
+        fs.writeFileSync(res2, J({ suite: { modelOverride: 'm' }, cases: [{ name: 'c1', arms: { with: [{ passed: true, tracePath: tr2 }] } }] }));
+        const b2 = path.join(d, 'b2.json');
+        fs.writeFileSync(b2, J({ model: 'm', cases: { c1: { with: 100000 } } }));
+        const edge = run(res2, b2, '--threshold', '15');
+        if (edge.status !== 0) err('scripts/eval-compare.mjs', `smoke "compare base 100000 now 115000 threshold 15": expected exit 0, got ${edge.status}`);
+      }
+    }
+  } finally {
+    fs.rmSync(d, { recursive: true, force: true });
   }
 }
 

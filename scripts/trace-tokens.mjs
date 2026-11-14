@@ -1,14 +1,15 @@
 #!/usr/bin/env node
 // Token trace summary (always exits 0).
 // Usage: node scripts/trace-tokens.mjs <trace.jsonl | result.json> [--md]
-import { readFileSync } from 'node:fs';
+import { readFileSync, realpathSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 
 const UNREADABLE = 'TRACE: unreadable';
 
 const mean = (arr) => arr.reduce((a, b) => a + b, 0) / arr.length;
 const isNum = (v) => typeof v === 'number' && Number.isFinite(v);
 
-function readText(path) {
+export function readText(path) {
   if (typeof path !== 'string') return null;
   try {
     return readFileSync(path, 'utf8');
@@ -32,7 +33,7 @@ function parseJsonl(text) {
 }
 
 // Returns structured numbers for one trace file, or null when unreadable.
-function analyzeTrace(text) {
+export function analyzeTrace(text) {
   if (text == null) return null;
   const entries = parseJsonl(text);
 
@@ -216,10 +217,18 @@ function main() {
   return out;
 }
 
+let runAsMain = false;
 try {
-  const lines = main();
-  if (lines.length) process.stdout.write(lines.join('\n') + '\n');
+  runAsMain = realpathSync(fileURLToPath(import.meta.url)) === realpathSync(process.argv[1]);
 } catch {
-  process.stdout.write(UNREADABLE + '\n');
+  runAsMain = false;
 }
-process.exitCode = 0;
+if (runAsMain) {
+  try {
+    const lines = main();
+    if (lines.length) process.stdout.write(lines.join('\n') + '\n');
+  } catch {
+    process.stdout.write(UNREADABLE + '\n');
+  }
+  process.exitCode = 0;
+}
