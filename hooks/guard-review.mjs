@@ -4,7 +4,7 @@
 import fs from 'fs';
 import path from 'path';
 
-const PRD_PATH = /(?<![A-Za-z0-9_.\/\\:-])(?:\/|\.{1,2}\/)?(?:[A-Za-z0-9_.-]+[\/\\])*docs[\/\\]prd[\/\\][A-Za-z0-9_.-]+\.md(?!\.?[A-Za-z0-9_\/-])/g;
+const PRD_PATH = /(?<![\p{L}\p{N}_.~\/\\:-])(?:[A-Za-z]:[\/\\]|\/|\.{1,2}\/)?(?:[\p{L}\p{N}_.~-]+[\/\\])*docs[\/\\]prd[\/\\][\p{L}\p{N}_.-]+\.md(?!\.?[\p{L}\p{N}_\/-])/gu;
 
 let raw = '';
 process.stdin.setEncoding('utf8');
@@ -18,7 +18,7 @@ process.stdin.on('end', () => {
         hookSpecificOutput: {
           hookEventName: 'PreToolUse',
           permissionDecision: 'deny',
-          permissionDecisionReason: `orchestrator: ${missing} does not exist yet. Save the PRD first (the main session may Write to docs/prd/), confirm with ls, then launch orchestrator:opus-reviewer.`,
+          permissionDecisionReason: `orchestrator: ${missing} does not exist yet. Save the PRD first (the main session may Write to docs/prd/), confirm with ls, then launch orchestrator:opus-reviewer. (ORCH_GUARD=off disables this guard)`,
         },
       }));
     }
@@ -42,6 +42,7 @@ function findMissing(input) {
 }
 
 function exists(p, cwd) {
+  if (/^[A-Za-z]:[\\/]/.test(p)) return process.platform === 'win32' ? fs.existsSync(p) : false;
   if (path.isAbsolute(p)) return fs.existsSync(p);
 
   const bases = [];

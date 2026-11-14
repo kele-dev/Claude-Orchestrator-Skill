@@ -307,6 +307,57 @@ if (exists(path.join(root, 'README.md'))) {
   });
 }
 
+// 7e. Pure checks: hooks.json registration and English "What's new" blocks (negative-tested in-memory in section 8f)
+const cmpVer = (a, b) => {
+  const x = [...String(a).split('.').map(Number), 0, 0, 0].slice(0, 3);
+  const y = [...String(b).split('.').map(Number), 0, 0, 0].slice(0, 3);
+  return x[0] - y[0] || x[1] - y[1] || x[2] - y[2];
+};
+function checkHookRegistration(hj, hookFiles) {
+  const out = [];
+  const hooks = hj?.hooks ?? {};
+  for (const ev of ['SessionStart', 'PreToolUse', 'PostToolUse', 'UserPromptSubmit']) {
+    if (!Array.isArray(hooks[ev]) || !hooks[ev].length) out.push(`required event ${ev} missing`);
+  }
+  const cmds = (entry) => (Array.isArray(entry?.hooks) ? entry.hooks : []).map((h) => String(h?.command ?? ''));
+  const covers = (event, tokens, file) => {
+    const list = Array.isArray(hooks[event]) ? hooks[event] : [];
+    return list.some((e) => {
+      const m = new Set(String(e?.matcher ?? '').split('|').map((s) => s.trim()));
+      return tokens.every((t) => m.has(t)) && cmds(e).some((c) => c.includes(file));
+    });
+  };
+  if (!covers('PreToolUse', ['Edit', 'Write', 'NotebookEdit'], 'guard-edit.mjs')) out.push('no PreToolUse matcher covering Edit, Write and NotebookEdit runs guard-edit.mjs');
+  if (!covers('PreToolUse', ['Agent'], 'guard-review.mjs') && !covers('PreToolUse', ['Task'], 'guard-review.mjs')) out.push('no PreToolUse matcher for Agent or Task runs guard-review.mjs');
+  if (!covers('PostToolUse', ['Bash', 'PowerShell'], 'trim-output.mjs')) out.push('no PostToolUse matcher covering Bash and PowerShell runs trim-output.mjs');
+  const all = Object.values(hooks).flatMap((es) => (Array.isArray(es) ? es.flatMap(cmds) : []));
+  for (const f of hookFiles) {
+    if (!all.some((c) => c.includes(`hooks/${f}`))) out.push(`hooks/${f} is not referenced by any command in hooks/hooks.json`);
+  }
+  return out;
+}
+function checkEnglishBlocks(readme, ver) {
+  const out = [];
+  const lines = readme.split(/\r?\n/);
+  const head = lines.map((l) => /^## What's new \((\d+(?:\.\d+){1,2}) and later\)/.exec(l)).find(Boolean);
+  if (!head) return ['README heading "## What\'s new (X.Y.Z and later)" not found'];
+  const need = new Set();
+  if (/^\d+\.\d+\.\d+/.test(String(ver))) need.add(String(ver).split(/[-+]/)[0]);
+  for (const l of lines) {
+    const m = /^- Baru di (\d+(?:\.\d+){1,2})\b/.exec(l);
+    if (m && cmpVer(m[1], head[1]) >= 0) need.add(m[1]);
+  }
+  const have = new Set(lines.map((l) => /^### (\d+(?:\.\d+){1,2})\s*$/.exec(l)?.[1]).filter(Boolean));
+  for (const v of need) if (!have.has(v)) out.push(`missing English "### ${v}" block under "What's new (${head[1]} and later)"`);
+  return out;
+}
+{
+  const hookDir = path.join(root, 'hooks');
+  const hookFiles = exists(hookDir) ? fs.readdirSync(hookDir).filter((f) => f.endsWith('.mjs')).sort() : [];
+  if (hooksJson) for (const m of checkHookRegistration(hooksJson, hookFiles)) err('hooks/hooks.json', m);
+  if (exists(path.join(root, 'README.md')) && plugin) for (const m of checkEnglishBlocks(readText(path.join(root, 'README.md')), plugin.version)) err('README.md', m);
+}
+
 // 8. Hook smoke tests
 function runHook(name, payload, extraEnv = {}) {
   const hookPath = path.join(root, 'hooks', name);
@@ -641,6 +692,31 @@ function runHook(name, payload, extraEnv = {}) {
       ['review url only allowed', 'orchestrator:opus-reviewer', 'Review https://example.com/docs/prd/x.md', {}, false],
       ['review ORCH_GUARD=off allowed', 'orchestrator:opus-reviewer', 'Review docs/prd/no-such-prd-xyz.md', { ORCH_GUARD: 'off' }, false],
     ];
+    const winMissing = ['C:', 'orch-nope', 'docs', 'prd', 'nope.md'].join('\\');
+    const nonAscii = 'rancangan-\u00e9.md';
+    reviewCases.push(
+      ['review windows backslash missing denied', 'orchestrator:opus-reviewer', `Review ${winMissing}`, {}, true],
+      ['review windows slash missing denied', 'orchestrator:opus-reviewer', 'Review C:/orch-nope/docs/prd/nope.md', {}, true],
+      ['review non-ascii missing denied', 'orchestrator:opus-reviewer', `Review docs/prd/tiada-é.md`, {}, true],
+      ['review windows missing ORCH_GUARD=off allowed', 'orchestrator:opus-reviewer', `Review ${winMissing}`, { ORCH_GUARD: 'off' }, false],
+    );
+    {
+      const tildeDir = path.join(tmp, 'RUNNER~1', 'docs', 'prd');
+      fs.mkdirSync(tildeDir, { recursive: true });
+      fs.writeFileSync(path.join(tildeDir, 'x.md'), '# x\n');
+      const tildeAbs = path.join(tmp, 'RUNNER~1', 'docs', 'prd').split(path.sep).join('/');
+      reviewCases.push(
+        ['review tilde dir existing allowed', 'orchestrator:opus-reviewer', `Review ${tildeAbs}/x.md`, {}, false],
+        ['review tilde dir missing denied', 'orchestrator:opus-reviewer', `Review ${tildeAbs}/missing.md`, {}, true],
+      );
+    }
+    if (process.platform === 'win32') {
+      fs.writeFileSync(path.join(tmp, 'docs', 'prd', nonAscii), '# x\n');
+      reviewCases.push(
+        ['review windows absolute existing allowed', 'orchestrator:opus-reviewer', `Review ${path.join(fs.realpathSync.native(tmp), 'docs', 'prd', 'exists.md')}`, {}, false],
+        ['review non-ascii existing allowed', 'orchestrator:opus-reviewer', `Review docs/prd/${nonAscii}`, {}, false],
+      );
+    }
     for (const [name, agent, prompt, env, deny] of reviewCases) {
       const g = review(agent, prompt, env);
       if (!g) continue;
@@ -744,6 +820,54 @@ function runHook(name, payload, extraEnv = {}) {
   } finally {
     fs.rmSync(d, { recursive: true, force: true });
   }
+}
+
+// 8f. Negative tests for the pure checks of 7e (in-memory mutations only; no processes, no copies of the repo)
+if (hooksJson && exists(path.join(root, 'README.md')) && plugin) {
+  const hookFiles = exists(path.join(root, 'hooks')) ? fs.readdirSync(path.join(root, 'hooks')).filter((f) => f.endsWith('.mjs')).sort() : [];
+  const readmeText = readText(path.join(root, 'README.md'));
+  const clone = () => JSON.parse(JSON.stringify(hooksJson));
+  const expectFail = (name, msgs, want) => {
+    if (!msgs.some((m) => m.includes(want))) err('scripts/validate.mjs', `negative test "${name}": expected a failure containing "${want}", got ${msgs.length ? JSON.stringify(msgs) : 'no failure'}`);
+  };
+  const locate = (h, event, script) => {
+    const list = h.hooks?.[event];
+    const i = Array.isArray(list) ? list.findIndex((e) => (e.hooks ?? []).some((x) => typeof x.command === 'string' && x.command.includes(script))) : -1;
+    if (i === -1) err('scripts/validate.mjs', `negative test setup: ${script} not found under ${event} in hooks.json`);
+    return i === -1 ? null : list;
+  };
+  const find = (list, script) => list.findIndex((e) => (e.hooks ?? []).some((x) => typeof x.command === 'string' && x.command.includes(script)));
+  let h = clone();
+  let lst = locate(h, 'PreToolUse', 'guard-edit.mjs');
+  if (lst) {
+    lst[find(lst, 'guard-edit.mjs')].matcher = 'Edit';
+    expectFail('guard-edit matcher Edit only', checkHookRegistration(h, hookFiles), 'covering Edit, Write and NotebookEdit');
+  }
+  h = clone();
+  lst = locate(h, 'PreToolUse', 'guard-review.mjs');
+  if (lst) {
+    lst.splice(find(lst, 'guard-review.mjs'), 1);
+    expectFail('guard-review registration removed', checkHookRegistration(h, hookFiles), 'guard-review.mjs');
+  }
+  h = clone();
+  lst = locate(h, 'PostToolUse', 'trim-output.mjs');
+  if (lst) {
+    lst[find(lst, 'trim-output.mjs')].matcher = 'Bash';
+    expectFail('trim matcher Bash only', checkHookRegistration(h, hookFiles), 'covering Bash and PowerShell');
+  }
+  h = clone();
+  delete h.hooks.UserPromptSubmit;
+  expectFail('event removed', checkHookRegistration(h, hookFiles), 'required event UserPromptSubmit missing');
+  expectFail('unregistered hook file', checkHookRegistration(clone(), [...hookFiles, 'extra-hook.mjs']), 'hooks/extra-hook.mjs is not referenced');
+  const lines = readmeText.split(/\r?\n/);
+  const at = lines.findIndex((l) => /^### 1\.11\.1\s*$/.test(l));
+  if (at === -1) {
+    expectFail('english 1.11.1 block removed', checkEnglishBlocks(readmeText, plugin.version), 'missing English "### 1.11.1"');
+  } else {
+    const without = lines.filter((_, i) => i !== at).join('\n');
+    expectFail('english 1.11.1 block removed', checkEnglishBlocks(without, plugin.version), 'missing English "### 1.11.1"');
+  }
+  expectFail('manifest version block missing', checkEnglishBlocks(readmeText, '99.0.0'), 'missing English "### 99.0.0"');
 }
 
 // 9. Eval cases: case.yaml name matches folder, prompt.md and scaffold script exist, graders use a known type with required keys

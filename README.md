@@ -67,14 +67,37 @@ Orchestration mode is active automatically in every session. Manual commands:
 - Edit guard: the main session cannot Edit/Write project files (except `docs/prd/`); subagents can. Turn it off with `/orchestrator:off` or env `ORCH_GUARD=off`.
 - The edit guard and output trim need Node 18+ on PATH. Without Node they do nothing (fail open). macOS desktop app: Node from nvm or Homebrew may be missing from the app's PATH; check that `/orchestrator:status` shows the store line, or install Node system-wide.
 - Review guard (`guard-review`): a PreToolUse hook on Agent/Task that denies `orchestrator:opus-reviewer` when its prompt names a `docs/prd/*.md` file that does not exist. It fails open when Node is missing or the check cannot run. Turn it off with env `ORCH_GUARD=off`.
+- `ORCH_GUARD=off` disables both the edit guard and the review guard. All `ORCH_*` environment variables are listed below.
+
+| Variable | Default | Effect |
+| --- | --- | --- |
+| `ORCH_GUARD` | unset | `off` disables the edit guard and the review guard. |
+| `ORCH_NO_TRIM` | unset | `1` turns off output trimming (same as `# notrim` in the command). |
+| `ORCH_TRIM_TAIL` | 30 | Number of last lines kept when output is trimmed. |
+| `ORCH_TRIM_ERRORS` | 10 | Maximum number of error/failure lines kept when output is trimmed. |
+| `ORCH_LONG` | unset | `off` disables the long-session warning. |
+| `ORCH_LONG_TOKENS` | 120000 | Context growth (tokens) that triggers the first long-session warning. |
+| `ORCH_LONG_REPEAT` | +250k, +400k | Comma list of further thresholds after the first, or `off`. |
+| `ORCH_LONG_BYTES` | 2 MB | Transcript size used when message usage is missing. |
+| `ORCH_LONG_DELEGATIONS` | 30 | Number of delegations that triggers the warning. |
+| `ORCH_STALE_DAYS` | 14 | Checkpoints older than this many days are marked stale in the session-info line. |
 
 ## What's new (1.9.0 and later)
+
+### 1.12.1
+- Review guard (`guard-review`) now checks PRD paths written as Windows absolute paths (`C:\proj\docs\prd\x.md`, `C:/proj/docs/prd/x.md`) and slugs with non-ASCII letters, and denies when the file is missing; `ORCH_GUARD=off` still disables it.
+- Guard and notice messages name their escape hatches: the edit and review guards mention `ORCH_GUARD=off`, the trim notices `ORCH_NO_TRIM=1`, and the long-session messages `ORCH_LONG=off` and `ORCH_LONG_TOKENS`.
+- Validator checks the hook matchers and registrations in `hooks/hooks.json` and requires an English "What's new" block for the manifest version and for each version with a "Baru di" bullet in this section.
+- README parity fixes: a table of all `ORCH_*` environment variables, the missing 1.11.1 block, and the Indonesian summary now covers `budget`, `isolate=worktree`, `lanes`/`batches` and the trim numbers.
 
 ### 1.12.0
 - Always-loaded rules are split: non-Opus PRD rules moved to `skills/on/non-opus.md`, and situational token rules moved to `skills/on/reference.md` (read on demand, so they may be followed less often).
 - Validator size budget: `CONTEXT_BUDGET_BYTES` caps `hooks/rules.md` + `skills/on/SKILL.md`.
 - `scripts/eval-compare.mjs` compares eval token totals with a stored baseline; the scheduled run is opt-in. The eval baseline is not committed yet, so the CI compare step stays inactive until the owner runs the eval once and commits the `--write` output.
 - Stale checkpoints (older than `ORCH_STALE_DAYS`, default 14) are marked in the session-info line.
+
+### 1.11.1
+- Long sessions hand off: when a session gets long or a task stops, Claude writes a checkpoint, gives a summary of at most 5 lines, and offers a new-session card that runs `/orchestrator:resume <slug>` (when a session tool is available, for example in the desktop app); otherwise it prints the command to run in a new session.
 
 ### 1.11.0
 - Long-session reminders repeat at +250k and +400k tokens (`ORCH_LONG_REPEAT`), suggesting a checkpoint and a new session.
@@ -127,14 +150,15 @@ If you previously installed via `install.ps1`, delete `haiku-coder.md`, `sonnet-
 ## Ringkasan (Bahasa Indonesia)
 
 - Pasang: `claude plugin install orchestrator --marketplace kele-dev/Claude-Orchestrator-Skill`
-- Aktifkan: `/orchestrator:on`
+- Aktifkan: `/orchestrator:on` (opsional `budget=<N>k`: berhenti dengan status BUDGET dan checkpoint bila total token agent mencapai batas)
 - Matikan untuk sesi ini: `/orchestrator:off`
-- Mode paralel: `/orchestrator:team <tugas>` (beberapa lane Haiku jalan bersamaan, maks 3 lane, 2 putaran fix per lane)
-- Mode otomatis: `/orchestrator:autopilot <tugas>` (batch demi batch tanpa bertanya, maks 5 batch, 2 putaran fix per batch)
+- Mode paralel: `/orchestrator:team <tugas>` (beberapa lane Haiku jalan bersamaan, maks 3 lane, 2 putaran fix per lane; opsional `lanes=N`, `budget=<N>k`, `commit=batch`, dan `isolate=worktree`: tiap lane di git worktree sendiri, hanya bila `worktree.baseRef` di settings bernilai `"head"`, working tree bersih, dan `commit=batch` aktif, kalau tidak jatuh ke tree bersama)
+- Mode otomatis: `/orchestrator:autopilot <tugas>` (batch demi batch tanpa bertanya, maks 5 batch, 2 putaran fix per batch; opsional `batches=N` dan `budget=<N>k`)
 - Tambahkan `--dry-run` untuk melihat rencananya dulu.
-- Claude akan menyarankan team/autopilot kalau tugasnya cocok, tapi default tetap `on`. Batas iterasi naik otomatis (maks 4 putaran fix) hanya selama perbaikannya ada kemajuan.
+- Claude akan menyarankan team/autopilot kalau tugasnya cocok, tapi default tetap `on`. Batas iterasi naik otomatis dengan syarat berbeda per batas: lane 3 -> 4 hanya saat perencanaan kalau ada 4 bagian atau lebih yang independen dan tidak berbagi file; batch 5 -> 8 hanya selama setiap batch yang selesai lolos; putaran perbaikan 2 -> 4 hanya selama setiap putaran menunjukkan kemajuan. Angka yang Anda beri sendiri (`lanes=N`, `batches=N`) tidak pernah dinaikkan dan dipotong ke batas atas (misalnya `lanes=6` menjadi 4).
 - Belajar: di akhir tugas Claude sendiri yang memutuskan pelajaran mana yang disimpan (maks 3, hanya yang sudah terbukti), serta memperbaiki atau menghapus yang usang, sebagai file lokal di store project (`~/.claude/orchestrator/<project-key>/lessons/`). Satu baris di laporan memberi tahu apa yang berubah. `/orchestrator:learn list` untuk melihat, `prune` untuk merapikan.
 - Hemat token: jawaban ringkas, output test dipotong, Opus tidak mendikte file panjang, self-review sebelum lapor, `learned-map` untuk peta project, saran sesi baru saat ganti topik, dan satu baris laporan token di akhir.
+- Hook (angka sekarang): output Bash/PowerShell dipangkas hanya bila lebih dari 80 baris DAN lebih dari 4000 karakter; yang dipertahankan 3 baris pertama, maks 10 baris error, dan 30 baris terakhir (`ORCH_TRIM_ERRORS`, `ORCH_TRIM_TAIL`), batas keras sekitar 26k karakter tetap berlaku; `# notrim` atau `ORCH_NO_TRIM=1` untuk output penuh; `ORCH_GUARD=off` mematikan guard edit dan guard review. Daftar semua variabel `ORCH_*` ada di tabel pada bagian Hooks.
 - Baru di 1.4: `/orchestrator:init` (peta project sekali jalan), `/orchestrator:resume` (lanjut dari checkpoint), `commit=batch`, riset/triase oleh Haiku, tipe brief, dan scan diff oleh Haiku sebelum Opus memverifikasi.
 - Baru di 1.5: `/orchestrator:status` (ringkasan status read-only), aturan orkestrasi kini juga dimuat saat sesi di-resume, dan validator plugin `node scripts/validate.mjs` + CI.
 - Baru di 1.6: hook pemangkas output (Bash/PowerShell di atas 80 baris dipotong jadi baris error + 40 baris terakhir; `# notrim` atau `ORCH_NO_TRIM=1` untuk output penuh), hook penjaga edit (sesi utama tidak bisa Edit/Write file project kecuali `docs/prd/`; matikan dengan `/orchestrator:off` atau `ORCH_GUARD=off`), keduanya butuh Node 18+, dan `/orchestrator:init` kini menulis `verify.sh`.
@@ -157,6 +181,7 @@ If you previously installed via `install.ps1`, delete `haiku-coder.md`, `sonnet-
 - Baru di 1.11.0: pengingat sesi panjang berulang di +250k dan +400k token konteks (`ORCH_LONG_REPEAT`) dengan saran checkpoint, `budget=<N>k` juga untuk `/orchestrator:on` biasa, skrip `scripts/trace-tokens.mjs` (total token dan biaya startup per agent dari trace eval), grader yang lebih jujur (cek trace khusus sesi utama dan keberhasilan tulis checkpoint, urutan review dengan `tool_order`), 5 eval baru dan log token berisi hasil terukur, serta validator memeriksa struktur eval.
 - Baru di 1.11.1: saat sesi panjang atau tugas berhenti, Claude menulis checkpoint, memberi ringkasan maks 5 baris, lalu langsung menawarkan card sesi baru yang menjalankan `/orchestrator:resume <slug>` (bila tool sesi tersedia, mis. desktop app); selain itu perintahnya dicetak untuk dijalankan di sesi baru.
 - Baru di 1.12.0: aturan dipisah (aturan non-Opus di `non-opus.md`, aturan token situasional di `reference.md` dibaca bila perlu), validator punya batas ukuran konteks, `scripts/eval-compare.mjs` membandingkan token eval dengan baseline (jadwal CI opsional; baseline belum di-commit, jadi langkah compare di CI tetap nonaktif sampai pemilik repo menjalankan eval dan meng-commit output `--write`), dan checkpoint basi ditandai sesuai `ORCH_STALE_DAYS` (default 14).
+- Baru di 1.12.1: review guard kini memeriksa path PRD berbentuk Windows absolut (`C:\proj\docs\prd\x.md`) dan slug dengan huruf non-ASCII (menolak bila file tidak ada), pesan guard dan notice menyebut cara mematikannya (`ORCH_GUARD=off`, `ORCH_NO_TRIM=1`, `ORCH_LONG=off`/`ORCH_LONG_TOKENS`), validator memeriksa matcher dan registrasi hook serta blok "What's new" bahasa Inggris, dan README memuat tabel semua variabel `ORCH_*`.
 - Mode orkestrasi aktif otomatis di setiap sesi.
 
 ## Maintainers

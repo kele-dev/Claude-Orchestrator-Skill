@@ -39,7 +39,7 @@ function trim(text, noLines) {
   const result = out ?? text;
   if (result.length > 30000) {
     const cut = result.length - 26000;
-    return `${result.slice(0, 6000)}\n[orchestrator: cut ${cut} chars; add "# notrim" to the command for full output]\n${result.slice(-20000)}`;
+    return `${result.slice(0, 6000)}\n[orchestrator: cut ${cut} chars; add "# notrim" to the command or set ORCH_NO_TRIM=1 for full output]\n${result.slice(-20000)}`;
   }
   return out;
 }
@@ -61,7 +61,7 @@ function trimLines(text) {
 
   const body = matched.length ? [...matched, '...'] : ['...'];
   return [
-    `[orchestrator: trimmed ${dropped} of ${lines.length} lines; add "# notrim" to the command for full output]`,
+    `[orchestrator: trimmed ${dropped} of ${lines.length} lines; add "# notrim" to the command or set ORCH_NO_TRIM=1 for full output]`,
     ...head,
     ...body,
     ...tail,
