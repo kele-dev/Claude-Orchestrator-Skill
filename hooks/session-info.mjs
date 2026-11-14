@@ -7,6 +7,11 @@ import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+const STALE_DAYS_DEFAULT = 14;
+const STALE_DAYS = /^\d+$/.test((process.env.ORCH_STALE_DAYS ?? '').trim()) && Number(process.env.ORCH_STALE_DAYS) > 0
+  ? Number(process.env.ORCH_STALE_DAYS)
+  : STALE_DAYS_DEFAULT;
+
 let raw = '';
 process.stdin.setEncoding('utf8');
 process.stdin.on('data', (d) => { raw += d; });
@@ -68,18 +73,27 @@ function run(input) {
       try { t = statSync(join(cpDir, f)).mtimeMs; } catch { /* ignore */ }
       return { f, t };
     })
-    .sort((a, b) => b.t - a.t || (a.f < b.f ? 1 : -1))
-    .map((x) => x.f);
-  const cps = allCps.slice(0, 5).map((f) => {
+    .sort((a, b) => b.t - a.t || (a.f < b.f ? 1 : -1));
+  let staleAny = false;
+  const cps = allCps.slice(0, 5).map(({ f, t }) => {
     let task = '';
     try {
       const m = readFileSync(join(store, 'checkpoints', f), 'utf8').match(/^\s*(?:[-*]\s*)?Task:\s*(.*)$/m);
       if (m) task = m[1].trim().slice(0, 80);
     } catch { /* ignore */ }
-    return `${f.replace(/\.md$/, '')} (${task})`;
+    const age = Date.now() - t;
+    let stale = '';
+    if (age > STALE_DAYS * 864e5) {
+      staleAny = true;
+      stale = ` (stale ${Math.floor(age / 864e5)}d)`;
+    }
+    return `${f.replace(/\.md$/, '')} (${task})${stale}`;
   });
   if (allCps.length > 5) cps.push(`+${allCps.length - 5} more`);
-  if (cps.length) lines.push(`Checkpoints: ${cps.join('; ')}`);
+  if (cps.length) {
+    const note = staleAny ? `. Stale = untouched over ${STALE_DAYS} days: offer the user to delete them.` : '';
+    lines.push(`Checkpoints: ${cps.join('; ')}${note}`);
+  }
 
   let legacy = false;
   try {

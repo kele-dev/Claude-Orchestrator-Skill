@@ -58,12 +58,16 @@ jobs:
       - name: Run eval
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          CASE: ${{ inputs.case }}
-          RUNS: ${{ inputs.runs }}
-          MODEL: ${{ inputs.model }}
-          MAX_COST: ${{ inputs.max_cost_usd }}
+          CASE: ${{ inputs.case || '*' }}
+          RUNS: ${{ inputs.runs || '1' }}
+          MODEL: ${{ inputs.model || 'claude-opus-5-5' }}
+          MAX_COST: ${{ inputs.max_cost_usd || '3' }}
         run: |
           claude plugin eval . --case "$CASE" --runs "$RUNS" --ablation none --scaffold --trust-plugin --allow-tools Bash Edit Write --model "$MODEL" --judge-model claude-haiku-5-5 --max-cost-usd "$MAX_COST" --no-publish --json evals/ci-result.json
+
+      - name: Compare tokens with baseline
+        if: hashFiles('evals/baseline.json') != ''
+        run: node scripts/eval-compare.mjs evals/ci-result.json evals/baseline.json --threshold 15
 
       - uses: actions/upload-artifact@v4
         if: always()
