@@ -15,7 +15,7 @@ Team mode is `orchestrator:on` with parallel execution (the main session never e
 - Max parallel lanes per wave: 3, raised to 4 only at plan time and only if the work has 4 or more truly independent, file-disjoint parts. Hard ceiling: 4.
 - Max fix rounds per lane: 2, raised automatically up to 4 (see `modes.md`).
 - `lanes=1` means no parallelism: use the normal `orchestrator:on` flow.
-- `opus-reviewer`: at most once, on the final combined diff, and only for large work (>5 tasks, or touches schema/auth/security).
+- `opus-reviewer`: at most once, on the final combined diff, and only for large work (>5 tasks, or touches schema/auth/security). Not Opus-class: the `orchestrator:on` reviewer rules (PRD before the first delegation, final diff) apply whatever the size.
 - `--dry-run`: stop after stage 1, show the lane plan and the planned number of delegations, and wait for the user's go.
 - `commit=batch` scope: per wave, after it is verified.
 - `isolate=worktree` (opt-in): launch each lane with `isolation: "worktree"`. Before wave 1 check that `worktree.baseRef` is `"head"` in settings, there are no uncommitted tracked changes outside `docs/prd/` (lanes branch from HEAD), and `commit=batch` is on (later waves branch from committed earlier waves); otherwise warn in one line and use the shared tree (note the caveat if the project needs installed deps a fresh worktree lacks).

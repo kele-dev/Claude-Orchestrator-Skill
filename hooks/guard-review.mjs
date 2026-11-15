@@ -4,7 +4,7 @@
 import fs from 'fs';
 import path from 'path';
 
-const PRD_PATH = /(?<![A-Za-z0-9_.\/\\:-])(?:\/|\.{1,2}\/)?(?:[A-Za-z0-9_.-]+[\/\\])*docs[\/\\]prd[\/\\][A-Za-z0-9_.-]+\.md(?!\.?[A-Za-z0-9_\/-])/g;
+const PRD_PATH = /(?<![A-Za-z0-9_.\/\\:-])(?:[A-Za-z]:[\/\\]|\/|\.{1,2}\/)?(?:[A-Za-z0-9_.-]+[\/\\])*docs[\/\\]prd[\/\\][A-Za-z0-9_.-]+\.md(?!\.?[A-Za-z0-9_\/-])/g;
 
 let raw = '';
 process.stdin.setEncoding('utf8');
@@ -34,15 +34,17 @@ function findMissing(input) {
   if (toolInput?.subagent_type !== 'orchestrator:opus-reviewer') return null;
   if (typeof toolInput.prompt !== 'string') return null;
 
-  const paths = toolInput.prompt.match(PRD_PATH) ?? [];
-  for (const p of paths) {
-    if (!exists(p, input.cwd)) return p;
+  const prompt = toolInput.prompt;
+  for (const m of prompt.matchAll(PRD_PATH)) {
+    const lineStart = prompt.lastIndexOf('\n', m.index - 1) + 1;
+    const before = prompt.slice(lineStart, m.index);
+    if (!exists(m[0], input.cwd, before)) return m[0];
   }
   return null;
 }
 
-function exists(p, cwd) {
-  if (path.isAbsolute(p)) return fs.existsSync(p);
+function exists(p, cwd, before = '') {
+  if (path.isAbsolute(p)) return fs.existsSync(p) || leftExtend(before, p);
 
   const bases = [];
   if (typeof cwd === 'string') bases.push(cwd);
@@ -50,5 +52,20 @@ function exists(p, cwd) {
   if (typeof env === 'string' && env !== '') bases.push(env);
   if (bases.length === 0) return true;
 
-  return bases.some((base) => fs.existsSync(path.resolve(base, p)));
+  return bases.some((base) => fs.existsSync(path.resolve(base, p))) || leftExtend(before, p);
+}
+
+// A path with spaces is matched only from its last space on; try the absolute roots
+// that start earlier on the same line (at most 20 candidates).
+function leftExtend(before, p) {
+  let tries = 0;
+  for (let i = 0; i < before.length; i++) {
+    const prev = i > 0 ? before[i - 1] : '';
+    const drive = /^[A-Za-z]:[\\/]/.test(before.slice(i)) && !/[A-Za-z0-9]/.test(prev);
+    const posix = before[i] === '/' && (i === 0 || /[\s"'`(]/.test(prev));
+    if (!drive && !posix) continue;
+    if (++tries > 20) break;
+    if (fs.existsSync(before.slice(i) + p)) return true;
+  }
+  return false;
 }

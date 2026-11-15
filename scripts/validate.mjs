@@ -345,6 +345,19 @@ function runHook(name, payload, extraEnv = {}) {
   }
   r = runHook('trim-output.mjs', trimPayload('git diff'));
   if (r && r.stdout.trim() !== '') err('hooks/trim-output.mjs', 'smoke "git diff untouched": expected empty stdout');
+  {
+    // read/list commands: 300-line limit; 150 lines over 4000 chars must pass untouched
+    const trimmedOut = (command, lineCount = 150) => {
+      const body = Array.from({ length: lineCount }, () => 'x'.repeat(50)).join('\n');
+      const res = runHook('trim-output.mjs', { ...trimPayload(command), tool_response: { stdout: body, stderr: '', interrupted: false } });
+      if (!res || res.stdout.trim() === '') return '';
+      return JSON.parse(res.stdout).hookSpecificOutput.updatedToolOutput.stdout;
+    };
+    if (trimmedOut('git ls-files') !== '') err('hooks/trim-output.mjs', 'smoke "trim read git ls-files": expected untrimmed (empty stdout) at 150 lines');
+    if (trimmedOut('cd x && ls -R') !== '') err('hooks/trim-output.mjs', 'smoke "trim read cd && ls": expected untrimmed (empty stdout) at 150 lines');
+    if (!trimmedOut('npm test | tail -n 200').includes('[orchestrator: trimmed')) err('hooks/trim-output.mjs', 'smoke "trim read pipe tail": expected trimmed after pipe');
+    if (!trimmedOut('git ls-files', 350).includes('[orchestrator: trimmed')) err('hooks/trim-output.mjs', 'smoke "trim read 350 lines": expected trimmed above 300 lines');
+  }
 
   const guard = (file, extra = {}) =>
     runHook('guard-edit.mjs', {
@@ -426,6 +439,16 @@ function runHook(name, payload, extraEnv = {}) {
       const b = sess({ ORCH_STALE_DAYS: '30' });
       if (!(a.includes('old (old one) (stale 20d)') && a.includes('new (new one)') && !a.includes('new (new one) (stale') && a.includes('offer the user to delete') && !b.includes('stale'))) {
         err('hooks/session-info.mjs', 'smoke "session-info stale": expected stale marker for 20d-old checkpoint only, none with ORCH_STALE_DAYS=30');
+      }
+
+      // session-info map: no learned-map.md -> "Map: none"; present -> no "Map: none"
+      if (!sess({}).includes('Map: none')) {
+        err('hooks/session-info.mjs', 'smoke "session-info map": expected "Map: none" on fresh store');
+      }
+      fs.mkdirSync(path.join(store, 'lessons'), { recursive: true });
+      fs.writeFileSync(path.join(store, 'lessons', 'learned-map.md'), '---\ndescription: map\n---\n');
+      if (sess({}).includes('Map: none')) {
+        err('hooks/session-info.mjs', 'smoke "session-info map": expected no "Map: none" once learned-map.md exists');
       }
     }
   } finally {
@@ -589,6 +612,20 @@ function runHook(name, payload, extraEnv = {}) {
       fs.appendFileSync(m, U.join('\n') + '\n');
       chk('from mark', bud([m, '--from', String(size)]).out, 'BUDGET: spent ? (1 agent, 1 without usage)');
 
+      // --main: last usage per message.id, sidechain skipped, context = last message input + cache
+      const am = (id, u, extra = {}) => J({ type: 'assistant', ...extra, message: { id, content: [{ type: 'text', text: 't' }], usage: u } });
+      w('main.jsonl', [
+        am('m1', { input_tokens: 1000, cache_read_input_tokens: 20000, cache_creation_input_tokens: 3000, output_tokens: 500 }),
+        am('m1', { input_tokens: 1000, cache_read_input_tokens: 20000, cache_creation_input_tokens: 3000, output_tokens: 800 }),
+        am('m2', { input_tokens: 2000, cache_read_input_tokens: 40000, cache_creation_input_tokens: 1000, output_tokens: 1200 }),
+        am('m3', { input_tokens: 99999 }, { isSidechain: true }),
+      ]);
+      chk('main', bud([path.join(tmp, 'main.jsonl'), '--main']).out, 'MAIN: 2 calls, input 3k, cache-read 60k, cache-write 4k, output 2k, context 43k');
+      chk('main known', bud([known, '--main']).out.startsWith('MAIN:') ? 'MAIN:' : 'other', 'MAIN:');
+      const missingMain = bud([path.join(tmp, 'none.jsonl'), '--main']);
+      chk('main missing file', missingMain.out, 'MAIN: ? (transcript unreadable)');
+      chk('main missing file exit', String(missingMain.status), '0');
+
       // auto mode: newest transcript of the project dir
       const autoCwd = fs.realpathSync(fs.mkdtempSync(path.join(tmp, 'auto-cwd-')));
       const autoCfg = path.join(tmp, 'auto-cfg');
@@ -626,6 +663,8 @@ function runHook(name, payload, extraEnv = {}) {
     // guard-review smoke
     fs.mkdirSync(path.join(tmp, 'docs', 'prd'), { recursive: true });
     fs.writeFileSync(path.join(tmp, 'docs', 'prd', 'exists.md'), '# x\n');
+    fs.mkdirSync(path.join(tmp, 'my proj', 'docs', 'prd'), { recursive: true });
+    fs.writeFileSync(path.join(tmp, 'my proj', 'docs', 'prd', 'exists.md'), '# x\n');
     const review = (agent, prompt, extraEnv = {}) =>
       runHook('guard-review.mjs', {
         hook_event_name: 'PreToolUse',
@@ -640,6 +679,11 @@ function runHook(name, payload, extraEnv = {}) {
       ['review glob only allowed', 'orchestrator:opus-reviewer', 'Review docs/prd/*.md', {}, false],
       ['review url only allowed', 'orchestrator:opus-reviewer', 'Review https://example.com/docs/prd/x.md', {}, false],
       ['review ORCH_GUARD=off allowed', 'orchestrator:opus-reviewer', 'Review docs/prd/no-such-prd-xyz.md', { ORCH_GUARD: 'off' }, false],
+      ['review absolute existing allowed', 'orchestrator:opus-reviewer', `Review ${path.join(tmp, 'docs', 'prd', 'exists.md')}`, {}, false],
+      ['review absolute missing denied', 'orchestrator:opus-reviewer', `Review ${path.join(tmp, 'docs', 'prd', 'nope.md')}`, {}, true],
+      ['review absolute with space existing allowed', 'orchestrator:opus-reviewer', `Review ${path.join(tmp, 'my proj', 'docs', 'prd', 'exists.md')} now`, {}, false],
+      ['review quoted absolute with space existing allowed', 'orchestrator:opus-reviewer', `Review "${path.join(tmp, 'my proj', 'docs', 'prd', 'exists.md')}" now`, {}, false],
+      ['review absolute with space missing denied', 'orchestrator:opus-reviewer', `Review ${path.join(tmp, 'my proj', 'docs', 'prd', 'nope.md')}`, {}, true],
     ];
     for (const [name, agent, prompt, env, deny] of reviewCases) {
       const g = review(agent, prompt, env);

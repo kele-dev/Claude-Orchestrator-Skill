@@ -62,7 +62,7 @@ Haiku fail -> fix brief, retry once (or straight to `sonnet-dev` if complex or 2
 Details: `reference.md` (only when escalating past the first retry).
 
 ## 5. REVIEW per batch
-Up to 5 files: read `git diff --stat` and `git diff -U1` yourself. Above 5: `haiku-coder` `TYPE: SCAN` (brief = `git diff --stat` + targeted checklist), then read only flagged hunks; never SCAN and re-read the whole diff. Risky/large: `opus-reviewer` with the PRD (not Opus-class: the final diff always goes to `opus-reviewer`). Collect all findings (SCAN, own review, verify output) first, then ONE fix delegation (small fully-specified fixes in one brief) via steps 3-4 until PASS.
+Up to 5 files: read `git diff --stat` and `git diff -U1` yourself. Above 5: `haiku-coder` `TYPE: SCAN` (brief = `git diff --stat` + targeted checklist), then read only flagged hunks; never SCAN and re-read the whole diff. Risky/large: `opus-reviewer` with the PRD (not Opus-class, full path: the final diff always goes to `opus-reviewer`). Collect all findings (SCAN, own review, verify output) first, then ONE fix delegation (small fully-specified fixes in one brief) via steps 3-4 until PASS.
 Details: `reference.md` (only when reviewing).
 
 ## 6. REPORT at the end

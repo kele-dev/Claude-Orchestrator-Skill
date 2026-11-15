@@ -14,6 +14,7 @@ Assess against the PRD, not taste. Check at minimum:
 - no new TODO/stubs/dead code;
 - tests not changed or silently weakened.
 Limit command output (`2>&1 | tail -n 30`, or error/summary filters) and judge PASS/FAIL from the summary line; read the diff and the files it touches, not the whole repo.
+PRD review (asked to assess a PRD, no diff yet): check instead that each task is atomic (max 5 files) with a runnable verification command, acceptance tests are written out, signatures/formulas/examples are specific enough for haiku-coder to execute without design decisions, tasks do not overlap files or contradict each other, and risks and assumptions are stated; run no build or tests.
 
 Output at most 5 findings, ordered by risk. Each finding: the problem, evidence (file:line), concrete fix.
 If there are no findings, write "PASS" and state what has not been verified.
