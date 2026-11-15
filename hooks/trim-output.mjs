@@ -19,7 +19,8 @@ process.stdin.on('end', () => {
     if (text === '') return;
     const noLines = (typeof command === 'string' && /(^|[|;&(]\s*)(git\s+(diff|show|log\b[^|]*-p)|cat|jq|Get-Content|type)\b/.test(command))
       || /^(\{|\[\s*($|[{"\]]))/.test((text.split('\n').find((l) => l.trim() !== '') ?? '').trimStart());
-    const stdout = trim(text, noLines);
+    const readCmd = typeof command === 'string' && /(^|[;&]\s*)(ls|find|git\s+ls-files|grep|rg|head|tail|sed\s+-n|wc|Get-ChildItem|Select-String)\b/.test(command.trimStart());
+    const stdout = trim(text, noLines, readCmd);
     if (stdout === null) return;
 
     process.stdout.write(JSON.stringify({
@@ -34,8 +35,8 @@ process.stdin.on('end', () => {
 });
 
 // Returns the trimmed text, or null when no rule applied.
-function trim(text, noLines) {
-  const out = noLines ? null : trimLines(text);
+function trim(text, noLines, readCmd) {
+  const out = noLines ? null : trimLines(text, readCmd ? 300 : 80);
   const result = out ?? text;
   if (result.length > 30000) {
     const cut = result.length - 26000;
@@ -44,9 +45,9 @@ function trim(text, noLines) {
   return out;
 }
 
-function trimLines(text) {
+function trimLines(text, maxLines) {
   const lines = text.split('\n');
-  if (lines.length <= 80 || text.length <= 4000) return null;
+  if (lines.length <= maxLines || text.length <= 4000) return null;
 
   const posInt = (v, d) => (/^[1-9]\d*$/.test(v ?? '') ? Number(v) : d);
   const tailN = posInt(process.env.ORCH_TRIM_TAIL, 30);

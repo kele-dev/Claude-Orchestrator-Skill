@@ -345,6 +345,19 @@ function runHook(name, payload, extraEnv = {}) {
   }
   r = runHook('trim-output.mjs', trimPayload('git diff'));
   if (r && r.stdout.trim() !== '') err('hooks/trim-output.mjs', 'smoke "git diff untouched": expected empty stdout');
+  {
+    // read/list commands: 300-line limit; 150 lines over 4000 chars must pass untouched
+    const trimmedOut = (command, lineCount = 150) => {
+      const body = Array.from({ length: lineCount }, () => 'x'.repeat(50)).join('\n');
+      const res = runHook('trim-output.mjs', { ...trimPayload(command), tool_response: { stdout: body, stderr: '', interrupted: false } });
+      if (!res || res.stdout.trim() === '') return '';
+      return JSON.parse(res.stdout).hookSpecificOutput.updatedToolOutput.stdout;
+    };
+    if (trimmedOut('git ls-files') !== '') err('hooks/trim-output.mjs', 'smoke "trim read git ls-files": expected untrimmed (empty stdout) at 150 lines');
+    if (trimmedOut('cd x && ls -R') !== '') err('hooks/trim-output.mjs', 'smoke "trim read cd && ls": expected untrimmed (empty stdout) at 150 lines');
+    if (!trimmedOut('npm test | tail -n 200').includes('[orchestrator: trimmed')) err('hooks/trim-output.mjs', 'smoke "trim read pipe tail": expected trimmed after pipe');
+    if (!trimmedOut('git ls-files', 350).includes('[orchestrator: trimmed')) err('hooks/trim-output.mjs', 'smoke "trim read 350 lines": expected trimmed above 300 lines');
+  }
 
   const guard = (file, extra = {}) =>
     runHook('guard-edit.mjs', {
