@@ -612,6 +612,20 @@ function runHook(name, payload, extraEnv = {}) {
       fs.appendFileSync(m, U.join('\n') + '\n');
       chk('from mark', bud([m, '--from', String(size)]).out, 'BUDGET: spent ? (1 agent, 1 without usage)');
 
+      // --main: last usage per message.id, sidechain skipped, context = last message input + cache
+      const am = (id, u, extra = {}) => J({ type: 'assistant', ...extra, message: { id, content: [{ type: 'text', text: 't' }], usage: u } });
+      w('main.jsonl', [
+        am('m1', { input_tokens: 1000, cache_read_input_tokens: 20000, cache_creation_input_tokens: 3000, output_tokens: 500 }),
+        am('m1', { input_tokens: 1000, cache_read_input_tokens: 20000, cache_creation_input_tokens: 3000, output_tokens: 800 }),
+        am('m2', { input_tokens: 2000, cache_read_input_tokens: 40000, cache_creation_input_tokens: 1000, output_tokens: 1200 }),
+        am('m3', { input_tokens: 99999 }, { isSidechain: true }),
+      ]);
+      chk('main', bud([path.join(tmp, 'main.jsonl'), '--main']).out, 'MAIN: 2 calls, input 3k, cache-read 60k, cache-write 4k, output 2k, context 43k');
+      chk('main known', bud([known, '--main']).out.startsWith('MAIN:') ? 'MAIN:' : 'other', 'MAIN:');
+      const missingMain = bud([path.join(tmp, 'none.jsonl'), '--main']);
+      chk('main missing file', missingMain.out, 'MAIN: ? (transcript unreadable)');
+      chk('main missing file exit', String(missingMain.status), '0');
+
       // auto mode: newest transcript of the project dir
       const autoCwd = fs.realpathSync(fs.mkdtempSync(path.join(tmp, 'auto-cwd-')));
       const autoCfg = path.join(tmp, 'auto-cfg');

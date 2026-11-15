@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// Sum sub-agent token usage from a Claude Code transcript (JSONL). Always exits 0.
-// Usage: node scripts/budget.mjs <transcript.jsonl|auto> [--mark] [--from <bytes>] [--limit <N>k]
+// Sum sub-agent token usage from a Claude Code transcript (JSONL), or main-session usage with --main. Always exits 0.
+// Usage: node scripts/budget.mjs <transcript.jsonl|auto> [--mark] [--main] [--from <bytes>] [--limit <N>k]
 import { statSync, readdirSync, realpathSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -37,6 +37,30 @@ function newestTranscript() {
   return undefined;
 }
 
+// Main-session usage: last usage per assistant message.id (non-sidechain entries only).
+function mainUsage(lines) {
+  const msgs = new Map();
+  let anon = 0, last = null;
+  for (const line of lines) {
+    if (!line.includes('"usage"')) continue;
+    const o = entries([line]).next().value;
+    if (!o || o.type !== 'assistant' || !o.message?.usage) continue;
+    msgs.set(o.message.id ?? 'anon-' + anon++, o.message.usage);
+    last = o.message.usage;
+  }
+  if (msgs.size === 0) return 'MAIN: 0 calls';
+  let inp = 0, cr = 0, cw = 0, out = 0;
+  for (const u of msgs.values()) {
+    inp += u.input_tokens ?? 0;
+    cr += u.cache_read_input_tokens ?? 0;
+    cw += u.cache_creation_input_tokens ?? 0;
+    out += u.output_tokens ?? 0;
+  }
+  const ctx = (last.input_tokens ?? 0) + (last.cache_read_input_tokens ?? 0) + (last.cache_creation_input_tokens ?? 0);
+  const k = (n) => Math.round(n / 1000);
+  return `MAIN: ${msgs.size} calls, input ${k(inp)}k, cache-read ${k(cr)}k, cache-write ${k(cw)}k, output ${k(out)}k, context ${k(ctx)}k`;
+}
+
 function main() {
   const args = process.argv.slice(2);
   const val = (name) => {
@@ -56,8 +80,10 @@ function main() {
   const lm = /^(\d+(?:\.\d+)?)k?$/i.exec(val('--limit') ?? '');
   const limit = lm && Number(lm[1]) > 0 ? Number(lm[1]) : null;
 
+  const main = args.includes('--main');
   let lines;
-  try { lines = readTranscript(file, from); } catch { return 'BUDGET: spent ? (transcript unreadable)'; }
+  try { lines = readTranscript(file, from); } catch { return main ? 'MAIN: ? (transcript unreadable)' : 'BUDGET: spent ? (transcript unreadable)'; }
+  if (main) return mainUsage(lines);
 
   const launches = new Set();
   const map = new Map(); // launch id -> agent key
