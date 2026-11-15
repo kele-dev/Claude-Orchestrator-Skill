@@ -626,6 +626,8 @@ function runHook(name, payload, extraEnv = {}) {
     // guard-review smoke
     fs.mkdirSync(path.join(tmp, 'docs', 'prd'), { recursive: true });
     fs.writeFileSync(path.join(tmp, 'docs', 'prd', 'exists.md'), '# x\n');
+    fs.mkdirSync(path.join(tmp, 'my proj', 'docs', 'prd'), { recursive: true });
+    fs.writeFileSync(path.join(tmp, 'my proj', 'docs', 'prd', 'exists.md'), '# x\n');
     const review = (agent, prompt, extraEnv = {}) =>
       runHook('guard-review.mjs', {
         hook_event_name: 'PreToolUse',
@@ -640,6 +642,11 @@ function runHook(name, payload, extraEnv = {}) {
       ['review glob only allowed', 'orchestrator:opus-reviewer', 'Review docs/prd/*.md', {}, false],
       ['review url only allowed', 'orchestrator:opus-reviewer', 'Review https://example.com/docs/prd/x.md', {}, false],
       ['review ORCH_GUARD=off allowed', 'orchestrator:opus-reviewer', 'Review docs/prd/no-such-prd-xyz.md', { ORCH_GUARD: 'off' }, false],
+      ['review absolute existing allowed', 'orchestrator:opus-reviewer', `Review ${path.join(tmp, 'docs', 'prd', 'exists.md')}`, {}, false],
+      ['review absolute missing denied', 'orchestrator:opus-reviewer', `Review ${path.join(tmp, 'docs', 'prd', 'nope.md')}`, {}, true],
+      ['review absolute with space existing allowed', 'orchestrator:opus-reviewer', `Review ${path.join(tmp, 'my proj', 'docs', 'prd', 'exists.md')} now`, {}, false],
+      ['review quoted absolute with space existing allowed', 'orchestrator:opus-reviewer', `Review "${path.join(tmp, 'my proj', 'docs', 'prd', 'exists.md')}" now`, {}, false],
+      ['review absolute with space missing denied', 'orchestrator:opus-reviewer', `Review ${path.join(tmp, 'my proj', 'docs', 'prd', 'nope.md')}`, {}, true],
     ];
     for (const [name, agent, prompt, env, deny] of reviewCases) {
       const g = review(agent, prompt, env);
