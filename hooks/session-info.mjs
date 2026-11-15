@@ -65,6 +65,9 @@ function run(input) {
   });
   if (allLessons.length > 20) lessons.push(`+${allLessons.length - 20} more (see ${store}/lessons)`);
   lines.push(lessons.length ? `Lessons: [${store}/lessons] ${lessons.join('; ')}` : 'Lessons: none');
+  if (!allLessons.includes('learned-map.md')) {
+    lines.push('Map: none (no learned-map.md in the store): before the first file-changing task, suggest /orchestrator:init to the user in one line.');
+  }
 
   const cpDir = join(store, 'checkpoints');
   const allCps = listMd(cpDir)

@@ -427,6 +427,16 @@ function runHook(name, payload, extraEnv = {}) {
       if (!(a.includes('old (old one) (stale 20d)') && a.includes('new (new one)') && !a.includes('new (new one) (stale') && a.includes('offer the user to delete') && !b.includes('stale'))) {
         err('hooks/session-info.mjs', 'smoke "session-info stale": expected stale marker for 20d-old checkpoint only, none with ORCH_STALE_DAYS=30');
       }
+
+      // session-info map: no learned-map.md -> "Map: none"; present -> no "Map: none"
+      if (!sess({}).includes('Map: none')) {
+        err('hooks/session-info.mjs', 'smoke "session-info map": expected "Map: none" on fresh store');
+      }
+      fs.mkdirSync(path.join(store, 'lessons'), { recursive: true });
+      fs.writeFileSync(path.join(store, 'lessons', 'learned-map.md'), '---\ndescription: map\n---\n');
+      if (sess({}).includes('Map: none')) {
+        err('hooks/session-info.mjs', 'smoke "session-info map": expected no "Map: none" once learned-map.md exists');
+      }
     }
   } finally {
     fs.rmSync(sh, { recursive: true, force: true });
