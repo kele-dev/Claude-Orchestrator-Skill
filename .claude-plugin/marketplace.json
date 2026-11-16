@@ -9,6 +9,16 @@
       "version": "1.12.1",
       "source": "./",
       "author": { "name": "kele-dev" }
+    },
+    {
+      "name": "improvement-cycle",
+      "description": "Audits a project across 9 dimensions with evidence, lets the user pick items, and executes them one commit each.",
+      "version": "2.0.0",
+      "source": {
+        "source": "github",
+        "repo": "kele-dev/improvement-cycle"
+      },
+      "author": { "name": "kele-dev" }
     }
   ]
 }
