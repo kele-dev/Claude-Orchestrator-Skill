@@ -213,7 +213,8 @@ for (const [f, h] of headingChecks) {
 // Always-loaded context budget (hooks/rules.md + skills/on/SKILL.md, LF-normalized bytes).
 // Raising it is a deliberate decision: state the release and reason in this comment.
 // v1.12.0: measured 13146 B after the non-opus.md / situational split, plus about 1 KB headroom.
-const CONTEXT_BUDGET_BYTES = 14200;
+// v1.12.1 (improvement cycle 002): measured 13320 B after the ask-first and chat-commit rule edits; raised to 14500 B to restore about 1 KB headroom.
+const CONTEXT_BUDGET_BYTES = 14500;
 const lfBytes = (t) => Buffer.byteLength(t.replace(/\r\n/g, '\n'));
 if (exists(path.join(root, 'hooks/rules.md')) && exists(path.join(root, 'skills/on/SKILL.md'))) {
   const n = lfBytes(readText(path.join(root, 'hooks/rules.md'))) + lfBytes(readText(path.join(root, 'skills/on/SKILL.md')));
@@ -419,6 +420,9 @@ function runHook(name, payload, extraEnv = {}) {
   if (r && (r.status !== 0 || !r.stdout.includes('Orchestrator store:'))) {
     err('hooks/session-info.mjs', `smoke "session-info": exit ${r.status}, expected "Orchestrator store:" in stdout`);
   }
+  if (r && !r.stdout.includes('Guards: active')) err('hooks/session-info.mjs', 'smoke "session-info": expected "Guards: active" in stdout');
+  r = runHook('session-info.mjs', { hook_event_name: 'SessionStart', source: 'startup', cwd: root }, { ORCH_GUARD: 'off' });
+  if (r && !r.stdout.includes('Guards: off (ORCH_GUARD=off)')) err('hooks/session-info.mjs', 'smoke "session-info ORCH_GUARD=off": expected "Guards: off (ORCH_GUARD=off)" in stdout');
 
   // session-info stale checkpoints (fake HOME and cwd in temp dirs)
   const sh = fs.mkdtempSync(path.join(os.tmpdir(), 'orch-st-'));
@@ -454,6 +458,164 @@ function runHook(name, payload, extraEnv = {}) {
   } finally {
     fs.rmSync(sh, { recursive: true, force: true });
     fs.rmSync(scwd, { recursive: true, force: true });
+  }
+}
+
+// 8a. Kill switches, invalid stdin and project-root fallback
+{
+  const bigStdout = Array.from({ length: 150 }, (_, i) => (i === 69 ? 'Error: boom'.padEnd(50, '.') : 'x'.repeat(50))).join('\n');
+  const trimReq = (command) => ({
+    hook_event_name: 'PostToolUse',
+    tool_name: 'Bash',
+    tool_input: { command },
+    tool_response: { stdout: bigStdout, stderr: '', interrupted: false },
+    cwd: root,
+  });
+  const editReq = (file) => ({
+    hook_event_name: 'PreToolUse',
+    tool_name: 'Edit',
+    tool_input: { file_path: file },
+    transcript_path: path.join(root, 'no-such-transcript.jsonl'),
+    cwd: root,
+  });
+
+  let r = runHook('guard-edit.mjs', editReq(path.join(root, 'agents', 'x.md')), { ORCH_GUARD: 'off' });
+  if (r && r.stdout.trim() !== '') err('hooks/guard-edit.mjs', 'smoke "guard ORCH_GUARD=off": expected empty stdout');
+  r = runHook('trim-output.mjs', trimReq('npm test'), { ORCH_NO_TRIM: '1' });
+  if (r && r.stdout.trim() !== '') err('hooks/trim-output.mjs', 'smoke "trim ORCH_NO_TRIM=1": expected empty stdout');
+
+  // invalid JSON stdin: fail open silently; with ORCH_DEBUG=1 the error goes to stderr
+  const rawHook = (name, env) => spawnSync(process.execPath, [path.join(root, 'hooks', name)], { input: '{bad' + 'x'.repeat(3100), encoding: 'utf8', cwd: root, env: { ...process.env, ORCH_DEBUG: '', ...env } });
+  for (const [name, prefix] of [['trim-output.mjs', 'orchestrator trim-output:'], ['guard-edit.mjs', 'orchestrator guard-edit:']]) {
+    const quiet = rawHook(name, {});
+    if (quiet.status !== 0 || quiet.stdout.trim() !== '' || quiet.stderr.trim() !== '') {
+      err(`hooks/${name}`, `smoke "invalid stdin": expected exit 0 with empty stdout and stderr (exit ${quiet.status})`);
+    }
+    const loud = rawHook(name, { ORCH_DEBUG: '1' });
+    if (!(loud.stderr ?? '').startsWith(prefix)) err(`hooks/${name}`, `smoke "invalid stdin ORCH_DEBUG=1": expected stderr starting with "${prefix}"`);
+  }
+
+  // project-root fallback: no CLAUDE_PROJECT_DIR, so the git top level of cwd is the project root
+  if (spawnSync('git', ['--version']).status === 0) {
+    const gtmp = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'orch-root-')));
+    try {
+      spawnSync('git', ['init', '-q'], { cwd: gtmp });
+      const tp = path.join(gtmp, 'transcript.jsonl');
+      fs.writeFileSync(tp, JSON.stringify({ type: 'user', message: { content: 'hello' } }) + '\n');
+      const payload = { hook_event_name: 'PreToolUse', tool_name: 'Edit', tool_input: { file_path: path.join(gtmp, 'a.txt') }, transcript_path: tp, cwd: gtmp };
+      const g = spawnSync(process.execPath, [path.join(root, 'hooks', 'guard-edit.mjs')], {
+        input: JSON.stringify(payload),
+        encoding: 'utf8',
+        cwd: gtmp,
+        env: { ...process.env, ORCH_GUARD: '', CLAUDE_PROJECT_DIR: '' },
+      });
+      if (!(g.stdout ?? '').includes('"deny"')) err('hooks/guard-edit.mjs', 'smoke "guard root fallback": expected deny for a project file without CLAUDE_PROJECT_DIR');
+    } finally {
+      fs.rmSync(gtmp, { recursive: true, force: true });
+    }
+  }
+}
+
+// 8a2. Large-input windows: trim cut, guard transcript window fallback, long-session head/tail reads
+{
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'orch-large-'));
+  const sid = `large-${process.pid}-${Date.now()}`;
+  try {
+    // trim-output: line trimming keeps ~33 lines, so 1000-char lines keep more than 30000 chars and hit the cut marker
+    const bigLines = Array.from({ length: 200 }, (_, i) => (i === 199 ? 'LAST-LINE-MARK'.padEnd(1000, '.') : 'x'.repeat(1000)));
+    const r = runHook('trim-output.mjs', {
+      hook_event_name: 'PostToolUse',
+      tool_name: 'Bash',
+      tool_input: { command: 'npm test' },
+      tool_response: { stdout: bigLines.join('\n'), stderr: '', interrupted: false },
+      cwd: root,
+    });
+    if (r) {
+      let out = null;
+      try {
+        out = JSON.parse(r.stdout).hookSpecificOutput.updatedToolOutput.stdout;
+      } catch {
+        err('hooks/trim-output.mjs', 'smoke "trim large": stdout is not the expected JSON');
+      }
+      if (out !== null && !(out.includes('[orchestrator: cut ') && out.includes('LAST-LINE-MARK'))) {
+        err('hooks/trim-output.mjs', 'smoke "trim large": expected cut marker and LAST-LINE-MARK in output');
+      }
+    }
+
+    // guard-edit: transcript over 512 KB whose off command is outside the window; full-file fallback must still see off
+    const offLine = JSON.stringify({ type: 'user', message: { content: '<command-message>orchestrator:off</command-message>\n<command-name>/orchestrator:off</command-name>' } });
+    const filler = JSON.stringify({ type: 'user', message: { content: 'f'.repeat(1000) } });
+    const bigTranscript = path.join(tmp, 'big-off.jsonl');
+    fs.writeFileSync(bigTranscript, offLine + '\n' + Array.from({ length: 700 }, () => filler + '\n').join(''));
+    const g = runHook('guard-edit.mjs', {
+      hook_event_name: 'PreToolUse',
+      tool_name: 'Edit',
+      tool_input: { file_path: path.join(root, 'agents', 'x.md') },
+      transcript_path: bigTranscript,
+      cwd: root,
+    });
+    if (g && g.stdout.trim() !== '') err('hooks/guard-edit.mjs', 'smoke "guard large transcript off": expected empty stdout');
+
+    // long-session: over 1 MB, usage at head and tail only, filler in the middle forces head/tail windows
+    const usage = (cacheRead) => JSON.stringify({ type: 'assistant', message: { usage: { input_tokens: 10, cache_read_input_tokens: cacheRead } } });
+    const longPath = path.join(tmp, 'long-large.jsonl');
+    fs.writeFileSync(longPath, usage(1000) + '\n' + 'y'.repeat(2.5 * 1024 * 1024) + '\n' + usage(131000) + '\n');
+    const rl = runHook('long-session.mjs', { hook_event_name: 'UserPromptSubmit', session_id: sid, transcript_path: longPath, cwd: root }, { ORCH_LONG: '', ORCH_LONG_DELEGATIONS: '', ORCH_LONG_BYTES: '999999999', ORCH_LONG_TOKENS: '', ORCH_LONG_REPEAT: '' });
+    if (rl && (!rl.stdout.includes('systemMessage') || !rl.stdout.includes('+130k'))) err('hooks/long-session.mjs', 'smoke "long large head/tail": expected systemMessage with "+130k" in stdout');
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+    for (const f of fs.readdirSync(os.tmpdir())) {
+      if (f.startsWith(`orchestrator-long-${sid}`)) fs.rmSync(path.join(os.tmpdir(), f), { force: true });
+    }
+  }
+}
+
+// 8a3. Store key: session-info.mjs and the bash/PowerShell lines in learn/reference.md must derive the same key
+{
+  const refPath = 'skills/learn/reference.md';
+  const refText = exists(path.join(root, refPath)) ? readText(path.join(root, refPath)) : null;
+  if (refText === null) {
+    err(refPath, 'missing, cannot check store key');
+  } else {
+    for (const pattern of ['tr A-Z a-z', "sed 's/[^a-z0-9][^a-z0-9]*/-/g'", 'tail -c 80', 'ToLower()', "-replace '[^a-z0-9]+','-'", 'Substring($k.Length - 80)']) {
+      if (!refText.includes(pattern)) err(refPath, `store key pattern missing: ${pattern}`);
+    }
+  }
+  const siPath = 'hooks/session-info.mjs';
+  if (exists(path.join(root, siPath))) {
+    if (!readText(path.join(root, siPath)).includes(".toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(-80)")) {
+      err(siPath, 'store key pattern missing: .toLowerCase().replace(/[^a-z0-9]+/g, \'-\').slice(-80)');
+    }
+  } else {
+    err(siPath, 'missing, cannot check store key');
+  }
+
+  // run the bash store command and session-info.mjs in the same fresh non-git dir; both must print the same path
+  if (refText !== null && process.platform !== 'win32' && spawnSync('bash', ['--version']).status === 0) {
+    const sdir = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'orch-key-cwd-')));
+    const shome = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'orch-key-home-')));
+    try {
+      const fence = refText.indexOf('```bash', refText.indexOf('## Store command'));
+      const bodyStart = refText.indexOf('\n', fence) + 1;
+      const bodyEnd = refText.indexOf('```', bodyStart);
+      const cmd = refText.slice(bodyStart, bodyEnd).split('\n').map((l) => l.trim()).filter(Boolean).join('\n');
+      const env = { ...process.env, HOME: shome, USERPROFILE: shome };
+      const b = spawnSync('bash', ['-c', cmd], { encoding: 'utf8', cwd: sdir, env });
+      const hook = spawnSync(process.execPath, [path.join(root, 'hooks', 'session-info.mjs')], {
+        input: JSON.stringify({ hook_event_name: 'SessionStart', source: 'startup', cwd: sdir }),
+        encoding: 'utf8',
+        cwd: root,
+        env: { ...env, ORCH_STALE_DAYS: '' },
+      });
+      const store = /Orchestrator store: (.*)/.exec(hook.stdout ?? '')?.[1]?.trim();
+      const bashOut = (b.stdout ?? '').trim();
+      if (!bashOut || !store || bashOut !== store) {
+        err('skills/learn/reference.md', `store key smoke: bash "${bashOut}" vs session-info "${store ?? ''}"`);
+      }
+    } finally {
+      fs.rmSync(sdir, { recursive: true, force: true });
+      fs.rmSync(shome, { recursive: true, force: true });
+    }
   }
 }
 
@@ -604,6 +766,10 @@ function runHook(name, payload, extraEnv = {}) {
       const m = path.join(tmp, 'm.jsonl');
       chk('known', bud([known]).out, 'BUDGET: spent 46k (2 agents)');
       chk('mixed limit 40k', bud([mixed, '--limit', '40k']).out, 'BUDGET: spent 46k+? (3 agents, 1 without usage) of 40k: OVER');
+      chk('known limit 100000k', bud([known, '--limit', '100000k']).out, 'BUDGET: spent 46k (2 agents) of 100000k: UNDER');
+      chk('mixed limit 100000k', bud([mixed, '--limit', '100000k']).out, 'BUDGET: spent 46k+? (3 agents, 1 without usage) of 100000k: UNKNOWN');
+      chk('mark unreadable',bud([path.join(tmp, 'none.jsonl'), '--mark']).out, 'BUDGET: mark ? (transcript unreadable)');
+      chk('from invalid mark', bud([known, '--from', '?', '--limit', '10k']).out, 'BUDGET: spent ? (no valid mark) of 10k: UNKNOWN');
       const missingRes = bud([path.join(tmp, 'none.jsonl')]);
       chk('missing file', missingRes.out, 'BUDGET: spent ? (transcript unreadable)');
       chk('missing file exit', String(missingRes.status), '0');
@@ -783,6 +949,10 @@ function runHook(name, payload, extraEnv = {}) {
         fs.writeFileSync(b2, J({ model: 'm', cases: { c1: { with: 100000 } } }));
         const edge = run(res2, b2, '--threshold', '15');
         if (edge.status !== 0) err('scripts/eval-compare.mjs', `smoke "compare base 100000 now 115000 threshold 15": expected exit 0, got ${edge.status}`);
+        const res3 = path.join(d, 'r3.json');
+        fs.writeFileSync(res3, J({ suite: { modelOverride: 'm' }, cases: [{ name: 'c1', arms: { with: [{ passed: true, tracePath: path.join(d, 'gone.jsonl') }] } }] }));
+        const empty = run(res3, b);
+        if (empty.status !== 0 || !(empty.stdout ?? '').includes('EVAL-COMPARE: EMPTY')) err('scripts/eval-compare.mjs', `smoke "compare all skipped": expected exit 0 with "EVAL-COMPARE: EMPTY", got ${empty.status}`);
       }
     }
   } finally {

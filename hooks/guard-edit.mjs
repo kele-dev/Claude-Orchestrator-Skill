@@ -1,9 +1,11 @@
 #!/usr/bin/env node
 // PreToolUse hook for Edit/Write/NotebookEdit: denies project edits from the main session while orchestration is on.
-// Fails open on malformed input (prints nothing, exits 0). With no on/off info in the transcript the default is "on".
+// Fails open on malformed input or hook errors (prints nothing, exits 0). Default mode is "on": no on/off info, or an unreadable transcript, means edits are denied.
 import fs from 'fs';
 import { execFileSync } from 'child_process';
 import path from 'path';
+
+const dbg = (e) => { if (process.env.ORCH_DEBUG === '1') process.stderr.write(`orchestrator guard-edit: ${e?.stack ?? e}\n`); };
 
 let raw = '';
 process.stdin.setEncoding('utf8');
@@ -19,8 +21,9 @@ process.stdin.on('end', () => {
         },
       }));
     }
-  } catch {
+  } catch (e) {
     // fail open
+    dbg(e);
   }
 });
 
@@ -52,7 +55,8 @@ function projectRoot(cwd) {
       cwd, timeout: 3000, stdio: ['ignore', 'pipe', 'ignore'], encoding: 'utf8',
     }).trim();
     if (top) return top;
-  } catch {
+  } catch (e) {
+    dbg(e);
     // not a git repo
   }
   return cwd;
@@ -88,7 +92,8 @@ function orchestrationOff(transcriptPath) {
     } finally {
       fs.closeSync(fd);
     }
-  } catch {
+  } catch (e) {
+    dbg(e);
     return false;
   }
   if (partial) {
@@ -100,7 +105,8 @@ function orchestrationOff(transcriptPath) {
     if (size > 16 * 1024 * 1024) return false;
     try {
       mode = lastMode(fs.readFileSync(transcriptPath, 'utf8'));
-    } catch {
+    } catch (e) {
+      dbg(e);
       return false;
     }
   }

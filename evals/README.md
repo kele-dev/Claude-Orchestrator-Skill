@@ -19,6 +19,7 @@ Each case is a directory `<case>/` containing:
 ## Run on GitHub
 
 1. Add the repository secret `ANTHROPIC_API_KEY`.
+- The eval job gives the agent Bash, so it can read ANTHROPIC_API_KEY: store a dedicated low-limit key as the repository secret.
 2. Go to Actions -> eval -> Run workflow, or run `gh workflow run eval.yml -f case='*'`.
 3. Results are in the `eval-results` artifact.
 4. Case `on-sonnet-guardrails` checks the rules for a non-Opus-class main session. Its `prompt.md` pins `model: claude-sonnet-5-5`; whether that overrides `--model` is not documented, so also run it with `gh workflow run eval.yml -f case='on-sonnet-*' -f model=claude-sonnet-5-5`.
@@ -104,7 +105,7 @@ Create a baseline: download `ci-result.json` from a CI eval run together with it
 
 and commit `evals/baseline.json`. It exits 2 and writes nothing when no trace was readable. If a `tracePath` in the result file no longer exists, the script also tries the same file name inside the result file's own folder.
 
-Compare: `node scripts/eval-compare.mjs <current.json> [baseline.json] [--threshold 15]`. A pair is OVER when now is strictly greater than base * (1 + threshold/100). NEW (not in baseline) and SKIP (no readable trace) never fail. If both files name a model and the models differ, the compare is skipped.
+Compare: `node scripts/eval-compare.mjs <current.json> [baseline.json] [--threshold 15]`. A pair is OVER when now is strictly greater than base * (1 + threshold/100). NEW (not in baseline) and SKIP (no readable trace) never fail. If both files name a model and the models differ, the compare is skipped. The summary counts measured and not-compared pairs; EMPTY (nothing measured) warns but does not fail. Baseline pairs missing from the current run print MISSING.
 
 Exit codes: 0 pass (or skipped), 1 at least one pair is OVER, 2 unreadable file or bad arguments.
 

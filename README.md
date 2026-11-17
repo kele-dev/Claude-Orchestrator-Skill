@@ -65,10 +65,21 @@ Orchestration mode is active automatically in every session. Manual commands:
 - Session info: SessionStart prints the project store path, a one-line index of saved lessons (at most 20), the 5 newest checkpoints, and a note when legacy files exist, so Claude needs no extra tool calls to find them. Needs Node 18+; without Node the skills compute the path themselves.
 - Output trim: Bash/PowerShell output is trimmed only when it is over 80 lines AND over 4000 chars. It keeps the first 3 lines, up to 10 error/failure lines, and the last 30 lines before the model sees it. `git diff/show`, `cat`, `jq`, `Get-Content`, `type`, and JSON output are not line-trimmed (a ~26k-char cap still applies to everything). Read, list and search commands at the start of a statement (`ls`, `find`, `git ls-files`, `grep`, `rg`, `head`, `tail`, `sed -n`, `wc`, `Get-ChildItem`, `Select-String`) are line-trimmed only above 300 lines. Add `# notrim` to a command, or set env `ORCH_NO_TRIM=1`, for full output. Env `ORCH_TRIM_TAIL` and `ORCH_TRIM_ERRORS` change the 30 and the 10.
 - Edit guard: the main session cannot Edit/Write project files (except `docs/prd/`); subagents can. Turn it off with `/orchestrator:off` or env `ORCH_GUARD=off`.
-- The edit guard and output trim need Node 18+ on PATH. Without Node they do nothing (fail open). macOS desktop app: Node from nvm or Homebrew may be missing from the app's PATH; check that `/orchestrator:status` shows the store line, or install Node system-wide.
+- Guard limits: the edit guard keeps orchestration discipline; it is not a security boundary. It checks only Edit/Write/NotebookEdit (shell writes such as `sed -i` or `>` are not checked), any subagent may edit, and `/orchestrator:off` is user-only (the skill sets `disable-model-invocation: true`).
+- Debugging: hooks fail open and print nothing on errors; set env `ORCH_DEBUG=1` to write swallowed errors to stderr (top-level failures plus failed file, git and transcript reads in guard-edit, long-session and session-info).
+- The edit guard and output trim need Node 18+ on PATH. Without Node they do nothing (fail open). macOS desktop app: Node from nvm or Homebrew may be missing from the app's PATH; check that `/orchestrator:status` shows `Guards: active` (the session-start `Guards:` line comes only from the hooks), or install Node system-wide.
 - Review guard (`guard-review`): a PreToolUse hook on Agent/Task that denies `orchestrator:opus-reviewer` when its prompt names a `docs/prd/*.md` file that does not exist. It fails open when Node is missing or the check cannot run. Turn it off with env `ORCH_GUARD=off`.
 
 ## What's new (1.9.0 and later)
+
+### 1.13.0
+- Guards are visible: session start prints `Guards: active` (or `Guards: off` with `ORCH_GUARD=off`) and `/orchestrator:status` reports it; the README states what the edit guard does not cover.
+- `ORCH_DEBUG=1` writes swallowed hook errors (top-level failures and failed file, git and transcript reads) to stderr.
+- Commits the user asks for in chat are allowed under `orchestrator:on`; the ask-first rule applies to every main model; non-Opus sessions send only the final diff to `opus-reviewer`.
+- Autopilot: a BLOCKED batch skips only dependent batches, a failing final check gets fix rounds, and team/autopilot print one progress line per wave or batch.
+- `scripts/budget.mjs`: an unreadable transcript prints `mark ?` and the budget becomes UNKNOWN (no more silent `mark 0`); `auto` stays inside the current repo and names the file it picked.
+- `scripts/eval-compare.mjs` prints EMPTY when nothing was measured and MISSING for baseline pairs absent from the run.
+- CI: GitHub Actions pinned by SHA, read-only token for validate, Dependabot for actions; more hook smoke tests (kill switches, invalid input, large inputs, store-key copies).
 
 ### 1.12.2
 - Slash commands for the user go in text blocks, never shell blocks (Run button ran them in PowerShell).
@@ -168,6 +179,7 @@ If you previously installed via `install.ps1`, delete `haiku-coder.md`, `sonnet-
 - Baru di 1.12.0: aturan dipisah (aturan non-Opus di `non-opus.md`, aturan token situasional di `reference.md` dibaca bila perlu), validator punya batas ukuran konteks, `scripts/eval-compare.mjs` membandingkan token eval dengan baseline (jadwal CI opsional; baseline belum di-commit, jadi langkah compare di CI tetap nonaktif sampai pemilik repo menjalankan eval dan meng-commit output `--write`), dan checkpoint basi ditandai sesuai `ORCH_STALE_DAYS` (default 14).
 - Baru di 1.12.1: aturan jalur pendek hanya berlaku untuk sesi utama non-Opus dan guard review menerima path PRD absolut atau berkutip yang berspasi; sesi dimulai dengan `Map: none` bila learned-map belum ada sehingga Claude menyarankan `/orchestrator:init` dulu; trim output hanya memotong perintah baca, listing, dan cari di atas 300 baris; dan `scripts/budget.mjs --main` melaporkan pemakaian token sesi utama (panggilan, cache baca/tulis, output, konteks saat ini) yang ditampilkan `/orchestrator:status`.
 - Baru di 1.12.2: perintah slash untuk pengguna ditaruh di blok teks, tidak pernah di blok shell (tombol Run menjalankannya di PowerShell).
+- Baru di 1.13.0: status guard terlihat (`Guards: active` atau `Guards: off`) dan batas guard dijelaskan; `ORCH_DEBUG=1` menulis error hook ke stderr; commit yang diminta user di chat diizinkan; autopilot hanya melewati batch yang bergantung pada batch BLOCKED, punya jalur bila cek akhir gagal, dan mencetak satu baris progres per batch; `budget.mjs` mencetak `mark ?` (bukan `mark 0`) bila transkrip tak terbaca; `eval-compare.mjs` mencetak EMPTY bila tidak ada yang diukur; GitHub Actions dipin per SHA dan ditambah Dependabot.
 - Mode orkestrasi aktif otomatis di setiap sesi.
 
 ## Maintainers

@@ -74,4 +74,4 @@ Both paths.
 - Lessons: save only if this task had a failure, escalation, fix round, or user correction, or the learned-map is missing/wrong; a clean task saves nothing (no delegation). Then at most 3 non-obvious, verified ones (see `orchestrator:learn`) via one `haiku-coder` delegation, bundled with other housekeeping due at the same time (also fix wrong ones), no approval; one line "Lessons saved: ...".
 
 ## Hard rules
-- Reply in the user's own language. Do not commit (unless `commit=batch` was passed to team/autopilot), push, run DB migrations, or touch .env; do not let subagents rewrite or weaken tests to make them green.
+- Reply in the user's own language. Do not commit (unless `commit=batch` was passed to team/autopilot, or the user asks for a commit in chat: then one `haiku-coder` `TYPE: COMMIT` with the paths and message), push, run DB migrations, or touch .env; do not let subagents rewrite or weaken tests to make them green.

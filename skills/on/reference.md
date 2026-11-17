@@ -26,7 +26,7 @@
 After a group of related tasks is finished:
 - Up to 5 files: the main session reads `git diff --stat` and `git diff -U1` itself.
 - Above 5 files: `haiku-coder` `TYPE: SCAN`; brief = `git diff --stat` + a targeted checklist; the agent reads per-file `git diff -U1`. The main session then reads only the hunks the SCAN flags. Never SCAN and also re-read the whole diff.
-- Risky or large work (>5 tasks, or schema/auth/security): also call `opus-reviewer` with the PRD (the `docs/prd/<slug>.md` path if saved, otherwise paste the full PRD text into the brief) and the list of allowed files. (not Opus-class: the final or batch diff always goes to `opus-reviewer`)
+- Risky or large work (>5 tasks, or schema/auth/security): also call `opus-reviewer` with the PRD (the `docs/prd/<slug>.md` path if saved, otherwise paste the full PRD text into the brief) and the list of allowed files. (not Opus-class: the final diff always goes to `opus-reviewer`, never per batch)
 - Collect all findings first (SCAN, own diff review, verify output), then ONE fix delegation; small fully-specified fixes go together in one brief, never one delegation per finding. Fixes go through steps 3-4, then re-review until "PASS".
 
 ## Token rules (situational)

@@ -96,13 +96,15 @@ if (!baseObj || !baseObj.cases || typeof baseObj.cases !== 'object') fail(`basel
 const base = values(baseObj, dirname(basePath));
 
 if (cur.model && base.model && cur.model !== base.model) {
-  process.stdout.write(`EVAL-COMPARE: SKIP model ${base.model} vs ${cur.model}\n`);
+  process.stdout.write(`::warning::EVAL-COMPARE: SKIP model ${base.model} vs ${cur.model}\n`);
   process.exit(0);
 }
 
 const baseMap = new Map(base.pairs.map(([c, a, n]) => [`${c}\u0000${a}`, n]));
-let over = 0;
+const curKeys = new Set();
+let over = 0, measured = 0, other = 0;
 for (const [name, arm, now] of cur.pairs) {
+  curKeys.add(`${name}\u0000${arm}`);
   const b = baseMap.get(`${name}\u0000${arm}`);
   let status;
   let pct = '';
@@ -114,7 +116,16 @@ for (const [name, arm, now] of cur.pairs) {
     status = now * 100 > b * (100 + threshold) ? 'OVER' : 'OK';
   }
   if (status === 'OVER') over++;
+  if (status === 'OK' || status === 'OVER') measured++;
+  else other++;
   process.stdout.write(`CMP: ${name} ${arm} base ${b ?? '?'} now ${now ?? '?'}${pct} ${status}\n`);
 }
-process.stdout.write(`EVAL-COMPARE: ${over ? 'FAIL' : 'PASS'} ${over} over, threshold ${threshold}%\n`);
+for (const [name, arm, b] of base.pairs) {
+  if (curKeys.has(`${name}\u0000${arm}`)) continue;
+  other++;
+  process.stdout.write(`CMP: ${name} ${arm} base ${b ?? '?'} now - MISSING\n`);
+}
+if (measured === 0) process.stdout.write('::warning::eval-compare measured nothing\n');
+const verdict = over ? 'FAIL' : measured === 0 ? 'EMPTY' : 'PASS';
+process.stdout.write(`EVAL-COMPARE: ${verdict} ${over} over, ${measured} measured, ${other} not compared, threshold ${threshold}%\n`);
 process.exit(over ? 1 : 0);

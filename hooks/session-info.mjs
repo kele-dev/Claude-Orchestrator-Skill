@@ -7,6 +7,8 @@ import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+const dbg = (e) => { if (process.env.ORCH_DEBUG === '1') process.stderr.write(`orchestrator session-info: ${e?.stack ?? e}\n`); };
+
 const STALE_DAYS_DEFAULT = 14;
 const STALE_DAYS = /^\d+$/.test((process.env.ORCH_STALE_DAYS ?? '').trim()) && Number(process.env.ORCH_STALE_DAYS) > 0
   ? Number(process.env.ORCH_STALE_DAYS)
@@ -19,8 +21,9 @@ process.stdin.on('end', () => {
   try {
     const out = run(JSON.parse(raw));
     if (out) process.stdout.write(out + '\n');
-  } catch {
+  } catch (e) {
     // fail open
+    dbg(e);
   }
 });
 
@@ -29,7 +32,8 @@ const fwd = (p) => p.replace(/\\/g, '/');
 function listMd(dir, prefix = '') {
   try {
     return readdirSync(dir).filter((f) => f.endsWith('.md') && f.startsWith(prefix)).sort();
-  } catch {
+  } catch (e) {
+    dbg(e);
     return [];
   }
 }
@@ -44,7 +48,8 @@ function run(input) {
       cwd, timeout: 3000, stdio: ['ignore', 'pipe', 'ignore'], encoding: 'utf8',
     }).trim();
     if (common) main = dirname(common);
-  } catch {
+  } catch (e) {
+    dbg(e);
     main = cwd;
   }
   main = fwd(main);
@@ -52,6 +57,7 @@ function run(input) {
   const key = main.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(-80);
   const store = fwd(homedir()) + '/.claude/orchestrator/' + key;
   const lines = [`Orchestrator store: ${store}`];
+  lines.push(process.env.ORCH_GUARD === 'off' ? 'Guards: off (ORCH_GUARD=off)' : `Guards: active (hooks run on Node ${process.version})`);
 
   const allLessons = listMd(join(store, 'lessons'), 'learned-');
   const lessons = allLessons.slice(0, 20).map((f) => {
@@ -60,7 +66,7 @@ function run(input) {
       const fm = readFileSync(join(store, 'lessons', f), 'utf8').match(/^---\r?\n([\s\S]*?)\r?\n---/);
       const m = fm && fm[1].match(/^description:\s*(.*)$/m);
       if (m) desc = m[1].trim();
-    } catch { /* ignore */ }
+    } catch (e) { dbg(e); /* ignore */ }
     return `${f}: ${desc.slice(0, 100)}`;
   });
   if (allLessons.length > 20) lessons.push(`+${allLessons.length - 20} more (see ${store}/lessons)`);
@@ -73,7 +79,7 @@ function run(input) {
   const allCps = listMd(cpDir)
     .map((f) => {
       let t = 0;
-      try { t = statSync(join(cpDir, f)).mtimeMs; } catch { /* ignore */ }
+      try { t = statSync(join(cpDir, f)).mtimeMs; } catch (e) { dbg(e); /* ignore */ }
       return { f, t };
     })
     .sort((a, b) => b.t - a.t || (a.f < b.f ? 1 : -1));
@@ -83,7 +89,7 @@ function run(input) {
     try {
       const m = readFileSync(join(store, 'checkpoints', f), 'utf8').match(/^\s*(?:[-*]\s*)?Task:\s*(.*)$/m);
       if (m) task = m[1].trim().slice(0, 80);
-    } catch { /* ignore */ }
+    } catch (e) { dbg(e); /* ignore */ }
     const age = Date.now() - t;
     let stale = '';
     if (age > STALE_DAYS * 864e5) {
@@ -101,7 +107,7 @@ function run(input) {
   let legacy = false;
   try {
     legacy = readdirSync(join(main, '.claude', 'skills')).some((d) => d.startsWith('learned-'));
-  } catch { /* none */ }
+  } catch (e) { dbg(e); /* none */ }
   if (!legacy) legacy = listMd(join(main, '.claude', 'orchestrator', 'checkpoints')).length > 0;
   if (legacy) lines.push(`Legacy files present in ${main}/.claude (read legacy.md in the orchestrator:learn skill folder).`);
 
