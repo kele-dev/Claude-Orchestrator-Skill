@@ -16,7 +16,7 @@ Autopilot is `orchestrator:on` without stopping between batches (the main sessio
 - Max batches: 5, raised automatically up to 8: if the plan, or work discovered on the way, needs more than 5, continue without asking, but only while every finished batch passed. Any BLOCKED batch ends the automatic raise (the cap stays where it is). If more are needed past the cap, report and ask whether to continue.
 - Max fix rounds per batch: 2, raised automatically up to 4 (see `modes.md`).
 - `opus-reviewer`: at most once on the PRD and once on the final diff, and only for large work (>5 tasks, or touches schema/auth/security). Never per batch. Not Opus-class: the `orchestrator:on` reviewer rules (PRD before the first delegation, final diff) apply whatever the size.
-- `--dry-run`: stop after stage 2 and show the PRD and batch plan.
+- `--dry-run`: stop after step 2 (PRD + batch plan) and show them; to continue, the user runs the same command again without --dry-run.
 - `commit=batch` scope: per batch, after it passes verification.
 - Checkpoint timing: after every 3rd batch.
 - `budget=<N>k` (optional): token budget over all delegations; rules in `modes.md` (Budget).
