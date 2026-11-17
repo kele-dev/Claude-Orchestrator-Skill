@@ -623,6 +623,38 @@ function sessionInfo(cwd, env = {}, raw = false) {
       fs.rmSync(shome, { recursive: true, force: true });
     }
   }
+
+  // on win32, run the PowerShell store command and session-info.mjs in the same fresh non-git dir; both must print the same path
+  if (refText !== null && process.platform === 'win32') {
+    const psCheck = (sh) => spawnSync(sh, ['-NoProfile', '-Command', 'exit 0']).status === 0;
+    const shell = psCheck('pwsh') ? 'pwsh' : psCheck('powershell') ? 'powershell' : null;
+    if (shell) {
+      const sdir = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'orch-key-cwd-')));
+      const shome = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'orch-key-home-')));
+      try {
+        const fence = refText.indexOf('```powershell', refText.indexOf('## Store command'));
+        if (fence === -1) {
+          err(refPath, 'store key: PowerShell block missing under ## Store command');
+        } else {
+          const bodyStart = refText.indexOf('\n', fence) + 1;
+          const bodyEnd = refText.indexOf('```', bodyStart);
+          const cmd = refText.slice(bodyStart, bodyEnd).split('\n').map((l) => l.trim()).filter(Boolean).join('\n');
+          const env = { ...process.env, HOME: shome, USERPROFILE: shome };
+          const p = spawnSync(shell, ['-NoProfile', '-Command', cmd], { encoding: 'utf8', cwd: sdir, env });
+          const hook = sessionInfo(sdir, { HOME: shome, USERPROFILE: shome, ORCH_STALE_DAYS: '' }, true);
+          const store = /Orchestrator store: (.*)/.exec(hook.stdout ?? '')?.[1]?.trim();
+          const norm = (s) => s.trim().replace(/\\/g, '/').toLowerCase();
+          const psOut = (p.stdout ?? '').trim();
+          if (!psOut || !store || norm(psOut) !== norm(store)) {
+            err('skills/learn/reference.md', `store key smoke: powershell "${psOut}" vs session-info "${store ?? ''}"`);
+          }
+        }
+      } finally {
+        fs.rmSync(sdir, { recursive: true, force: true });
+        fs.rmSync(shome, { recursive: true, force: true });
+      }
+    }
+  }
 }
 
 // 8b. Script smoke tests: digest.mjs and long-session.mjs
