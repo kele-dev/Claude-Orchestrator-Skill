@@ -1,7 +1,7 @@
 # Improvement Backlog
 
 Project: orchestrator (Claude Code plugin, kele-dev marketplace)
-Last updated: 2026-11-17 (cycle 008)
+Last updated: 2026-11-17 (cycle 009)
 
 Scoring: see the improvement-cycle skill `references/scoring.md`. Score = Impact x Confidence / Effort. P0 >= 8.0 (score-based P0 only for Security/Stability/data integrity) or any override, P1 4.0-7.9 (cap for other dimensions without an override), P2 2.0-3.9, P3 < 2.0. New features are capped at P2 unless the user asked for features that cycle.
 
@@ -40,8 +40,8 @@ Scoring: see the improvement-cycle skill `references/scoring.md`. Score = Impact
 | IC-031 | P2 | 2.0 | Observability & ops | rules hook depends on cat and hooks on node PATH with no failure signal | hooks/hooks.json:8 | S | proposed | 001 |
 | IC-032 | P2 | 2.0 | Performance | Every Bash/Edit tool call spawns Node (~70-80 ms measured) | hooks/hooks.json:22-27,44-50; measured node -e 0 65-75 ms | M | proposed | 001 |
 | IC-033 | P2 | 2.0 | UX & accessibility | Windows Git Bash instruction gives no default path or fallback | skills/on/SKILL.md:30; skills/init/SKILL.md:37; cycle 003 proposal: generate verify.ps1 when bash is missing (skills/init/SKILL.md:37) | M | proposed | 001 |
-| IC-034 | P2 | 2.0 | New features | Proposal: in-plugin help command and changelogs moved out of README | skills/ (no help); README.md:31-46,71-117,143-166 | M | proposed | 001 |
-| IC-035 | P2 | 2.0 | New features | Proposal: store key from repo identity instead of truncated path | hooks/session-info.mjs:52; skills/learn/reference.md:12; docs/ideas/token-saving.md:52 | M | proposed | 001 |
+| IC-034 | P2 | 2.0 | New features | Proposal: in-plugin help command and changelogs moved out of README | skills/ (no help); README.md:31-46,71-117,143-166 | M | deferred | 001 |
+| IC-035 | P2 | 2.0 | New features | Proposal: store key from repo identity instead of truncated path | hooks/session-info.mjs:52; skills/learn/reference.md:12; docs/ideas/token-saving.md:52 | M | deferred | 001 |
 | IC-036 | P3 | 1.0 | Stability | long-session marker and cache writes are non-atomic | hooks/long-session.mjs:132,148,172,184 | S | proposed | 001 |
 | IC-037 | P1 | 9.0 | Observability & ops | Guards: active line is printed even with ORCH_GUARD=off and only proves SessionStart ran | hooks/session-info.mjs:56; hooks/guard-edit.mjs:29; skills/status/SKILL.md:14; README.md:70 | S | done | 002 |
 | IC-038 | P1 | 9.0 | UX & accessibility | modes.md still says nothing is committed without commit=batch, contradicting its new chat exception (regression of IC-001) | skills/on/modes.md:15 vs :20 | S | done | 002 |
@@ -78,8 +78,8 @@ Scoring: see the improvement-cycle skill `references/scoring.md`. Score = Impact
 | IC-069 | P1 | 6.0 | UX & accessibility | Short-path file limit is <=2 in on/SKILL.md but 1 for non-Opus elsewhere | skills/on/SKILL.md:21; skills/on/non-opus.md:4; README.md:157 | S | done | 006 |
 | IC-070 | P1 | 4.5 | UX & accessibility | Budget rule in modes.md is one ~250-word bullet that contradicts itself (never sum notices vs sum notices), gives UNKNOWN no action, uses three stop wordings, and tells the model to pass an unquoted `?` (shell glob) | skills/on/modes.md:10; skills/autopilot/SKILL.md:44; README.md:35; scripts/budget.mjs:151 | M | done | 004 |
 | IC-071 | P2 | 3.0 | UX & accessibility | Ideas doc says open: none while ideas 13-17 are open | docs/ideas/token-saving.md:3,46-53 | S | proposed | 003 |
-| IC-072 | P2 | 3.0 | New features | Proposal: read guard for large whole-file main-session reads (idea 14) | docs/ideas/token-saving.md:49 | M | proposed | 003 |
-| IC-073 | P2 | 2.0 | New features | Proposal: trim statistics row in status (idea 15) | docs/ideas/token-saving.md:50; skills/status/SKILL.md:12-26 | M | proposed | 003 |
+| IC-072 | P2 | 3.0 | New features | Proposal: read guard for large whole-file main-session reads (idea 14) | docs/ideas/token-saving.md:49 | M | deferred | 003 |
+| IC-073 | P2 | 2.0 | New features | Proposal: trim statistics row in status (idea 15) | docs/ideas/token-saving.md:50; skills/status/SKILL.md:12-26 | M | deferred | 003 |
 | IC-074 | P1 | 9.0 | Code quality & tests | budget UNDER and UNKNOWN verdicts are never asserted | scripts/budget.mjs:133-136; scripts/validate.mjs:766-776 | S | done | 003 |
 | IC-075 | P1 | 6.0 | Code quality & tests | trace-tokens lacks the tracePath basename fallback that eval-compare has | scripts/trace-tokens.mjs:178,193; scripts/eval-compare.mjs:27-29 | S | done | 003 |
 | IC-076 | P1 | 6.0 | DX/CI-CD/dependencies | evals README says guard-review enforces reviewer-after-PRD order; it only checks the PRD exists | evals/README.md:26; hooks/guard-review.mjs:32-45 | S | done | 003 |
@@ -98,6 +98,12 @@ Scoring: see the improvement-cycle skill `references/scoring.md`. Score = Impact
 | IC-089 | P1 | 4.0 | UX & accessibility | Progress line has undefined name placeholders, no delegation counter source and no states for DONE/BUDGET | skills/on/modes.md:12 | S | done | 007 |
 | IC-090 | P2 | 2.0 | Stability | budget auto git top-level cutoff may miss a transcript of a session launched above the repo (needs investigation) | scripts/budget.mjs:26-45 | S | proposed | 004 |
 | IC-091 | P3 | 1.0 | Performance | budget auto spawns git on every call | scripts/budget.mjs:26-33 | S | proposed | 004 |
+| IC-092 | P1 | 6.0 | New features | Proposal: cache-break detector in budget (flag turns where cache reads collapse and name the turn) | scripts/budget.mjs:65-69; https://codex.danielvaughan.com/2026/07/28/token-reduction-is-not-cost-reduction-prompt-cache-economics-codex-cli-tool-output-compaction-billing/ | S | done | 009 |
+| IC-093 | P1 | 6.0 | New features | Proposal: guard-edit denial streak switches to stop-and-ask after 3 denials in a row | hooks/guard-edit.mjs:22-23; https://anthropic.com/engineering/claude-code-auto-mode | S | done | 009 |
+| IC-094 | P1 | 4.5 | New features | Proposal: eval CI runs only the cases affected by changed skills, hooks or agents | .github/workflows/eval.yml:64; https://www.fast.io/resources/ai-agent-prompt-regression-testing.md | M | done | 009 |
+| IC-095 | P1 | 4.0 | New features | Proposal: delegation outcome ledger that turns past PASS/FAIL per tier into routing hints | hooks/hooks.json:32,42; https://arxiv.org/abs/2607.00053 | M | done | 009 |
+| IC-096 | P2 | 3.0 | New features | Proposal: export orchestration runs as OpenTelemetry GenAI spans (invoke_agent, execute_tool, token usage) | scripts/trace-tokens.mjs:79,128; https://github.com/open-telemetry/semantic-conventions-genai | M | done | 009 |
+| IC-097 | P2 | 2.0 | New features | Proposal: PRD task table compiled into a file-dependency DAG that derives parallel lanes and skips unchanged tasks | skills/team/SKILL.md:3; https://arxiv.org/pdf/2603.16104v1 | L | done | 009 |
 
 ## Status legend
 
