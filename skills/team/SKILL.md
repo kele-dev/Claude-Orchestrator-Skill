@@ -53,4 +53,5 @@ Team mode is `orchestrator:on` with parallel execution (the main session never e
 - Fix cap reached and not raised: mark the lane BLOCKED, let the other lanes finish, and do not start later waves that depend on it.
 
 ## 5. REPORT
+- End state: DONE when every lane passed and the project-level check passes; a failing project check is handled per `modes.md` (Project check); otherwise BLOCKED.
 Per `modes.md`: report. Unit = lane; status PASS / BLOCKED.
