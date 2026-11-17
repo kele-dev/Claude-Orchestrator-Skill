@@ -23,6 +23,10 @@ The brief tells Haiku to read only top-level files that exist:
 
 Same delegation: also copy missing legacy topics (`legacy.md` in the `orchestrator:learn` folder; only if legacy files exist).
 
+## Errors
+- Haiku pass reports FAILED or an API error: retry once; if it fails again, report the error in one line and write nothing.
+- Zero verified commands: say so, write the map without a verify line, and do not create verify.sh.
+
 ## 3. Derive (same delegation)
 - Stack, key folders and their purpose, entry points.
 - Test, build, lint, and typecheck commands.
@@ -39,4 +43,4 @@ Same delegation: also copy missing legacy topics (`legacy.md` in the `orchestrat
 
 ## 6. Report
 - The main session reads only the Haiku report and the written map.
-- Report in one short block (stack, commands with their status, the verify.sh result, anything broken) plus the token line.
+- Report in one short block (stack, commands with their status, the verify.sh result, anything broken, the store path, and that `/orchestrator:init --refresh` re-maps the project) plus the token line.
