@@ -320,7 +320,7 @@ function runHook(name, payload, extraEnv = {}) {
     input: JSON.stringify(payload),
     encoding: 'utf8',
     cwd: root,
-    env: { ...process.env, ORCH_GUARD: '', ORCH_NO_TRIM: '', CLAUDE_PROJECT_DIR: root, ...extraEnv },
+    env: { ...process.env, ORCH_GUARD: '', ORCH_NO_TRIM: '', CLAUDE_PROJECT_DIR: root, ORCH_STATE_DIR: os.tmpdir(), ...extraEnv },
   });
 }
 {
@@ -696,6 +696,17 @@ function runHook(name, payload, extraEnv = {}) {
     const r8 = runHook('long-session.mjs', incPayload, incEnv);
     if (r8 && !r8.stdout.includes('2 delegations')) err('hooks/long-session.mjs', 'smoke "long incremental 2": expected "2 delegations" in stdout');
     if (fs.existsSync(sidFCount)) err('hooks/long-session.mjs', 'smoke "long incremental 2": expected .count file removed');
+
+    // IC-020: with ORCH_STATE_DIR empty, markers go to the private per-user dir (0700 on non-Windows)
+    const sidS = `${sidA}-s`;
+    const stateTag = String(process.getuid?.() ?? os.userInfo().username).replace(/[^A-Za-z0-9_-]/g, '');
+    const stateMarker = path.join(os.tmpdir(), `orchestrator-${stateTag}`, `orchestrator-long-${sidS}`);
+    const rs = runHook('long-session.mjs', longPayload(sidS), { ORCH_LONG: '', ORCH_LONG_DELEGATIONS: '', ORCH_LONG_BYTES: '5', ORCH_STATE_DIR: '' });
+    if (rs && !rs.stdout.includes('systemMessage')) err('hooks/long-session.mjs', 'smoke "long state dir": expected systemMessage in stdout');
+    if (!fs.existsSync(stateMarker)) err('hooks/long-session.mjs', 'smoke "long state dir": expected marker in per-user state dir');
+    if (process.platform !== 'win32' && fs.existsSync(stateMarker) && (fs.statSync(path.dirname(stateMarker)).mode & 0o777) !== 0o700) err('hooks/long-session.mjs', 'smoke "long state dir": expected state dir mode 0700');
+    fs.rmSync(stateMarker, { force: true });
+    fs.rmSync(`${stateMarker}.count`, { force: true });
 
     const usageTranscript = (cacheRead2) => {
       const usageLines = [
