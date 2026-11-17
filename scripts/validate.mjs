@@ -949,6 +949,10 @@ function runHook(name, payload, extraEnv = {}) {
         fs.writeFileSync(b2, J({ model: 'm', cases: { c1: { with: 100000 } } }));
         const edge = run(res2, b2, '--threshold', '15');
         if (edge.status !== 0) err('scripts/eval-compare.mjs', `smoke "compare base 100000 now 115000 threshold 15": expected exit 0, got ${edge.status}`);
+        const res3 = path.join(d, 'r3.json');
+        fs.writeFileSync(res3, J({ suite: { modelOverride: 'm' }, cases: [{ name: 'c1', arms: { with: [{ passed: true, tracePath: path.join(d, 'gone.jsonl') }] } }] }));
+        const empty = run(res3, b);
+        if (empty.status !== 0 || !(empty.stdout ?? '').includes('EVAL-COMPARE: EMPTY')) err('scripts/eval-compare.mjs', `smoke "compare all skipped": expected exit 0 with "EVAL-COMPARE: EMPTY", got ${empty.status}`);
       }
     }
   } finally {
