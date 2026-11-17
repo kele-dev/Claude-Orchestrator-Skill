@@ -523,6 +523,44 @@ function sessionInfo(cwd, env = {}, raw = false) {
     if (!(loud.stderr ?? '').startsWith(prefix)) err(`hooks/${name}`, `smoke "invalid stdin ORCH_DEBUG=1": expected stderr starting with "${prefix}"`);
   }
 
+  // delegation ledger (SubagentStop): temp HOME and non-git cwd; store key = cwd path, same rule as session-info.mjs
+  {
+    const home = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'orch-ledger-home-')));
+    const lcwd = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'orch-ledger-cwd-')));
+    const homeEnv = { HOME: home, USERPROFILE: home };
+    const key = lcwd.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(-80);
+    const store = path.join(home, '.claude', 'orchestrator', key);
+    const file = path.join(store, 'delegations.jsonl');
+    const ledgerLines = () => (fs.existsSync(file) ? fs.readFileSync(file, 'utf8').split('\n').filter(Boolean) : []);
+    const payload = (extra) => ({ hook_event_name: 'SubagentStop', cwd: lcwd, ...extra });
+    try {
+      let r = runHook('ledger.mjs', payload({ agent_type: 'orchestrator:haiku-coder', agent_id: 'a1', last_assistant_message: 'STATUS: SUCCESS\nFILES: x' }), homeEnv);
+      if (r && (r.status !== 0 || r.stdout.trim() !== '')) err('hooks/ledger.mjs', 'smoke "record": expected exit 0 and empty stdout');
+      const first = ledgerLines();
+      if (first.length !== 1 || JSON.parse(first[0]).tier !== 'haiku-coder' || JSON.parse(first[0]).status !== 'SUCCESS') err('hooks/ledger.mjs', 'smoke "record": expected one haiku-coder SUCCESS line');
+
+      runHook('ledger.mjs', payload({ agent_type: 'Explore', agent_id: 'a2', last_assistant_message: 'STATUS: SUCCESS' }), homeEnv);
+      if (ledgerLines().length !== 1) err('hooks/ledger.mjs', 'smoke "non-tier agent": expected no new line');
+
+      runHook('ledger.mjs', payload({ agent_type: 'orchestrator:sonnet-dev', agent_id: 'a3' }), homeEnv);
+      const last = ledgerLines();
+      if (last.length !== 2 || JSON.parse(last[1]).status !== '?') err('hooks/ledger.mjs', 'smoke "no message": expected sonnet-dev line with status "?"');
+
+      const stats = spawnSync(process.execPath, [path.join(root, 'hooks', 'ledger.mjs'), '--stats', store], { encoding: 'utf8', cwd: root, env: { ...process.env, ...homeEnv } });
+      if (stats.stdout.trim() !== 'LEDGER: haiku-coder 1/1 pass, sonnet-dev 0/1 pass') err('hooks/ledger.mjs', `smoke "stats": unexpected output "${stats.stdout.trim()}"`);
+      const emptyDir = fs.mkdtempSync(path.join(os.tmpdir(), 'orch-ledger-empty-'));
+      const none = spawnSync(process.execPath, [path.join(root, 'hooks', 'ledger.mjs'), '--stats', emptyDir], { encoding: 'utf8', cwd: root, env: { ...process.env, ...homeEnv } });
+      if (none.stdout.trim() !== 'LEDGER: no delegations') err('hooks/ledger.mjs', 'smoke "stats empty": expected "LEDGER: no delegations"');
+
+      const bad = spawnSync(process.execPath, [path.join(root, 'hooks', 'ledger.mjs')], { input: '{bad', encoding: 'utf8', cwd: root, env: { ...process.env, ...homeEnv, ORCH_DEBUG: '' } });
+      if (bad.status !== 0 || bad.stdout.trim() !== '') err('hooks/ledger.mjs', 'smoke "invalid stdin": expected exit 0 and empty stdout');
+      fs.rmSync(emptyDir, { recursive: true, force: true });
+    } finally {
+      fs.rmSync(home, { recursive: true, force: true });
+      fs.rmSync(lcwd, { recursive: true, force: true });
+    }
+  }
+
   // project-root fallback: no CLAUDE_PROJECT_DIR, so the git top level of cwd is the project root
   if (spawnSync('git', ['--version']).status === 0) {
     const gtmp = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'orch-root-')));
