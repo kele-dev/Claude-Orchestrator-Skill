@@ -14,8 +14,9 @@ process.stdin.on('end', () => {
   try {
     const out = run(JSON.parse(raw));
     if (out) process.stdout.write(out + '\n');
-  } catch {
+  } catch (e) {
     // fail open
+    if (process.env.ORCH_DEBUG === '1') process.stderr.write(`orchestrator long-session: ${e?.stack ?? e}\n`);
   }
 });
 

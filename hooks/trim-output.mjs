@@ -29,8 +29,9 @@ process.stdin.on('end', () => {
         updatedToolOutput: { ...response, stdout, stderr: '' },
       },
     }));
-  } catch {
+  } catch (e) {
     // fail open
+    if (process.env.ORCH_DEBUG === '1') process.stderr.write(`orchestrator trim-output: ${e?.stack ?? e}\n`);
   }
 });
 

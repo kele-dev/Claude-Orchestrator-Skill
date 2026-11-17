@@ -19,8 +19,9 @@ process.stdin.on('end', () => {
         },
       }));
     }
-  } catch {
+  } catch (e) {
     // fail open
+    if (process.env.ORCH_DEBUG === '1') process.stderr.write(`orchestrator guard-edit: ${e?.stack ?? e}\n`);
   }
 });
 
