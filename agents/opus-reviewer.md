@@ -1,6 +1,6 @@
 ---
 name: opus-reviewer
-description: Architecture reviewer. Called by the orchestrator to assess the PRD of large work and the final (or a batch) diff, only when the orchestrator asks. Read-only; does not change files.
+description: Architecture reviewer. Called by the orchestrator to assess the PRD of large work and the final diff, only when the orchestrator asks. Read-only; does not change files.
 tools: Read, Grep, Glob, Bash
 model: opus
 effort: high
