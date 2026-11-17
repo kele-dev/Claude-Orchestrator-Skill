@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Token trace summary (always exits 0).
+// Token trace summary (exits 0; 2 on an unknown --option).
 // Usage: node scripts/trace-tokens.mjs <trace.jsonl | result.json> [--md]
 import { readFileSync, realpathSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -162,8 +162,15 @@ function parseResult(text) {
   }
 }
 
+let badOption = false;
+
 function main() {
   const args = process.argv.slice(2);
+  const unknown = args.find((a) => a.startsWith('--') && a !== '--md');
+  if (unknown) {
+    badOption = true;
+    return [`TRACE: ERROR unknown option ${unknown}`];
+  }
   const md = args.includes('--md');
   const file = args.find((a) => a !== '--md');
   const text = file ? readText(file) : null;
@@ -237,5 +244,5 @@ if (runAsMain) {
     process.stderr.write(`trace-tokens: ${e.code || e.message} reading ${process.argv[2] ?? 'no transcript found'}\n`);
     process.stdout.write(UNREADABLE + '\n');
   }
-  process.exitCode = 0;
+  process.exitCode = badOption ? 2 : 0;
 }

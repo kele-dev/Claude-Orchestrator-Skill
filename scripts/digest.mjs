@@ -8,6 +8,11 @@ const args = process.argv.slice(2);
 const file = args.find((a, i) => !a.startsWith('--') && args[i - 1] !== '--last');
 const li = args.indexOf('--last');
 const v = li >= 0 ? args[li + 1] : args.find((a) => a.startsWith('--last='))?.slice('--last='.length);
+const hasLast = args.some((a) => a === '--last' || a.startsWith('--last='));
+if (hasLast && !/^[1-9]\d*$/.test(v ?? '')) {
+  process.stderr.write(`digest: invalid --last "${v ?? ''}" (use a whole number of 1 or more)\n`);
+  process.exit(2);
+}
 const last = /^[1-9]\d*$/.test(v ?? '') ? Number(v) : 60;
 const MAX = 2000;
 

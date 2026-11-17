@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // Sum sub-agent token usage from a Claude Code transcript (JSONL), or main-session usage with --main. Always exits 0.
 // Usage: node scripts/budget.mjs <transcript.jsonl|auto> [--mark] [--main] [--from <bytes>] [--limit <N>k]
+// Exit: 0 ok, 2 invalid --limit (a number above 0).
 import { statSync, readdirSync, realpathSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import os from 'node:os';
@@ -92,6 +93,10 @@ function main() {
   }
   const lm = /^(\d+(?:\.\d+)?)k?$/i.exec(val('--limit') ?? '');
   const limit = lm && Number(lm[1]) > 0 ? Number(lm[1]) : null;
+  if (args.some((a) => a === '--limit' || a.startsWith('--limit=')) && limit === null) {
+    process.stdout.write(`BUDGET: ERROR invalid --limit "${val('--limit') ?? ''}" (use a number above 0, e.g. 50k)\n`);
+    process.exit(2);
+  }
   const unknownSuffix = limit !== null ? ` of ${limit}k: UNKNOWN` : '';
   const fv = val('--from');
   const hasFrom = args.some((a) => a === '--from' || a.startsWith('--from='));

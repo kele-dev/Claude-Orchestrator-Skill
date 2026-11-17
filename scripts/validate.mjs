@@ -998,6 +998,19 @@ function runHook(name, payload, extraEnv = {}) {
   }
 }
 
+// 8f. Smoke tests: bad arguments are rejected with exit 2 and a message prefix
+{
+  const bad = (script, args, prefix, stream = 'stdout') => {
+    const r = spawnSync(process.execPath, [path.join(root, 'scripts', script), ...args], { encoding: 'utf8', cwd: root });
+    const got = (r[stream] ?? '').split('\n')[0];
+    if (r.status !== 2 || !got.startsWith(prefix)) err(`scripts/${script}`, `smoke "bad arg ${args.join(' ')}": expected exit 2 and "${prefix}", got exit ${r.status} "${got}"`);
+  };
+  bad('eval-compare.mjs', ['x.json', '--write'], 'EVAL-COMPARE: ERROR missing value for --write');
+  bad('budget.mjs', ['x.jsonl', '--limit', '0'], 'BUDGET: ERROR invalid --limit "0"');
+  bad('digest.mjs', ['x.jsonl', '--last', '0'], 'digest: invalid --last "0"', 'stderr');
+  bad('trace-tokens.mjs', ['--foo'], 'TRACE: ERROR unknown option --foo');
+}
+
 // 9. Eval cases: case.yaml name matches folder, prompt.md and scaffold script exist, graders use a known type with required keys
 const GRADER_TYPES = new Set(['regex', 'tool_order', 'tool_used', 'file_exists', 'llm', 'baseline']);
 const REQUIRED = { regex: ['pattern'], tool_order: ['before', 'after'], tool_used: ['tool'], file_exists: ['path'], llm: [], baseline: ['baseline_file'] };

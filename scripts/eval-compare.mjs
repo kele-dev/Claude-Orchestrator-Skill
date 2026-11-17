@@ -66,7 +66,7 @@ for (let i = 0; i < args.length; i++) {
     threshold = Number(v);
   } else if (args[i] === '--write') {
     writeTo = args[++i];
-    if (!writeTo) fail('--write needs a path');
+    if (!writeTo || writeTo.startsWith('--')) fail('missing value for --write');
   } else if (args[i].startsWith('--')) {
     fail(`unknown flag ${args[i]}`);
   } else {
@@ -89,7 +89,11 @@ if (writeTo) {
     process.stdout.write('EVAL-COMPARE: ERROR no readable trace, nothing written\n');
     process.exit(2);
   }
-  writeFileSync(writeTo, JSON.stringify({ model: cur.model, plugin: cur.plugin, cases }, null, 2) + '\n');
+  try {
+    writeFileSync(writeTo, JSON.stringify({ model: cur.model, plugin: cur.plugin, cases }, null, 2) + '\n');
+  } catch (e) {
+    fail(`cannot write ${writeTo}: ${e.code || e.message}`);
+  }
   process.stdout.write(`EVAL-COMPARE: WROTE ${writeTo}\n`);
   process.exit(0);
 }
