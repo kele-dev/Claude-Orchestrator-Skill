@@ -152,6 +152,12 @@ If you previously installed via `install.ps1`, delete `haiku-coder.md`, `sonnet-
 - Mode paralel: `/orchestrator:team <tugas>` (beberapa lane Haiku jalan bersamaan, maks 3 lane, 2 putaran fix per lane)
 - Mode otomatis: `/orchestrator:autopilot <tugas>` (batch demi batch tanpa bertanya, maks 5 batch, 2 putaran fix per batch)
 - Tambahkan `--dry-run` untuk melihat rencananya dulu.
+- `/orchestrator:init` - memetakan proyek sekali dan menulis learned-map
+- `/orchestrator:resume <slug>` - melanjutkan dari checkpoint di sesi baru
+- `/orchestrator:status` - ringkasan read-only: mode, versi, guard, store, lessons, checkpoint
+- `budget=<N>k` - batas token untuk semua delegasi
+- cek `Guards: active` di `/orchestrator:status` (tanpa Node guard mati diam-diam)
+- `ORCH_DEBUG=1` menulis error hook ke stderr
 - Claude akan menyarankan team/autopilot kalau tugasnya cocok, tapi default tetap `on`. Batas iterasi naik otomatis (maks 4 putaran fix) hanya selama perbaikannya ada kemajuan.
 - Belajar: di akhir tugas Claude sendiri yang memutuskan pelajaran mana yang disimpan (maks 3, hanya yang sudah terbukti), serta memperbaiki atau menghapus yang usang, sebagai file lokal di store project (`~/.claude/orchestrator/<project-key>/lessons/`). Satu baris di laporan memberi tahu apa yang berubah. `/orchestrator:learn list` untuk melihat, `prune` untuk merapikan.
 - Hemat token: jawaban ringkas, output test dipotong, Opus tidak mendikte file panjang, self-review sebelum lapor, `learned-map` untuk peta project, saran sesi baru saat ganti topik, dan satu baris laporan token di akhir.
