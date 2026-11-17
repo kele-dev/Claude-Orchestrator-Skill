@@ -428,6 +428,23 @@ function sessionInfo(cwd, env = {}, raw = false) {
       err('hooks/guard-edit.mjs', 'smoke "guard agents/x.md main thread denied": expected "docs/prd/ is writable" in deny reason');
     }
   }
+  {
+    // IC-093: 3 denials in a row add the stop hint; an allowed main-thread edit resets the streak
+    const sid = `smoke-streak-${process.pid}-${Date.now()}`;
+    const counter = path.join(os.tmpdir(), `orchestrator-deny-${sid}`);
+    try {
+      const deniedFile = path.join(root, 'agents', 'x.md');
+      const [g1, , g3] = [1, 2, 3].map(() => guard(deniedFile, { session_id: sid }));
+      if (g1 && g1.stdout.includes('in a row')) err('hooks/guard-edit.mjs', 'smoke "guard streak 1st denial": unexpected "in a row"');
+      if (g3 && !g3.stdout.includes('denial 3 in a row')) err('hooks/guard-edit.mjs', 'smoke "guard streak 3rd denial": expected "denial 3 in a row"');
+      const allowed = guard(path.join(root, 'docs', 'prd', 'x.md'), { session_id: sid });
+      if (allowed && allowed.stdout.trim() !== '') err('hooks/guard-edit.mjs', 'smoke "guard streak allowed reset": expected empty stdout');
+      const g4 = guard(deniedFile, { session_id: sid });
+      if (g4 && g4.stdout.includes('in a row')) err('hooks/guard-edit.mjs', 'smoke "guard streak after reset": unexpected "in a row"');
+    } finally {
+      fs.rmSync(counter, { force: true });
+    }
+  }
 
   r = sessionInfo(root);
   if (r && (r.status !== 0 || !r.stdout.includes('Orchestrator store:'))) {

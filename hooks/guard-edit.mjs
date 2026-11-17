@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 // PreToolUse hook for Edit/Write/NotebookEdit: denies project edits from the main session while orchestration is on.
 // Fails open on malformed input or hook errors (prints nothing, exits 0). Default mode is "on": no on/off info, or an unreadable transcript, means edits are denied.
+// Counts consecutive main-session denials per session in the temp dir; from the 3rd on, the deny reason tells the model to stop retrying. An allowed main-session call resets the count.
 import fs from 'fs';
+import os from 'os';
 import { execFileSync } from 'child_process';
 import path from 'path';
 
@@ -16,19 +18,64 @@ process.stdin.on('end', () => {
     const input = JSON.parse(raw);
     if (shouldDeny(input)) {
       const target = input.tool_input?.file_path ?? input.tool_input?.notebook_path;
+      const streak = bumpDenyStreak(input);
+      let reason = `orchestrator: the main session must not edit ${target} (project file). Delegate this change to orchestrator:haiku-coder. docs/prd/ is writable: the main session may Write/Edit PRD files there itself (e.g. a PRD from orchestrator:opus-planner). /orchestrator:off disables this guard. Set ORCH_GUARD=off to bypass. Explain this to the user in their language.`;
+      if (streak >= DENY_STREAK) reason += ` This is denial ${streak} in a row: stop retrying edits; delegate the change to orchestrator:haiku-coder or ask the user how to proceed.`;
       process.stdout.write(JSON.stringify({
         hookSpecificOutput: {
           hookEventName: 'PreToolUse',
           permissionDecision: 'deny',
-          permissionDecisionReason: `orchestrator: the main session must not edit ${target} (project file). Delegate this change to orchestrator:haiku-coder. docs/prd/ is writable: the main session may Write/Edit PRD files there itself (e.g. a PRD from orchestrator:opus-planner). /orchestrator:off disables this guard. Set ORCH_GUARD=off to bypass. Explain this to the user in their language.`,
+          permissionDecisionReason: reason,
         },
       }));
+    } else if (!(typeof input.agent_id === 'string' && input.agent_id !== '')) {
+      resetDenyStreak(input);
     }
   } catch (e) {
     // fail open
     dbg(e);
   }
 });
+
+const DENY_STREAK = 3;
+
+// Per-session counter file in the temp dir; empty session id means no counter.
+function denyFile(input) {
+  const sid = String(input.session_id ?? '').replace(/[^A-Za-z0-9_-]/g, '').slice(0, 80);
+  return sid === '' ? null : path.join(os.tmpdir(), `orchestrator-deny-${sid}`);
+}
+
+// Adds one to the streak and returns it. Never throws: counter errors must not block the deny.
+function bumpDenyStreak(input) {
+  try {
+    const file = denyFile(input);
+    if (file === null) return 0;
+    let count = 0;
+    try {
+      count = Number.parseInt(fs.readFileSync(file, 'utf8'), 10);
+    } catch {
+      count = 0;
+    }
+    if (!Number.isInteger(count) || count < 0) count = 0;
+    count += 1;
+    const tmp = `${file}.${process.pid}.tmp`;
+    fs.writeFileSync(tmp, String(count));
+    fs.renameSync(tmp, file);
+    return count;
+  } catch (e) {
+    dbg(e);
+    return 0;
+  }
+}
+
+function resetDenyStreak(input) {
+  try {
+    const file = denyFile(input);
+    if (file !== null) fs.rmSync(file, { force: true });
+  } catch (e) {
+    dbg(e);
+  }
+}
 
 function shouldDeny(input) {
   if (process.env.ORCH_GUARD === 'off') return false;
