@@ -4,8 +4,8 @@
 // Exit: 0 ok, 1 a pair is over the threshold, 2 unreadable file or bad args.
 // --strict (CI): a model mismatch or an EMPTY result exits 2, and any MISSING pair fails (exit 1).
 import { readFileSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { analyzeTrace, readText, safeTracePath } from './trace-tokens.mjs';
+import { dirname } from 'node:path';
+import { analyzeTrace, readRunTrace } from './trace-tokens.mjs';
 
 function fail(msg) {
   process.stdout.write(`EVAL-COMPARE: ERROR ${msg}\n`);
@@ -25,11 +25,7 @@ function loadJson(path) {
 function armTokens(runs, dir) {
   const totals = [];
   for (const run of Array.isArray(runs) ? runs : []) {
-    let text = readText(safeTracePath(run?.tracePath));
-    if (text == null && typeof run?.tracePath === 'string') {
-      text = readText(safeTracePath(join(dir, run.tracePath.split(/[\\/]/).pop())));
-    }
-    const a = analyzeTrace(text);
+    const a = analyzeTrace(readRunTrace(run, dir));
     if (a && a.sum != null) totals.push(a.sum);
   }
   return totals.length ? Math.round(totals.reduce((x, y) => x + y, 0) / totals.length) : null;
@@ -66,7 +62,7 @@ for (let i = 0; i < args.length; i++) {
     threshold = Number(v);
   } else if (args[i] === '--write') {
     writeTo = args[++i];
-    if (!writeTo) fail('--write needs a path');
+    if (!writeTo || writeTo.startsWith('--')) fail('missing value for --write');
   } else if (args[i].startsWith('--')) {
     fail(`unknown flag ${args[i]}`);
   } else {
@@ -89,7 +85,11 @@ if (writeTo) {
     process.stdout.write('EVAL-COMPARE: ERROR no readable trace, nothing written\n');
     process.exit(2);
   }
-  writeFileSync(writeTo, JSON.stringify({ model: cur.model, plugin: cur.plugin, cases }, null, 2) + '\n');
+  try {
+    writeFileSync(writeTo, JSON.stringify({ model: cur.model, plugin: cur.plugin, cases }, null, 2) + '\n');
+  } catch (e) {
+    fail(`cannot write ${writeTo}: ${e.code || e.message}`);
+  }
   process.stdout.write(`EVAL-COMPARE: WROTE ${writeTo}\n`);
   process.exit(0);
 }

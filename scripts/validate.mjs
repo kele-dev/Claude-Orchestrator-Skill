@@ -323,16 +323,28 @@ function runHook(name, payload, extraEnv = {}) {
     env: { ...process.env, ORCH_GUARD: '', ORCH_NO_TRIM: '', CLAUDE_PROJECT_DIR: root, ORCH_STATE_DIR: os.tmpdir(), ...extraEnv },
   });
 }
-{
-  const lines = Array.from({ length: 150 }, (_, i) => (i === 69 ? 'Error: boom'.padEnd(50, '.') : 'x'.repeat(50)));
-  const stdout = lines.join('\n');
-  const trimPayload = (command) => ({
-    hook_event_name: 'PostToolUse',
-    tool_name: 'Bash',
-    tool_input: { command },
-    tool_response: { stdout, stderr: '', interrupted: false },
+// Shared trim-output payload: 150 lines, one 50-char error line at index 69.
+const BIG_STDOUT = Array.from({ length: 150 }, (_, i) => (i === 69 ? 'Error: boom'.padEnd(50, '.') : 'x'.repeat(50))).join('\n');
+const trimPayload = (command) => ({
+  hook_event_name: 'PostToolUse',
+  tool_name: 'Bash',
+  tool_input: { command },
+  tool_response: { stdout: BIG_STDOUT, stderr: '', interrupted: false },
+  cwd: root,
+});
+
+// Shared session-info runner. raw: spawn with only the given env added (no runHook defaults).
+function sessionInfo(cwd, env = {}, raw = false) {
+  const payload = { hook_event_name: 'SessionStart', source: 'startup', cwd };
+  if (!raw) return runHook('session-info.mjs', payload, env);
+  return spawnSync(process.execPath, [path.join(root, 'hooks', 'session-info.mjs')], {
+    input: JSON.stringify(payload),
+    encoding: 'utf8',
     cwd: root,
+    env: { ...process.env, ...env },
   });
+}
+{
   let r = runHook('trim-output.mjs', trimPayload('npm test'));
   if (r) {
     let out = null;
@@ -417,19 +429,19 @@ function runHook(name, payload, extraEnv = {}) {
     }
   }
 
-  r = runHook('session-info.mjs', { hook_event_name: 'SessionStart', source: 'startup', cwd: root });
+  r = sessionInfo(root);
   if (r && (r.status !== 0 || !r.stdout.includes('Orchestrator store:'))) {
     err('hooks/session-info.mjs', `smoke "session-info": exit ${r.status}, expected "Orchestrator store:" in stdout`);
   }
   if (r && !r.stdout.includes('Guards: active')) err('hooks/session-info.mjs', 'smoke "session-info": expected "Guards: active" in stdout');
-  r = runHook('session-info.mjs', { hook_event_name: 'SessionStart', source: 'startup', cwd: root }, { ORCH_GUARD: 'off' });
+  r = sessionInfo(root, { ORCH_GUARD: 'off' });
   if (r && !r.stdout.includes('Guards: off (ORCH_GUARD=off)')) err('hooks/session-info.mjs', 'smoke "session-info ORCH_GUARD=off": expected "Guards: off (ORCH_GUARD=off)" in stdout');
 
   // session-info stale checkpoints (fake HOME and cwd in temp dirs)
   const sh = fs.mkdtempSync(path.join(os.tmpdir(), 'orch-st-'));
   const scwd = fs.mkdtempSync(path.join(os.tmpdir(), 'orch-cwd-'));
   try {
-    const sess = (e) => runHook('session-info.mjs', { hook_event_name: 'SessionStart', source: 'startup', cwd: scwd }, { HOME: sh, USERPROFILE: sh, ORCH_STALE_DAYS: '', ...e })?.stdout ?? '';
+    const sess = (e) => sessionInfo(scwd, { HOME: sh, USERPROFILE: sh, ORCH_STALE_DAYS: '', ...e })?.stdout ?? '';
     const store = /Orchestrator store: (.*)/.exec(sess({}))?.[1]?.trim();
     if (!store) {
       err('hooks/session-info.mjs', 'smoke "session-info stale": no "Orchestrator store:" line');
@@ -470,14 +482,6 @@ function runHook(name, payload, extraEnv = {}) {
 
 // 8a. Kill switches, invalid stdin and project-root fallback
 {
-  const bigStdout = Array.from({ length: 150 }, (_, i) => (i === 69 ? 'Error: boom'.padEnd(50, '.') : 'x'.repeat(50))).join('\n');
-  const trimReq = (command) => ({
-    hook_event_name: 'PostToolUse',
-    tool_name: 'Bash',
-    tool_input: { command },
-    tool_response: { stdout: bigStdout, stderr: '', interrupted: false },
-    cwd: root,
-  });
   const editReq = (file) => ({
     hook_event_name: 'PreToolUse',
     tool_name: 'Edit',
@@ -488,7 +492,7 @@ function runHook(name, payload, extraEnv = {}) {
 
   let r = runHook('guard-edit.mjs', editReq(path.join(root, 'agents', 'x.md')), { ORCH_GUARD: 'off' });
   if (r && r.stdout.trim() !== '') err('hooks/guard-edit.mjs', 'smoke "guard ORCH_GUARD=off": expected empty stdout');
-  r = runHook('trim-output.mjs', trimReq('npm test'), { ORCH_NO_TRIM: '1' });
+  r = runHook('trim-output.mjs', trimPayload('npm test'), { ORCH_NO_TRIM: '1' });
   if (r && r.stdout.trim() !== '') err('hooks/trim-output.mjs', 'smoke "trim ORCH_NO_TRIM=1": expected empty stdout');
 
   // invalid JSON stdin: fail open silently; with ORCH_DEBUG=1 the error goes to stderr
@@ -608,12 +612,7 @@ function runHook(name, payload, extraEnv = {}) {
       const cmd = refText.slice(bodyStart, bodyEnd).split('\n').map((l) => l.trim()).filter(Boolean).join('\n');
       const env = { ...process.env, HOME: shome, USERPROFILE: shome };
       const b = spawnSync('bash', ['-c', cmd], { encoding: 'utf8', cwd: sdir, env });
-      const hook = spawnSync(process.execPath, [path.join(root, 'hooks', 'session-info.mjs')], {
-        input: JSON.stringify({ hook_event_name: 'SessionStart', source: 'startup', cwd: sdir }),
-        encoding: 'utf8',
-        cwd: root,
-        env: { ...env, ORCH_STALE_DAYS: '' },
-      });
+      const hook = sessionInfo(sdir, { HOME: shome, USERPROFILE: shome, ORCH_STALE_DAYS: '' }, true);
       const store = /Orchestrator store: (.*)/.exec(hook.stdout ?? '')?.[1]?.trim();
       const bashOut = (b.stdout ?? '').trim();
       if (!bashOut || !store || bashOut !== store) {
@@ -622,6 +621,38 @@ function runHook(name, payload, extraEnv = {}) {
     } finally {
       fs.rmSync(sdir, { recursive: true, force: true });
       fs.rmSync(shome, { recursive: true, force: true });
+    }
+  }
+
+  // on win32, run the PowerShell store command and session-info.mjs in the same fresh non-git dir; both must print the same path
+  if (refText !== null && process.platform === 'win32') {
+    const psCheck = (sh) => spawnSync(sh, ['-NoProfile', '-Command', 'exit 0']).status === 0;
+    const shell = psCheck('pwsh') ? 'pwsh' : psCheck('powershell') ? 'powershell' : null;
+    if (shell) {
+      const sdir = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'orch-key-cwd-')));
+      const shome = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'orch-key-home-')));
+      try {
+        const fence = refText.indexOf('```powershell', refText.indexOf('## Store command'));
+        if (fence === -1) {
+          err(refPath, 'store key: PowerShell block missing under ## Store command');
+        } else {
+          const bodyStart = refText.indexOf('\n', fence) + 1;
+          const bodyEnd = refText.indexOf('```', bodyStart);
+          const cmd = refText.slice(bodyStart, bodyEnd).split('\n').map((l) => l.trim()).filter(Boolean).join('\n');
+          const env = { ...process.env, HOME: shome, USERPROFILE: shome };
+          const p = spawnSync(shell, ['-NoProfile', '-Command', cmd], { encoding: 'utf8', cwd: sdir, env });
+          const hook = sessionInfo(sdir, { HOME: shome, USERPROFILE: shome, ORCH_STALE_DAYS: '' }, true);
+          const store = /Orchestrator store: (.*)/.exec(hook.stdout ?? '')?.[1]?.trim();
+          const norm = (s) => s.trim().replace(/\\/g, '/').toLowerCase();
+          const psOut = (p.stdout ?? '').trim();
+          if (!psOut || !store || norm(psOut) !== norm(store)) {
+            err('skills/learn/reference.md', `store key smoke: powershell "${psOut}" vs session-info "${store ?? ''}"`);
+          }
+        }
+      } finally {
+        fs.rmSync(sdir, { recursive: true, force: true });
+        fs.rmSync(shome, { recursive: true, force: true });
+      }
     }
   }
 }
@@ -805,7 +836,7 @@ function runHook(name, payload, extraEnv = {}) {
         am('m3', { input_tokens: 99999 }, { isSidechain: true }),
       ]);
       chk('main', bud([path.join(tmp, 'main.jsonl'), '--main']).out, 'MAIN: 2 calls, input 3k, cache-read 60k, cache-write 4k, output 2k, context 43k');
-      chk('main known', bud([known, '--main']).out.startsWith('MAIN:') ? 'MAIN:' : 'other', 'MAIN:');
+      chk('main known', bud([known, '--main']).out, 'MAIN: 0 calls');
       const missingMain = bud([path.join(tmp, 'none.jsonl'), '--main']);
       chk('main missing file', missingMain.out, 'MAIN: ? (transcript unreadable)');
       chk('main missing file exit', String(missingMain.status), '0');
@@ -924,6 +955,11 @@ function runHook(name, payload, extraEnv = {}) {
       chk('non-jsonl tracePath exit', String(nonJsonl.status), '0');
       const nonJsonlMd = spawnSync(process.execPath, [tracePath, path.join(d, 'r2.json'), '--md'], { encoding: 'utf8', cwd: root });
       chk('non-jsonl tracePath md', (nonJsonlMd.stdout ?? '').trim().includes('| ? | ? |'), true);
+      // tracePath folder missing (results moved): the trace with the same basename next to result.json is used
+      fs.copyFileSync(path.join(d, 't.jsonl'), path.join(d, 'moved-trace.jsonl'));
+      fs.writeFileSync(path.join(d, 'moved.json'), J({ suite: { plugins: [{ version: '9.9.9' }] }, cases: [{ name: 'c3', arms: { with: [{ passed: true, tracePath: path.join(d, 'gone-folder', 'moved-trace.jsonl') }] } }] }));
+      const moved = trace(path.join(d, 'moved.json')).out.split('\n');
+      if (moved[0] !== 'RUN: c3 with #1 PASS' || !moved[1]?.startsWith('TRACE: total 36k tokens')) err('scripts/trace-tokens.mjs', `smoke "moved tracePath fallback": expected RUN line then token lines, got "${moved.slice(0, 2).join(' | ')}"`);
     }
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
@@ -993,6 +1029,72 @@ function runHook(name, payload, extraEnv = {}) {
         if (missingStrict.status !== 1 || !/^EVAL-COMPARE: FAIL/m.test(missingStrict.stdout ?? '')) err('scripts/eval-compare.mjs', `smoke "compare missing --strict": expected exit 1 with "EVAL-COMPARE: FAIL", got ${missingStrict.status}`);
       }
     }
+  } finally {
+    fs.rmSync(d, { recursive: true, force: true });
+  }
+}
+
+// 8f. Smoke tests: bad arguments are rejected with exit 2 and a message prefix
+{
+  const bad = (script, args, prefix, stream = 'stdout') => {
+    const r = spawnSync(process.execPath, [path.join(root, 'scripts', script), ...args], { encoding: 'utf8', cwd: root });
+    const got = (r[stream] ?? '').split('\n')[0];
+    if (r.status !== 2 || !got.startsWith(prefix)) err(`scripts/${script}`, `smoke "bad arg ${args.join(' ')}": expected exit 2 and "${prefix}", got exit ${r.status} "${got}"`);
+  };
+  bad('eval-compare.mjs', ['x.json', '--write'], 'EVAL-COMPARE: ERROR missing value for --write');
+  bad('budget.mjs', ['x.jsonl', '--limit', '0'], 'BUDGET: ERROR invalid --limit "0"');
+  bad('digest.mjs', ['x.jsonl', '--last', '0'], 'digest: invalid --last "0"', 'stderr');
+  bad('trace-tokens.mjs', ['--foo'], 'TRACE: ERROR unknown option --foo');
+}
+
+// 8g. Smoke tests for untested branches: eval-compare --write skips and default baseline, budget --from alignment, trace-tokens unreadable run
+{
+  const d = fs.mkdtempSync(path.join(os.tmpdir(), 'orch-branch-'));
+  try {
+    const J = JSON.stringify;
+    const cmpPath = path.join(root, 'scripts', 'eval-compare.mjs');
+    const budPath = path.join(root, 'scripts', 'budget.mjs');
+    const tracePath = path.join(root, 'scripts', 'trace-tokens.mjs');
+    const run = (script, args) => spawnSync(process.execPath, [script, ...args], { encoding: 'utf8', cwd: root });
+    const tr = path.join(d, 't.jsonl');
+    fs.writeFileSync(tr, [{ type: 'system', subtype: 'init', model: 'm' }, { type: 'result', num_turns: 1, total_cost_usd: 0.1, result: 'x', modelUsage: { m: { inputTokens: 1000, outputTokens: 1000, cacheReadInputTokens: 50000, cacheCreationInputTokens: 48000 } } }].map((x) => J(x)).join('\n') + '\n');
+
+    // eval-compare --write: the unreadable arm (null pair) is skipped
+    const res = path.join(d, 'r.json');
+    fs.writeFileSync(res, J({ suite: { modelOverride: 'm' }, cases: [{ name: 'c1', arms: { with: [{ passed: true, tracePath: tr }], without: [{ passed: true, tracePath: path.join(d, 'gone.jsonl') }] } }] }));
+    const wb = path.join(d, 'wb.json');
+    const w = run(cmpPath, [res, '--write', wb]);
+    let wc = null;
+    try { wc = JSON.parse(fs.readFileSync(wb, 'utf8')).cases; } catch { /* reported below */ }
+    if (w.status !== 0 || !wc || JSON.stringify(Object.keys(wc)) !== '["c1"]' || JSON.stringify(Object.keys(wc.c1)) !== '["with"]') {
+      err('scripts/eval-compare.mjs', `smoke "compare write skips null pairs": expected exit 0 and only c1.with, got exit ${w.status}`);
+    }
+
+    // eval-compare default baseline: evals/baseline.json relative to cwd, missing here
+    const bcwd = path.join(d, 'no-baseline');
+    fs.mkdirSync(bcwd);
+    const nb = spawnSync(process.execPath, [cmpPath, res], { encoding: 'utf8', cwd: bcwd });
+    if (nb.status !== 2 || !(nb.stdout ?? '').startsWith('EVAL-COMPARE: ERROR baseline unreadable: evals/baseline.json')) {
+      err('scripts/eval-compare.mjs', `smoke "compare default baseline missing": expected exit 2 with "EVAL-COMPARE: ERROR baseline unreadable: evals/baseline.json", got exit ${nb.status}`);
+    }
+
+    // budget --from mid-line: the partial first line is dropped, so it matches the next line start
+    const am = (id, out) => J({ type: 'assistant', message: { id, content: [{ type: 'text', text: 't' }], usage: { input_tokens: 1, output_tokens: out } } });
+    const tl = [am('m1', 500), am('m2', 800)];
+    const tf = path.join(d, 'x.jsonl');
+    fs.writeFileSync(tf, tl.join('\n') + '\n');
+    const budAt = (from) => (run(budPath, [tf, '--main', '--from', String(from)]).stdout ?? '').trim();
+    const mid = budAt(5);
+    const aligned = budAt(Buffer.byteLength(tl[0] + '\n'));
+    if (mid !== aligned || !aligned.startsWith('MAIN: 1 calls')) {
+      err('scripts/budget.mjs', `smoke "from mid-line": expected the next-line result "${aligned}", got "${mid}"`);
+    }
+
+    // trace-tokens: a run whose trace cannot be read prints RUN then exactly TRACE: unreadable
+    const ur = path.join(d, 'u.json');
+    fs.writeFileSync(ur, J({ suite: { plugins: [{ version: '9.9.9' }] }, cases: [{ name: 'c5', arms: { with: [{ passed: false, tracePath: path.join(d, 'nope.jsonl') }] } }] }));
+    const ut = (run(tracePath, [ur]).stdout ?? '').trim();
+    if (ut !== 'RUN: c5 with #1 FAIL\nTRACE: unreadable') err('scripts/trace-tokens.mjs', `smoke "unreadable run": expected RUN line then TRACE: unreadable, got "${ut}"`);
   } finally {
     fs.rmSync(d, { recursive: true, force: true });
   }

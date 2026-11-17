@@ -1,7 +1,7 @@
 # Improvement Backlog
 
 Project: orchestrator (Claude Code plugin, kele-dev marketplace)
-Last updated: 2026-11-17 (cycle 007)
+Last updated: 2026-11-17 (cycle 008)
 
 Scoring: see the improvement-cycle skill `references/scoring.md`. Score = Impact x Confidence / Effort. P0 >= 8.0 (score-based P0 only for Security/Stability/data integrity) or any override, P1 4.0-7.9 (cap for other dimensions without an override), P2 2.0-3.9, P3 < 2.0. New features are capped at P2 unless the user asked for features that cycle.
 
@@ -24,11 +24,11 @@ Scoring: see the improvement-cycle skill `references/scoring.md`. Score = Impact
 | IC-015 | P1 | 6.0 | UX & accessibility | status delegation count omits opus-planner | skills/status/SKILL.md:18; agents/opus-planner.md | S | done | 007 |
 | IC-016 | P1 | 6.0 | UX & accessibility | Deny messages do not name the blocked file; review guard omits its escape hatch | hooks/guard-edit.mjs:18,31; hooks/guard-review.mjs:21 | S | done | 007 |
 | IC-017 | P1 | 6.0 | UX & accessibility | resume tells user to run team/autopilot with a placeholder instead of the exact command | skills/resume/SKILL.md:51 vs :29 | S | done | 007 |
-| IC-018 | P1 | 4.5 | Stability | Transcripts over 16 MB with an old off line are wrongly denied edits | hooks/guard-edit.mjs:94-106 | M | proposed | 001 |
-| IC-019 | P1 | 4.5 | DX/CI-CD/dependencies | Token-regression gate in eval CI is dead: evals/baseline.json not committed | .github/workflows/eval.yml:89; README.md:165; `ls evals/baseline.json` -> No such file | M | proposed | 001 |
+| IC-018 | P1 | 4.5 | Stability | Transcripts over 16 MB with an old off line are wrongly denied edits | hooks/guard-edit.mjs:94-106 | M | stale | 001 |
+| IC-019 | P1 | 4.5 | DX/CI-CD/dependencies | Token-regression gate in eval CI is dead: evals/baseline.json not committed | .github/workflows/eval.yml:89; README.md:165; `ls evals/baseline.json` -> No such file | M | deferred | 001 |
 | IC-020 | P1 | 4.0 | Security | Predictable tmp marker files written with writeFileSync (symlink follow) and never cleaned | hooks/long-session.mjs:132,156-157,172,184 | S | done | 006 |
 | IC-021 | P1 | 4.0 | Security | SessionStart injects user-store text into model context unescaped; raw transcript_path in digest command | hooks/session-info.mjs:255-259,262,279-281,293,305 | S | done | 005 |
-| IC-022 | P1 | 4.0 | DX/CI-CD/dependencies | Eval fixture scripts have inconsistent executable bits, unchecked by validate | git ls-files -s evals/*/fixture.sh (5x 100755, 5x 100644); scripts/validate.mjs:802-803 | S | proposed | 001 |
+| IC-022 | P1 | 4.0 | DX/CI-CD/dependencies | Eval fixture scripts have inconsistent executable bits, unchecked by validate | git ls-files -s evals/*/fixture.sh (5x 100755, 5x 100644); scripts/validate.mjs:802-803 | S | deferred | 001 |
 | IC-023 | P1 | 4.0 | UX & accessibility | /orchestrator:on with no task has no defined behavior | skills/on/SKILL.md:8; README.md:35 | S | done | 007 |
 | IC-024 | P1 | 4.0 | UX & accessibility | Chat style rule asks for terse telegraphic and not cryptic in the same bullet | hooks/rules.md:10 | S | done | 007 |
 | IC-025 | P2 | 3.0 | Stability | trim-output blanks stderr and can drop failure lines without keywords | hooks/trim-output.mjs:251,277-283 | M | proposed | 001 |
@@ -47,13 +47,13 @@ Scoring: see the improvement-cycle skill `references/scoring.md`. Score = Impact
 | IC-038 | P1 | 9.0 | UX & accessibility | modes.md still says nothing is committed without commit=batch, contradicting its new chat exception (regression of IC-001) | skills/on/modes.md:15 vs :20 | S | done | 002 |
 | IC-039 | P1 | 4.0 | UX & accessibility | Guard-limits bullet says the model can call orchestrator:off, but off sets disable-model-invocation (regression of IC-008) | README.md:68; skills/off/SKILL.md:4; hooks/guard-edit.mjs:145-146 | S | done | 002 |
 | IC-040 | P1 | 9.0 | Observability & ops | Inner catches that change guard decisions stay silent under ORCH_DEBUG; README overclaims | hooks/guard-edit.mjs:56,92,104,119; hooks/long-session.mjs:33,82,94,120,129,134,149,188; hooks/session-info.mjs:33,48,65,78,88,106; README.md:69 | S | done | 002 |
-| IC-041 | P1 | 4.5 | Code quality & tests | Store-key cross-check silently skipped on Windows CI, PowerShell line never executed, substring checks only | scripts/validate.mjs:576,590; .github/workflows/validate.yml:13 | M | proposed | 002 |
+| IC-041 | P1 | 4.5 | Code quality & tests | Store-key cross-check silently skipped on Windows CI, PowerShell line never executed, substring checks only | scripts/validate.mjs:576,590; .github/workflows/validate.yml:13 | M | done | 002 |
 | IC-042 | P1 | 6.0 | UX & accessibility | status report cap of 12 rows cannot hold the 14+ rows its Collect and Caps sections require | skills/status/SKILL.md:12-23,26 | S | done | 002 |
 | IC-043 | P1 | 4.0 | Security | ORCH_DEBUG prints full stack and JSON.parse message, which can include stdin snippets (tool input, secrets) | hooks/guard-edit.mjs:23; hooks/guard-review.mjs:27; hooks/long-session.mjs:19; hooks/session-info.mjs:24; hooks/trim-output.mjs:34 | S | done | 005 |
 | IC-044 | P1 | 4.0 | Stability | Root-fallback smoke test inherits GIT_* env and ignores git init failure | scripts/validate.mjs:495-510 | S | proposed | 002 |
 | IC-045 | P1 | 4.0 | Code quality & tests | ORCH_DEBUG smoke tests cover 2 of 5 hooks and do not assert empty stdout | scripts/validate.mjs:484-492 | S | proposed | 002 |
 | IC-046 | P1 | 6.0 | DX/CI-CD/dependencies | Always-loaded context budget headroom is 790 B (comment promises ~1 KB) and the comment is stale | scripts/validate.mjs:213-216; `cat hooks/rules.md skills/on/SKILL.md \| wc -c` -> 13410 vs 14200 | S | done | 002 |
-| IC-047 | P1 | 6.0 | Code quality & tests | New smoke block duplicates trim payload and session-info helpers already in validate.mjs | scripts/validate.mjs:325-334 vs 462-470; ~415-420 vs ~573-600 | S | proposed | 002 |
+| IC-047 | P1 | 6.0 | Code quality & tests | New smoke block duplicates trim payload and session-info helpers already in validate.mjs | scripts/validate.mjs:325-334 vs 462-470; ~415-420 vs ~573-600 | S | done | 002 |
 | IC-048 | P1 | 4.0 | Stability | New smoke tests write ~3 MB of temp fixtures with unguarded cleanup and a tmpdir scan in finally | scripts/validate.mjs section 8a2/8a3 finally blocks | S | proposed | 002 |
 | IC-049 | P3 | 1.0 | Performance | validate.mjs gained ~15 child spawns per run (estimate, unmeasured) | scripts/validate.mjs:461-616 | S | proposed | 002 |
 | IC-050 | P3 | 1.0 | New features | Proposal: ORCH_DEBUG writes to a debug log file because hook stderr on exit 0 is not shown in chat | README.md:69 | M | proposed | 002 |
@@ -81,15 +81,15 @@ Scoring: see the improvement-cycle skill `references/scoring.md`. Score = Impact
 | IC-072 | P2 | 3.0 | New features | Proposal: read guard for large whole-file main-session reads (idea 14) | docs/ideas/token-saving.md:49 | M | proposed | 003 |
 | IC-073 | P2 | 2.0 | New features | Proposal: trim statistics row in status (idea 15) | docs/ideas/token-saving.md:50; skills/status/SKILL.md:12-26 | M | proposed | 003 |
 | IC-074 | P1 | 9.0 | Code quality & tests | budget UNDER and UNKNOWN verdicts are never asserted | scripts/budget.mjs:133-136; scripts/validate.mjs:766-776 | S | done | 003 |
-| IC-075 | P1 | 6.0 | Code quality & tests | trace-tokens lacks the tracePath basename fallback that eval-compare has | scripts/trace-tokens.mjs:178,193; scripts/eval-compare.mjs:27-29 | S | proposed | 003 |
-| IC-076 | P1 | 6.0 | DX/CI-CD/dependencies | evals README says guard-review enforces reviewer-after-PRD order; it only checks the PRD exists | evals/README.md:26; hooks/guard-review.mjs:32-45 | S | proposed | 003 |
-| IC-077 | P1 | 6.0 | Code quality & tests | Weak checkpoint grader still counts toward autopilot-budget-stop pass rate | evals/autopilot-budget-stop/graders/checkpoint.md:1-5; evals/README.md:96 | S | proposed | 003 |
-| IC-078 | P1 | 4.5 | Code quality & tests | Validator skips nested grader keys and never checks grader enums or min/max | scripts/validate.mjs:38-40,972-975 | M | proposed | 003 |
-| IC-079 | P1 | 6.0 | Code quality & tests | Untested branches in eval-compare, trace-tokens, transcript; MAIN assertion accepts any output | scripts/eval-compare.mjs:84-87,98,109-110; scripts/trace-tokens.mjs:140,209-210; scripts/transcript.mjs:12; scripts/validate.mjs:786 | S | proposed | 003 |
+| IC-075 | P1 | 6.0 | Code quality & tests | trace-tokens lacks the tracePath basename fallback that eval-compare has | scripts/trace-tokens.mjs:178,193; scripts/eval-compare.mjs:27-29 | S | done | 003 |
+| IC-076 | P1 | 6.0 | DX/CI-CD/dependencies | evals README says guard-review enforces reviewer-after-PRD order; it only checks the PRD exists | evals/README.md:26; hooks/guard-review.mjs:32-45 | S | done | 003 |
+| IC-077 | P1 | 6.0 | Code quality & tests | Weak checkpoint grader still counts toward autopilot-budget-stop pass rate | evals/autopilot-budget-stop/graders/checkpoint.md:1-5; evals/README.md:96 | S | done | 003 |
+| IC-078 | P1 | 4.5 | Code quality & tests | Validator skips nested grader keys and never checks grader enums or min/max | scripts/validate.mjs:38-40,972-975 | M | deferred | 003 |
+| IC-079 | P1 | 6.0 | Code quality & tests | Untested branches in eval-compare, trace-tokens, transcript; MAIN assertion accepts any output | scripts/eval-compare.mjs:84-87,98,109-110; scripts/trace-tokens.mjs:140,209-210; scripts/transcript.mjs:12; scripts/validate.mjs:786 | S | done | 003 |
 | IC-080 | P2 | 3.0 | DX/CI-CD/dependencies | README says CI runs on every push; it runs on main pushes and PRs only | README.md:173; .github/workflows/validate.yml:4-6 | S | proposed | 003 |
 | IC-081 | P1 | 4.0 | DX/CI-CD/dependencies | Eval CI pins Claude Code 2.1.318 while trace fields were measured on 2.1.317 | .github/workflows/eval.yml:47; evals/README.md:52 | S | proposed | 003 |
 | IC-082 | P1 | 6.0 | DX/CI-CD/dependencies | .gitignore misses evals/ci-result.json (token and cost data) | .gitignore:1; evals/README.md:34 | S | done | 004 |
-| IC-083 | P1 | 6.0 | Code quality & tests | Script CLIs mishandle bad args (unguarded --write, --limit 0, --last 0, unknown flags) | scripts/eval-compare.mjs:4,88; scripts/budget.mjs:80-81; scripts/digest.mjs:11; scripts/trace-tokens.mjs:162 | S | proposed | 003 |
+| IC-083 | P1 | 6.0 | Code quality & tests | Script CLIs mishandle bad args (unguarded --write, --limit 0, --last 0, unknown flags) | scripts/eval-compare.mjs:4,88; scripts/budget.mjs:80-81; scripts/digest.mjs:11; scripts/trace-tokens.mjs:162 | S | done | 003 |
 | IC-084 | P1 | 6.0 | DX/CI-CD/dependencies | eval-compare still exits 0 on EMPTY, model SKIP and MISSING pairs, so the CI gate stays green (regression of IC-053, partial); proposal: --strict and a verdict file | scripts/eval-compare.mjs:98-100,129-131; .github/workflows/eval.yml:64,69-71; evals/README.md:110 | S | done | 004 |
 | IC-085 | P1 | 9.0 | UX & accessibility | Autopilot FINAL CHECK FAILED has no owner, brief or cap counter, and team has no final-check outcome (extends IC-062) | skills/autopilot/SKILL.md:40; skills/on/modes.md:13-14; skills/team/SKILL.md:55-56 | S | done | 004 |
 | IC-086 | P1 | 6.0 | DX/CI-CD/dependencies | Always-loaded context headroom is 801 B again and the budget comment lacks 1.13.0 (regression of IC-046) | scripts/validate.mjs:215-217; LF bytes hooks/rules.md 3041 + skills/on/SKILL.md 10658 = 13699 vs 14500 | S | done | 004 |
