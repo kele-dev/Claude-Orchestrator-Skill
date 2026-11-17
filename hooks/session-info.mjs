@@ -7,7 +7,8 @@ import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const dbg = (e) => { if (process.env.ORCH_DEBUG === '1') process.stderr.write(`orchestrator session-info: ${e?.stack ?? e}\n`); };
+const fmt = (e) => process.env.ORCH_DEBUG === '2' ? String(e?.stack ?? e) : `${e?.name ?? 'Error'}: ${String(e?.message ?? e).replace(/"[^"]*"/g, '"…"').slice(0, 200)}`;
+const dbg = (e) => { if (process.env.ORCH_DEBUG === '1' || process.env.ORCH_DEBUG === '2') process.stderr.write(`orchestrator session-info: ${fmt(e)}\n`); };
 const clean = (s) => String(s).replace(/[\u0000-\u001f\u007f`]/g, ' ').replace(/\s+/g, ' ').trim();
 
 const STALE_DAYS_DEFAULT = 14;

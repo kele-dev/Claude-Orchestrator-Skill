@@ -5,7 +5,8 @@ import fs from 'fs';
 import { execFileSync } from 'child_process';
 import path from 'path';
 
-const dbg = (e) => { if (process.env.ORCH_DEBUG === '1') process.stderr.write(`orchestrator guard-edit: ${e?.stack ?? e}\n`); };
+const fmt = (e) => process.env.ORCH_DEBUG === '2' ? String(e?.stack ?? e) : `${e?.name ?? 'Error'}: ${String(e?.message ?? e).replace(/"[^"]*"/g, '"…"').slice(0, 200)}`;
+const dbg = (e) => { if (process.env.ORCH_DEBUG === '1' || process.env.ORCH_DEBUG === '2') process.stderr.write(`orchestrator guard-edit: ${fmt(e)}\n`); };
 
 let raw = '';
 process.stdin.setEncoding('utf8');

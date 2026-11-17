@@ -5,6 +5,7 @@ import fs from 'fs';
 import path from 'path';
 
 const PRD_PATH = /(?<![A-Za-z0-9_.\/\\:-])(?:[A-Za-z]:[\/\\]|\/|\.{1,2}\/)?(?:[A-Za-z0-9_.-]+[\/\\])*docs[\/\\]prd[\/\\][A-Za-z0-9_.-]+\.md(?!\.?[A-Za-z0-9_\/-])/g;
+const fmt = (e) => process.env.ORCH_DEBUG === '2' ? String(e?.stack ?? e) : `${e?.name ?? 'Error'}: ${String(e?.message ?? e).replace(/"[^"]*"/g, '"…"').slice(0, 200)}`;
 
 let raw = '';
 process.stdin.setEncoding('utf8');
@@ -24,7 +25,7 @@ process.stdin.on('end', () => {
     }
   } catch (e) {
     // fail open
-    if (process.env.ORCH_DEBUG === '1') process.stderr.write(`orchestrator guard-review: ${e?.stack ?? e}\n`);
+    if (process.env.ORCH_DEBUG === '1' || process.env.ORCH_DEBUG === '2') process.stderr.write(`orchestrator guard-review: ${fmt(e)}\n`);
   }
 });
 
