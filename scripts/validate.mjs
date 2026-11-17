@@ -953,6 +953,12 @@ function runHook(name, payload, extraEnv = {}) {
         fs.writeFileSync(res3, J({ suite: { modelOverride: 'm' }, cases: [{ name: 'c1', arms: { with: [{ passed: true, tracePath: path.join(d, 'gone.jsonl') }] } }] }));
         const empty = run(res3, b);
         if (empty.status !== 0 || !(empty.stdout ?? '').includes('EVAL-COMPARE: EMPTY')) err('scripts/eval-compare.mjs', `smoke "compare all skipped": expected exit 0 with "EVAL-COMPARE: EMPTY", got ${empty.status}`);
+        const emptyStrict = run(res3, b, '--strict');
+        if (emptyStrict.status !== 2) err('scripts/eval-compare.mjs', `smoke "compare all skipped --strict": expected exit 2, got ${emptyStrict.status}`);
+        const b3 = path.join(d, 'b3.json');
+        fs.writeFileSync(b3, J({ model: 'm', cases: { c1: { with: n }, c2: { with: 100 } } }));
+        const missingStrict = run(res, b3, '--strict');
+        if (missingStrict.status !== 1 || !/^EVAL-COMPARE: FAIL/m.test(missingStrict.stdout ?? '')) err('scripts/eval-compare.mjs', `smoke "compare missing --strict": expected exit 1 with "EVAL-COMPARE: FAIL", got ${missingStrict.status}`);
       }
     }
   } finally {

@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // Compare eval token totals against a baseline.
-// Usage: node scripts/eval-compare.mjs <current.json> [baseline.json=evals/baseline.json] [--threshold 15] [--write <out.json>]
+// Usage: node scripts/eval-compare.mjs <current.json> [baseline.json=evals/baseline.json] [--threshold 15] [--write <out.json>] [--strict]
 // Exit: 0 ok, 1 a pair is over the threshold, 2 unreadable file or bad args.
+// --strict (CI): a model mismatch or an EMPTY result exits 2, and any MISSING pair fails (exit 1).
 import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { analyzeTrace, readText } from './trace-tokens.mjs';
@@ -55,8 +56,11 @@ const args = process.argv.slice(2);
 const pos = [];
 let threshold = 15;
 let writeTo = null;
+let strict = false;
 for (let i = 0; i < args.length; i++) {
-  if (args[i] === '--threshold') {
+  if (args[i] === '--strict') {
+    strict = true;
+  } else if (args[i] === '--threshold') {
     const v = args[++i];
     if (!/^\d+(\.\d+)?$/.test(v ?? '')) fail('bad --threshold');
     threshold = Number(v);
@@ -69,7 +73,7 @@ for (let i = 0; i < args.length; i++) {
     pos.push(args[i]);
   }
 }
-if (pos.length < 1 || pos.length > 2) fail('usage: eval-compare.mjs <current.json> [baseline.json] [--threshold N] [--write out.json]');
+if (pos.length < 1 || pos.length > 2) fail('usage: eval-compare.mjs <current.json> [baseline.json] [--threshold N] [--write out.json] [--strict]');
 
 const curObj = loadJson(pos[0]);
 if (!curObj || !Array.isArray(curObj.cases)) fail(`current file unreadable: ${pos[0]}`);
@@ -97,12 +101,12 @@ const base = values(baseObj, dirname(basePath));
 
 if (cur.model && base.model && cur.model !== base.model) {
   process.stdout.write(`::warning::EVAL-COMPARE: SKIP model ${base.model} vs ${cur.model}\n`);
-  process.exit(0);
+  process.exit(strict ? 2 : 0);
 }
 
 const baseMap = new Map(base.pairs.map(([c, a, n]) => [`${c}\u0000${a}`, n]));
 const curKeys = new Set();
-let over = 0, measured = 0, other = 0;
+let over = 0, measured = 0, other = 0, missing = 0;
 for (const [name, arm, now] of cur.pairs) {
   curKeys.add(`${name}\u0000${arm}`);
   const b = baseMap.get(`${name}\u0000${arm}`);
@@ -123,9 +127,12 @@ for (const [name, arm, now] of cur.pairs) {
 for (const [name, arm, b] of base.pairs) {
   if (curKeys.has(`${name}\u0000${arm}`)) continue;
   other++;
+  missing++;
   process.stdout.write(`CMP: ${name} ${arm} base ${b ?? '?'} now - MISSING\n`);
 }
 if (measured === 0) process.stdout.write('::warning::eval-compare measured nothing\n');
-const verdict = over ? 'FAIL' : measured === 0 ? 'EMPTY' : 'PASS';
+const failMissing = strict && missing > 0;
+const verdict = over || failMissing ? 'FAIL' : measured === 0 ? 'EMPTY' : 'PASS';
 process.stdout.write(`EVAL-COMPARE: ${verdict} ${over} over, ${measured} measured, ${other} not compared, threshold ${threshold}%\n`);
-process.exit(over ? 1 : 0);
+if (over || failMissing) process.exit(1);
+process.exit(strict && measured === 0 ? 2 : 0);
