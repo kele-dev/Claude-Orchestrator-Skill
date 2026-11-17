@@ -512,6 +512,60 @@ function runHook(name, payload, extraEnv = {}) {
   }
 }
 
+// 8a2. Large-input windows: trim cut, guard transcript window fallback, long-session head/tail reads
+{
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'orch-large-'));
+  const sid = `large-${process.pid}-${Date.now()}`;
+  try {
+    // trim-output: line trimming keeps ~33 lines, so 1000-char lines keep more than 30000 chars and hit the cut marker
+    const bigLines = Array.from({ length: 200 }, (_, i) => (i === 199 ? 'LAST-LINE-MARK'.padEnd(1000, '.') : 'x'.repeat(1000)));
+    const r = runHook('trim-output.mjs', {
+      hook_event_name: 'PostToolUse',
+      tool_name: 'Bash',
+      tool_input: { command: 'npm test' },
+      tool_response: { stdout: bigLines.join('\n'), stderr: '', interrupted: false },
+      cwd: root,
+    });
+    if (r) {
+      let out = null;
+      try {
+        out = JSON.parse(r.stdout).hookSpecificOutput.updatedToolOutput.stdout;
+      } catch {
+        err('hooks/trim-output.mjs', 'smoke "trim large": stdout is not the expected JSON');
+      }
+      if (out !== null && !(out.includes('[orchestrator: cut ') && out.includes('LAST-LINE-MARK'))) {
+        err('hooks/trim-output.mjs', 'smoke "trim large": expected cut marker and LAST-LINE-MARK in output');
+      }
+    }
+
+    // guard-edit: transcript over 512 KB whose off command is outside the window; full-file fallback must still see off
+    const offLine = JSON.stringify({ type: 'user', message: { content: '<command-message>orchestrator:off</command-message>\n<command-name>/orchestrator:off</command-name>' } });
+    const filler = JSON.stringify({ type: 'user', message: { content: 'f'.repeat(1000) } });
+    const bigTranscript = path.join(tmp, 'big-off.jsonl');
+    fs.writeFileSync(bigTranscript, offLine + '\n' + Array.from({ length: 700 }, () => filler + '\n').join(''));
+    const g = runHook('guard-edit.mjs', {
+      hook_event_name: 'PreToolUse',
+      tool_name: 'Edit',
+      tool_input: { file_path: path.join(root, 'agents', 'x.md') },
+      transcript_path: bigTranscript,
+      cwd: root,
+    });
+    if (g && g.stdout.trim() !== '') err('hooks/guard-edit.mjs', 'smoke "guard large transcript off": expected empty stdout');
+
+    // long-session: over 1 MB, usage at head and tail only, filler in the middle forces head/tail windows
+    const usage = (cacheRead) => JSON.stringify({ type: 'assistant', message: { usage: { input_tokens: 10, cache_read_input_tokens: cacheRead } } });
+    const longPath = path.join(tmp, 'long-large.jsonl');
+    fs.writeFileSync(longPath, usage(1000) + '\n' + 'y'.repeat(2.5 * 1024 * 1024) + '\n' + usage(131000) + '\n');
+    const rl = runHook('long-session.mjs', { hook_event_name: 'UserPromptSubmit', session_id: sid, transcript_path: longPath, cwd: root }, { ORCH_LONG: '', ORCH_LONG_DELEGATIONS: '', ORCH_LONG_BYTES: '999999999', ORCH_LONG_TOKENS: '', ORCH_LONG_REPEAT: '' });
+    if (rl && (!rl.stdout.includes('systemMessage') || !rl.stdout.includes('+130k'))) err('hooks/long-session.mjs', 'smoke "long large head/tail": expected systemMessage with "+130k" in stdout');
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+    for (const f of fs.readdirSync(os.tmpdir())) {
+      if (f.startsWith(`orchestrator-long-${sid}`)) fs.rmSync(path.join(os.tmpdir(), f), { force: true });
+    }
+  }
+}
+
 // 8b. Script smoke tests: digest.mjs and long-session.mjs
 {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'orch-validate-'));
