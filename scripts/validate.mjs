@@ -566,6 +566,55 @@ function runHook(name, payload, extraEnv = {}) {
   }
 }
 
+// 8a3. Store key: session-info.mjs and the bash/PowerShell lines in learn/reference.md must derive the same key
+{
+  const refPath = 'skills/learn/reference.md';
+  const refText = exists(path.join(root, refPath)) ? readText(path.join(root, refPath)) : null;
+  if (refText === null) {
+    err(refPath, 'missing, cannot check store key');
+  } else {
+    for (const pattern of ['tr A-Z a-z', "sed 's/[^a-z0-9][^a-z0-9]*/-/g'", 'tail -c 80', 'ToLower()', "-replace '[^a-z0-9]+','-'", 'Substring($k.Length - 80)']) {
+      if (!refText.includes(pattern)) err(refPath, `store key pattern missing: ${pattern}`);
+    }
+  }
+  const siPath = 'hooks/session-info.mjs';
+  if (exists(path.join(root, siPath))) {
+    if (!readText(path.join(root, siPath)).includes(".toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(-80)")) {
+      err(siPath, 'store key pattern missing: .toLowerCase().replace(/[^a-z0-9]+/g, \'-\').slice(-80)');
+    }
+  } else {
+    err(siPath, 'missing, cannot check store key');
+  }
+
+  // run the bash store command and session-info.mjs in the same fresh non-git dir; both must print the same path
+  if (refText !== null && process.platform !== 'win32' && spawnSync('bash', ['--version']).status === 0) {
+    const sdir = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'orch-key-cwd-')));
+    const shome = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'orch-key-home-')));
+    try {
+      const fence = refText.indexOf('```bash', refText.indexOf('## Store command'));
+      const bodyStart = refText.indexOf('\n', fence) + 1;
+      const bodyEnd = refText.indexOf('```', bodyStart);
+      const cmd = refText.slice(bodyStart, bodyEnd).split('\n').map((l) => l.trim()).filter(Boolean).join('\n');
+      const env = { ...process.env, HOME: shome, USERPROFILE: shome };
+      const b = spawnSync('bash', ['-c', cmd], { encoding: 'utf8', cwd: sdir, env });
+      const hook = spawnSync(process.execPath, [path.join(root, 'hooks', 'session-info.mjs')], {
+        input: JSON.stringify({ hook_event_name: 'SessionStart', source: 'startup', cwd: sdir }),
+        encoding: 'utf8',
+        cwd: root,
+        env: { ...env, ORCH_STALE_DAYS: '' },
+      });
+      const store = /Orchestrator store: (.*)/.exec(hook.stdout ?? '')?.[1]?.trim();
+      const bashOut = (b.stdout ?? '').trim();
+      if (!bashOut || !store || bashOut !== store) {
+        err('skills/learn/reference.md', `store key smoke: bash "${bashOut}" vs session-info "${store ?? ''}"`);
+      }
+    } finally {
+      fs.rmSync(sdir, { recursive: true, force: true });
+      fs.rmSync(shome, { recursive: true, force: true });
+    }
+  }
+}
+
 // 8b. Script smoke tests: digest.mjs and long-session.mjs
 {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'orch-validate-'));
