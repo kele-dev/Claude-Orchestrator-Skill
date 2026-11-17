@@ -7,6 +7,13 @@ Runs on Windows, macOS, and Linux.
 
 ## Installation
 
+### Prerequisites
+
+- Claude Code.
+- Node 18+ on PATH (hooks: guards, trim, session info; without it they do nothing).
+- git 2.31+ (project store key).
+- bash for `verify.sh` (Git Bash on Windows).
+
 **Terminal (Windows, macOS, Linux)** - one command:
 
 ```bash
@@ -26,7 +33,9 @@ Inside a `claude` session you can also run: `/plugin marketplace add kele-dev/Cl
 
 After installing, start a new session (Opus recommended as the main model). User scope means it applies to all projects.
 
-Update: `claude plugin update orchestrator@kele-dev`. Uninstall: `claude plugin uninstall orchestrator@kele-dev`.
+Update: `claude plugin update orchestrator@kele-dev`. Start a new session after updating.
+
+Uninstall: `claude plugin uninstall orchestrator@kele-dev`. The per-project store in `~/.claude/orchestrator/` (lessons, checkpoints) is kept; delete it by hand if you no longer need it.
 
 ## Usage
 
@@ -147,6 +156,7 @@ If you previously installed via `install.ps1`, delete `haiku-coder.md`, `sonnet-
 ## Ringkasan (Bahasa Indonesia)
 
 - Pasang: `claude plugin install orchestrator --marketplace kele-dev/Claude-Orchestrator-Skill`
+- Prasyarat: Node 18+ di PATH, git 2.31+, bash (Git Bash di Windows); setelah update buka sesi baru; uninstall tidak menghapus ~/.claude/orchestrator/.
 - Aktifkan: `/orchestrator:on`
 - Matikan untuk sesi ini: `/orchestrator:off`
 - Mode paralel: `/orchestrator:team <tugas>` (beberapa lane Haiku jalan bersamaan, maks 3 lane, 2 putaran fix per lane)
