@@ -52,6 +52,7 @@ function run(input) {
   const key = main.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(-80);
   const store = fwd(homedir()) + '/.claude/orchestrator/' + key;
   const lines = [`Orchestrator store: ${store}`];
+  lines.push(`Guards: active (hooks run on Node ${process.version})`);
 
   const allLessons = listMd(join(store, 'lessons'), 'learned-');
   const lessons = allLessons.slice(0, 20).map((f) => {
