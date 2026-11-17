@@ -84,7 +84,10 @@ function main() {
   }
   if (args.includes('--mark')) {
     let size;
-    try { size = statSync(file).size; } catch { return 'BUDGET: mark ? (transcript unreadable)'; }
+    try { size = statSync(file).size; } catch (e) {
+      process.stderr.write(`budget: ${e.code || e.message} reading ${file ?? 'no transcript found'}\n`);
+      return 'BUDGET: mark ? (transcript unreadable)';
+    }
     return `BUDGET: mark ${size}`;
   }
   const lm = /^(\d+(?:\.\d+)?)k?$/i.exec(val('--limit') ?? '');
@@ -97,7 +100,9 @@ function main() {
 
   const main = args.includes('--main');
   let lines;
-  try { lines = readTranscript(file, from); } catch { return main ? 'MAIN: ? (transcript unreadable)' : `BUDGET: spent ? (transcript unreadable)${unknownSuffix}`; }
+  try { lines = readTranscript(file, from); } catch (e) {
+    process.stderr.write(`budget: ${e.code || e.message} reading ${file ?? 'no transcript found'}\n`);
+    return main ? 'MAIN: ? (transcript unreadable)' : `BUDGET: spent ? (transcript unreadable)${unknownSuffix}`; }
   if (main) return mainUsage(lines);
 
   const launches = new Set();
@@ -153,6 +158,10 @@ function main() {
 }
 
 let line;
-try { line = main(); } catch { line = 'BUDGET: spent ? (transcript unreadable)'; }
+try { line = main(); } catch (e) {
+  const f = process.argv.slice(2).find((a) => !a.startsWith('--'));
+  process.stderr.write(`budget: ${e.code || e.message} reading ${f ?? 'no transcript found'}\n`);
+  line = 'BUDGET: spent ? (transcript unreadable)';
+}
 process.stdout.write(line + '\n');
 process.exit(0);
