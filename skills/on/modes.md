@@ -17,4 +17,4 @@
 - Checkpoint: write one per `orchestrator:resume` at the timing the mode file gives, and at every stop that is not DONE.
 - Report: table (unit -> files/tasks -> executor -> attempts -> status PASS / BLOCKED); verification commands run and their results; tokens per agent and delegations per `orchestrator:on` step 6, and caps used vs. caps allowed (including any automatic raises); budget spent vs. limit when `budget=` was given; assumptions and open items.
 - Lessons out: save per `orchestrator:on` step 6 (automatic, bundled with other housekeeping, one report line).
-- Hard rules: same as `orchestrator:on`. No commit unless `commit=batch`; never push.
+- Hard rules: same as `orchestrator:on`. No commit unless `commit=batch` or the user asks for one in chat; never push.
