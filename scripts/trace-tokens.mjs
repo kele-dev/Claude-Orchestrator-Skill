@@ -13,7 +13,8 @@ export function readText(path) {
   if (typeof path !== 'string') return null;
   try {
     return readFileSync(path, 'utf8');
-  } catch {
+  } catch (e) {
+    process.stderr.write(`trace-tokens: ${e.code || e.message} reading ${path}\n`);
     return null;
   }
 }
@@ -227,7 +228,8 @@ if (runAsMain) {
   try {
     const lines = main();
     if (lines.length) process.stdout.write(lines.join('\n') + '\n');
-  } catch {
+  } catch (e) {
+    process.stderr.write(`trace-tokens: ${e.code || e.message} reading ${process.argv[2] ?? 'no transcript found'}\n`);
     process.stdout.write(UNREADABLE + '\n');
   }
   process.exitCode = 0;

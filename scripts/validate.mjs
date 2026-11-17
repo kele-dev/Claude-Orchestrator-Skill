@@ -214,7 +214,8 @@ for (const [f, h] of headingChecks) {
 // Raising it is a deliberate decision: state the release and reason in this comment.
 // v1.12.0: measured 13146 B after the non-opus.md / situational split, plus about 1 KB headroom.
 // v1.12.1 (improvement cycle 002): measured 13320 B after the ask-first and chat-commit rule edits; raised to 14500 B to restore about 1 KB headroom.
-const CONTEXT_BUDGET_BYTES = 14500;
+// v1.13.0: measured 13699 B after the slash-command rule in hooks/rules.md (PR #18); raised to 14700 B to keep about 1 KB headroom.
+const CONTEXT_BUDGET_BYTES = 14700;
 const lfBytes = (t) => Buffer.byteLength(t.replace(/\r\n/g, '\n'));
 if (exists(path.join(root, 'hooks/rules.md')) && exists(path.join(root, 'skills/on/SKILL.md'))) {
   const n = lfBytes(readText(path.join(root, 'hooks/rules.md'))) + lfBytes(readText(path.join(root, 'skills/on/SKILL.md')));
@@ -953,6 +954,12 @@ function runHook(name, payload, extraEnv = {}) {
         fs.writeFileSync(res3, J({ suite: { modelOverride: 'm' }, cases: [{ name: 'c1', arms: { with: [{ passed: true, tracePath: path.join(d, 'gone.jsonl') }] } }] }));
         const empty = run(res3, b);
         if (empty.status !== 0 || !(empty.stdout ?? '').includes('EVAL-COMPARE: EMPTY')) err('scripts/eval-compare.mjs', `smoke "compare all skipped": expected exit 0 with "EVAL-COMPARE: EMPTY", got ${empty.status}`);
+        const emptyStrict = run(res3, b, '--strict');
+        if (emptyStrict.status !== 2) err('scripts/eval-compare.mjs', `smoke "compare all skipped --strict": expected exit 2, got ${emptyStrict.status}`);
+        const b3 = path.join(d, 'b3.json');
+        fs.writeFileSync(b3, J({ model: 'm', cases: { c1: { with: n }, c2: { with: 100 } } }));
+        const missingStrict = run(res, b3, '--strict');
+        if (missingStrict.status !== 1 || !/^EVAL-COMPARE: FAIL/m.test(missingStrict.stdout ?? '')) err('scripts/eval-compare.mjs', `smoke "compare missing --strict": expected exit 1 with "EVAL-COMPARE: FAIL", got ${missingStrict.status}`);
       }
     }
   } finally {

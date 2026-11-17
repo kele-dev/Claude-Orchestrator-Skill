@@ -32,7 +32,7 @@ Update: `claude plugin update orchestrator@kele-dev`. Uninstall: `claude plugin 
 
 Orchestration mode is active automatically in every session. Manual commands:
 
-- `/orchestrator:on` - turn on (or `/orchestrator:on <task>` to give a task directly); optional `budget=<N>k` (e.g. `/orchestrator:on budget=50k <task>`) stops with status BUDGET and a checkpoint once the agents' total tokens reach it
+- `/orchestrator:on` - turn on (or `/orchestrator:on <task>` to give a task directly); optional `budget=<N>k` (e.g. `/orchestrator:on budget=50k <task>`) stops before the next group once the budget script reports OVER, with status BUDGET and a checkpoint
 - `/orchestrator:off` - turn off for the rest of this session (Claude works directly as usual)
 - `/orchestrator:team <task>` - parallel mode: the main session splits the work into lanes that own separate files, Haiku lanes run at the same time, only failed lanes are retried. Caps: 3 lanes (4 only at plan time, when the work has 4 or more independent, file-disjoint parts), 2 fix rounds per lane, raised automatically up to 4 rounds only while fixes make progress (a cap you set, e.g. `lanes=N`, is never raised; optional `budget=<N>k` stops with status BUDGET and a checkpoint once the agents' total tokens reach it). Lanes that need each other's files cooperate through the main session. Add `--dry-run` to see the lane plan first. `isolate=worktree` (opt-in) runs each lane in its own git worktree; needs `worktree.baseRef` set to `"head"` in settings, a clean working tree, and `commit=batch`, otherwise it warns and uses the shared tree; passed lanes are copied back into the main tree.
 - `/orchestrator:autopilot <task>` - autonomous mode: one short clarification round, a PRD, then batch after batch without asking in between, until done or a cap is hit. Caps: 5 batches, 2 fix rounds per batch, raised automatically up to 8 batches / 4 rounds only while work keeps passing (a cap you set, e.g. `batches=N`, is never raised; optional `budget=<N>k` stops with status BUDGET and a checkpoint once the agents' total tokens reach it). Add `--dry-run` to see the plan first.
@@ -77,7 +77,7 @@ Orchestration mode is active automatically in every session. Manual commands:
 - `ORCH_DEBUG=1` writes swallowed hook errors (top-level failures and failed file, git and transcript reads) to stderr.
 - Commits the user asks for in chat are allowed under `orchestrator:on`; the ask-first rule applies to every main model; non-Opus sessions send only the final diff to `opus-reviewer`.
 - Autopilot: a BLOCKED batch skips only dependent batches, a failing final check gets fix rounds, and team/autopilot print one progress line per wave or batch.
-- `scripts/budget.mjs`: an unreadable transcript prints `mark ?` and the budget becomes UNKNOWN (no more silent `mark 0`); `auto` stays inside the current repo and names the file it picked.
+- `scripts/budget.mjs`: an unreadable transcript prints `mark ?` and the budget becomes UNKNOWN (no more silent `mark 0`); `auto` stops at the git top level (outside git it still walks to the filesystem root) and names the file it picked.
 - `scripts/eval-compare.mjs` prints EMPTY when nothing was measured and MISSING for baseline pairs absent from the run.
 - CI: GitHub Actions pinned by SHA, read-only token for validate, Dependabot for actions; more hook smoke tests (kill switches, invalid input, large inputs, store-key copies).
 
@@ -152,6 +152,12 @@ If you previously installed via `install.ps1`, delete `haiku-coder.md`, `sonnet-
 - Mode paralel: `/orchestrator:team <tugas>` (beberapa lane Haiku jalan bersamaan, maks 3 lane, 2 putaran fix per lane)
 - Mode otomatis: `/orchestrator:autopilot <tugas>` (batch demi batch tanpa bertanya, maks 5 batch, 2 putaran fix per batch)
 - Tambahkan `--dry-run` untuk melihat rencananya dulu.
+- `/orchestrator:init` - memetakan proyek sekali dan menulis learned-map
+- `/orchestrator:resume <slug>` - melanjutkan dari checkpoint di sesi baru
+- `/orchestrator:status` - ringkasan read-only: mode, versi, guard, store, lessons, checkpoint
+- `budget=<N>k` - batas token untuk semua delegasi
+- cek `Guards: active` di `/orchestrator:status` (tanpa Node guard mati diam-diam)
+- `ORCH_DEBUG=1` menulis error hook ke stderr
 - Claude akan menyarankan team/autopilot kalau tugasnya cocok, tapi default tetap `on`. Batas iterasi naik otomatis (maks 4 putaran fix) hanya selama perbaikannya ada kemajuan.
 - Belajar: di akhir tugas Claude sendiri yang memutuskan pelajaran mana yang disimpan (maks 3, hanya yang sudah terbukti), serta memperbaiki atau menghapus yang usang, sebagai file lokal di store project (`~/.claude/orchestrator/<project-key>/lessons/`). Satu baris di laporan memberi tahu apa yang berubah. `/orchestrator:learn list` untuk melihat, `prune` untuk merapikan.
 - Hemat token: jawaban ringkas, output test dipotong, Opus tidak mendikte file panjang, self-review sebelum lapor, `learned-map` untuk peta project, saran sesi baru saat ganti topik, dan satu baris laporan token di akhir.
@@ -179,7 +185,7 @@ If you previously installed via `install.ps1`, delete `haiku-coder.md`, `sonnet-
 - Baru di 1.12.0: aturan dipisah (aturan non-Opus di `non-opus.md`, aturan token situasional di `reference.md` dibaca bila perlu), validator punya batas ukuran konteks, `scripts/eval-compare.mjs` membandingkan token eval dengan baseline (jadwal CI opsional; baseline belum di-commit, jadi langkah compare di CI tetap nonaktif sampai pemilik repo menjalankan eval dan meng-commit output `--write`), dan checkpoint basi ditandai sesuai `ORCH_STALE_DAYS` (default 14).
 - Baru di 1.12.1: aturan jalur pendek hanya berlaku untuk sesi utama non-Opus dan guard review menerima path PRD absolut atau berkutip yang berspasi; sesi dimulai dengan `Map: none` bila learned-map belum ada sehingga Claude menyarankan `/orchestrator:init` dulu; trim output hanya memotong perintah baca, listing, dan cari di atas 300 baris; dan `scripts/budget.mjs --main` melaporkan pemakaian token sesi utama (panggilan, cache baca/tulis, output, konteks saat ini) yang ditampilkan `/orchestrator:status`.
 - Baru di 1.12.2: perintah slash untuk pengguna ditaruh di blok teks, tidak pernah di blok shell (tombol Run menjalankannya di PowerShell).
-- Baru di 1.13.0: status guard terlihat (`Guards: active` atau `Guards: off`) dan batas guard dijelaskan; `ORCH_DEBUG=1` menulis error hook ke stderr; commit yang diminta user di chat diizinkan; autopilot hanya melewati batch yang bergantung pada batch BLOCKED, punya jalur bila cek akhir gagal, dan mencetak satu baris progres per batch; `budget.mjs` mencetak `mark ?` (bukan `mark 0`) bila transkrip tak terbaca; `eval-compare.mjs` mencetak EMPTY bila tidak ada yang diukur; GitHub Actions dipin per SHA dan ditambah Dependabot.
+- Baru di 1.13.0: status guard terlihat (`Guards: active` atau `Guards: off`) beserta batas guard; `ORCH_DEBUG=1` menulis error hook ke stderr; commit yang diminta user di chat diizinkan, ask-first berlaku untuk setiap model utama, dan diff akhir non-Opus hanya dikirim ke `opus-reviewer`; autopilot melewati batch BLOCKED hanya bila bergantung, cek akhir yang gagal dapat putaran fix, dan ada satu baris progres per batch atau wave; budget mencetak `mark ?` bila transkrip tak terbaca dan `auto` berhenti di top level git; eval-compare mencetak EMPTY dan MISSING; CI memakai SHA pin, token read-only, Dependabot, dan lebih banyak smoke test.
 - Mode orkestrasi aktif otomatis di setiap sesi.
 
 ## Maintainers
