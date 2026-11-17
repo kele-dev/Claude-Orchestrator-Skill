@@ -1,7 +1,7 @@
 # Improvement Backlog
 
 Project: orchestrator (Claude Code plugin, kele-dev marketplace)
-Last updated: 2026-11-17 (cycle 005)
+Last updated: 2026-11-17 (cycle 006)
 
 Scoring: see the improvement-cycle skill `references/scoring.md`. Score = Impact x Confidence / Effort. P0 >= 8.0 (score-based P0 only for Security/Stability/data integrity) or any override, P1 4.0-7.9 (cap for other dimensions without an override), P2 2.0-3.9, P3 < 2.0. New features are capped at P2 unless the user asked for features that cycle.
 
@@ -26,7 +26,7 @@ Scoring: see the improvement-cycle skill `references/scoring.md`. Score = Impact
 | IC-017 | P1 | 6.0 | UX & accessibility | resume tells user to run team/autopilot with a placeholder instead of the exact command | skills/resume/SKILL.md:51 vs :29 | S | proposed | 001 |
 | IC-018 | P1 | 4.5 | Stability | Transcripts over 16 MB with an old off line are wrongly denied edits | hooks/guard-edit.mjs:94-106 | M | proposed | 001 |
 | IC-019 | P1 | 4.5 | DX/CI-CD/dependencies | Token-regression gate in eval CI is dead: evals/baseline.json not committed | .github/workflows/eval.yml:89; README.md:165; `ls evals/baseline.json` -> No such file | M | proposed | 001 |
-| IC-020 | P1 | 4.0 | Security | Predictable tmp marker files written with writeFileSync (symlink follow) and never cleaned | hooks/long-session.mjs:132,156-157,172,184 | S | proposed | 001 |
+| IC-020 | P1 | 4.0 | Security | Predictable tmp marker files written with writeFileSync (symlink follow) and never cleaned | hooks/long-session.mjs:132,156-157,172,184 | S | done | 006 |
 | IC-021 | P1 | 4.0 | Security | SessionStart injects user-store text into model context unescaped; raw transcript_path in digest command | hooks/session-info.mjs:255-259,262,279-281,293,305 | S | done | 005 |
 | IC-022 | P1 | 4.0 | DX/CI-CD/dependencies | Eval fixture scripts have inconsistent executable bits, unchecked by validate | git ls-files -s evals/*/fixture.sh (5x 100755, 5x 100644); scripts/validate.mjs:802-803 | S | proposed | 001 |
 | IC-023 | P1 | 4.0 | UX & accessibility | /orchestrator:on with no task has no defined behavior | skills/on/SKILL.md:8; README.md:35 | S | proposed | 001 |
@@ -62,7 +62,7 @@ Scoring: see the improvement-cycle skill `references/scoring.md`. Score = Impact
 | IC-053 | P1 | 9.0 | DX/CI-CD/dependencies | eval-compare prints PASS when nothing was measured (all SKIP/NEW, model mismatch exits 0, missing arms unreported) | scripts/eval-compare.mjs:98-120 | S | done | 003 |
 | IC-054 | P1 | 6.0 | Observability & ops | budget/trace-tokens drop the failure cause and resolved file on unreadable transcripts | scripts/budget.mjs:85,140; scripts/trace-tokens.mjs:15-17,218-222 | S | done | 004 |
 | IC-055 | P2 | 3.0 | Performance | readTranscript loads the whole file even with --from; digest reads all for the last 60 messages | scripts/transcript.mjs:7-10; scripts/digest.mjs:16-17 | M | proposed | 003 |
-| IC-056 | P1 | 4.0 | Security | eval-compare and trace-tokens read tracePath from result JSON without confining it to the results folder | scripts/trace-tokens.mjs:190,205; scripts/eval-compare.mjs:16,51 | S | proposed | 003 |
+| IC-056 | P1 | 4.0 | Security | eval-compare and trace-tokens read tracePath from result JSON without confining it to the results folder | scripts/trace-tokens.mjs:190,205; scripts/eval-compare.mjs:16,51 | S | done | 006 |
 | IC-057 | P1 | 4.0 | DX/CI-CD/dependencies | validate.yml has no timeout-minutes or concurrency on a 3-OS matrix | .github/workflows/validate.yml:11-20 | S | proposed | 003 |
 | IC-058 | P1 | 4.0 | Security | Executor agents have Bash+Write with no path limit and read-only planner/reviewer have Bash; no hook checks shell writes | agents/haiku-coder.md:4; agents/sonnet-dev.md:4; agents/opus-planner.md:4; agents/opus-reviewer.md:4; hooks/hooks.json:19-30 | S | done | 005 |
 | IC-059 | P2 | 2.0 | Observability & ops | Eval workflow cannot tell a failed run from no baseline; artifact upload ignores missing files | .github/workflows/eval.yml:67-73 | S | proposed | 003 |
@@ -70,12 +70,12 @@ Scoring: see the improvement-cycle skill `references/scoring.md`. Score = Impact
 | IC-061 | P1 | 9.0 | UX & accessibility | team and autopilot runs show no progress line per wave or batch | skills/team/SKILL.md:41; skills/autopilot/SKILL.md:36; skills/on/modes.md:11 | S | done | 003 |
 | IC-062 | P1 | 9.0 | UX & accessibility | Autopilot has no path when every batch passes but the final project check fails | skills/autopilot/SKILL.md:38-43; skills/on/modes.md:12 | S | done | 003 |
 | IC-063 | P1 | 9.0 | UX & accessibility | Non-Opus reviewer rule: autopilot says never per batch, non-opus.md/reference.md say final or batch diff | skills/autopilot/SKILL.md:18; skills/on/non-opus.md:5; skills/on/reference.md:29; agents/opus-reviewer.md:3 | S | done | 003 |
-| IC-064 | P1 | 6.0 | UX & accessibility | init has no path for a failed Haiku pass or zero verified commands; report omits store path and --refresh | skills/init/SKILL.md:16-17,33,37,40-42 | S | proposed | 003 |
-| IC-065 | P1 | 6.0 | UX & accessibility | learn promises "say remove that" but has no remove command | skills/learn/SKILL.md:4,35; skills/learn/reference.md:14-17 | S | proposed | 003 |
+| IC-064 | P1 | 6.0 | UX & accessibility | init has no path for a failed Haiku pass or zero verified commands; report omits store path and --refresh | skills/init/SKILL.md:16-17,33,37,40-42 | S | done | 006 |
+| IC-065 | P1 | 6.0 | UX & accessibility | learn promises "say remove that" but has no remove command | skills/learn/SKILL.md:4,35; skills/learn/reference.md:14-17 | S | done | 006 |
 | IC-066 | P2 | 3.0 | UX & accessibility | isolate=worktree precondition worded differently in README and team skill | README.md:37; skills/team/SKILL.md:21 | S | proposed | 003 |
-| IC-067 | P1 | 6.0 | UX & accessibility | --dry-run stops after an undefined "stage" and never defines how to continue | skills/team/SKILL.md:19; skills/autopilot/SKILL.md:19 | S | proposed | 003 |
-| IC-068 | P1 | 6.0 | UX & accessibility | README install/update/uninstall lacks prerequisites (Node 18+, git 2.31+, bash), restart and store cleanup notes | README.md:8-29,46,65,70 | S | proposed | 003 |
-| IC-069 | P1 | 6.0 | UX & accessibility | Short-path file limit is <=2 in on/SKILL.md but 1 for non-Opus elsewhere | skills/on/SKILL.md:21; skills/on/non-opus.md:4; README.md:157 | S | proposed | 003 |
+| IC-067 | P1 | 6.0 | UX & accessibility | --dry-run stops after an undefined "stage" and never defines how to continue | skills/team/SKILL.md:19; skills/autopilot/SKILL.md:19 | S | done | 006 |
+| IC-068 | P1 | 6.0 | UX & accessibility | README install/update/uninstall lacks prerequisites (Node 18+, git 2.31+, bash), restart and store cleanup notes | README.md:8-29,46,65,70 | S | done | 006 |
+| IC-069 | P1 | 6.0 | UX & accessibility | Short-path file limit is <=2 in on/SKILL.md but 1 for non-Opus elsewhere | skills/on/SKILL.md:21; skills/on/non-opus.md:4; README.md:157 | S | done | 006 |
 | IC-070 | P1 | 4.5 | UX & accessibility | Budget rule in modes.md is one ~250-word bullet that contradicts itself (never sum notices vs sum notices), gives UNKNOWN no action, uses three stop wordings, and tells the model to pass an unquoted `?` (shell glob) | skills/on/modes.md:10; skills/autopilot/SKILL.md:44; README.md:35; scripts/budget.mjs:151 | M | done | 004 |
 | IC-071 | P2 | 3.0 | UX & accessibility | Ideas doc says open: none while ideas 13-17 are open | docs/ideas/token-saving.md:3,46-53 | S | proposed | 003 |
 | IC-072 | P2 | 3.0 | New features | Proposal: read guard for large whole-file main-session reads (idea 14) | docs/ideas/token-saving.md:49 | M | proposed | 003 |
