@@ -7,7 +7,8 @@ import { closeSync, existsSync, openSync, readFileSync, readSync, rmSync, statSy
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-const dbg = (e) => { if (process.env.ORCH_DEBUG === '1') process.stderr.write(`orchestrator long-session: ${e?.stack ?? e}\n`); };
+const fmt = (e) => process.env.ORCH_DEBUG === '2' ? String(e?.stack ?? e) : `${e?.name ?? 'Error'}: ${String(e?.message ?? e).replace(/"[^"]*"/g, '"…"').slice(0, 200)}`;
+const dbg = (e) => { if (process.env.ORCH_DEBUG === '1' || process.env.ORCH_DEBUG === '2') process.stderr.write(`orchestrator long-session: ${fmt(e)}\n`); };
 
 let raw = '';
 process.stdin.setEncoding('utf8');

@@ -1,7 +1,7 @@
 # Improvement Backlog
 
 Project: orchestrator (Claude Code plugin, kele-dev marketplace)
-Last updated: 2026-11-17 (cycle 004)
+Last updated: 2026-11-17 (cycle 005)
 
 Scoring: see the improvement-cycle skill `references/scoring.md`. Score = Impact x Confidence / Effort. P0 >= 8.0 (score-based P0 only for Security/Stability/data integrity) or any override, P1 4.0-7.9 (cap for other dimensions without an override), P2 2.0-3.9, P3 < 2.0. New features are capped at P2 unless the user asked for features that cycle.
 
@@ -27,7 +27,7 @@ Scoring: see the improvement-cycle skill `references/scoring.md`. Score = Impact
 | IC-018 | P1 | 4.5 | Stability | Transcripts over 16 MB with an old off line are wrongly denied edits | hooks/guard-edit.mjs:94-106 | M | proposed | 001 |
 | IC-019 | P1 | 4.5 | DX/CI-CD/dependencies | Token-regression gate in eval CI is dead: evals/baseline.json not committed | .github/workflows/eval.yml:89; README.md:165; `ls evals/baseline.json` -> No such file | M | proposed | 001 |
 | IC-020 | P1 | 4.0 | Security | Predictable tmp marker files written with writeFileSync (symlink follow) and never cleaned | hooks/long-session.mjs:132,156-157,172,184 | S | proposed | 001 |
-| IC-021 | P1 | 4.0 | Security | SessionStart injects user-store text into model context unescaped; raw transcript_path in digest command | hooks/session-info.mjs:255-259,262,279-281,293,305 | S | proposed | 001 |
+| IC-021 | P1 | 4.0 | Security | SessionStart injects user-store text into model context unescaped; raw transcript_path in digest command | hooks/session-info.mjs:255-259,262,279-281,293,305 | S | done | 005 |
 | IC-022 | P1 | 4.0 | DX/CI-CD/dependencies | Eval fixture scripts have inconsistent executable bits, unchecked by validate | git ls-files -s evals/*/fixture.sh (5x 100755, 5x 100644); scripts/validate.mjs:802-803 | S | proposed | 001 |
 | IC-023 | P1 | 4.0 | UX & accessibility | /orchestrator:on with no task has no defined behavior | skills/on/SKILL.md:8; README.md:35 | S | proposed | 001 |
 | IC-024 | P1 | 4.0 | UX & accessibility | Chat style rule asks for terse telegraphic and not cryptic in the same bullet | hooks/rules.md:10 | S | proposed | 001 |
@@ -49,7 +49,7 @@ Scoring: see the improvement-cycle skill `references/scoring.md`. Score = Impact
 | IC-040 | P1 | 9.0 | Observability & ops | Inner catches that change guard decisions stay silent under ORCH_DEBUG; README overclaims | hooks/guard-edit.mjs:56,92,104,119; hooks/long-session.mjs:33,82,94,120,129,134,149,188; hooks/session-info.mjs:33,48,65,78,88,106; README.md:69 | S | done | 002 |
 | IC-041 | P1 | 4.5 | Code quality & tests | Store-key cross-check silently skipped on Windows CI, PowerShell line never executed, substring checks only | scripts/validate.mjs:576,590; .github/workflows/validate.yml:13 | M | proposed | 002 |
 | IC-042 | P1 | 6.0 | UX & accessibility | status report cap of 12 rows cannot hold the 14+ rows its Collect and Caps sections require | skills/status/SKILL.md:12-23,26 | S | done | 002 |
-| IC-043 | P1 | 4.0 | Security | ORCH_DEBUG prints full stack and JSON.parse message, which can include stdin snippets (tool input, secrets) | hooks/guard-edit.mjs:23; hooks/guard-review.mjs:27; hooks/long-session.mjs:19; hooks/session-info.mjs:24; hooks/trim-output.mjs:34 | S | proposed | 002 |
+| IC-043 | P1 | 4.0 | Security | ORCH_DEBUG prints full stack and JSON.parse message, which can include stdin snippets (tool input, secrets) | hooks/guard-edit.mjs:23; hooks/guard-review.mjs:27; hooks/long-session.mjs:19; hooks/session-info.mjs:24; hooks/trim-output.mjs:34 | S | done | 005 |
 | IC-044 | P1 | 4.0 | Stability | Root-fallback smoke test inherits GIT_* env and ignores git init failure | scripts/validate.mjs:495-510 | S | proposed | 002 |
 | IC-045 | P1 | 4.0 | Code quality & tests | ORCH_DEBUG smoke tests cover 2 of 5 hooks and do not assert empty stdout | scripts/validate.mjs:484-492 | S | proposed | 002 |
 | IC-046 | P1 | 6.0 | DX/CI-CD/dependencies | Always-loaded context budget headroom is 790 B (comment promises ~1 KB) and the comment is stale | scripts/validate.mjs:213-216; `cat hooks/rules.md skills/on/SKILL.md \| wc -c` -> 13410 vs 14200 | S | done | 002 |
@@ -64,7 +64,7 @@ Scoring: see the improvement-cycle skill `references/scoring.md`. Score = Impact
 | IC-055 | P2 | 3.0 | Performance | readTranscript loads the whole file even with --from; digest reads all for the last 60 messages | scripts/transcript.mjs:7-10; scripts/digest.mjs:16-17 | M | proposed | 003 |
 | IC-056 | P1 | 4.0 | Security | eval-compare and trace-tokens read tracePath from result JSON without confining it to the results folder | scripts/trace-tokens.mjs:190,205; scripts/eval-compare.mjs:16,51 | S | proposed | 003 |
 | IC-057 | P1 | 4.0 | DX/CI-CD/dependencies | validate.yml has no timeout-minutes or concurrency on a 3-OS matrix | .github/workflows/validate.yml:11-20 | S | proposed | 003 |
-| IC-058 | P1 | 4.0 | Security | Executor agents have Bash+Write with no path limit and read-only planner/reviewer have Bash; no hook checks shell writes | agents/haiku-coder.md:4; agents/sonnet-dev.md:4; agents/opus-planner.md:4; agents/opus-reviewer.md:4; hooks/hooks.json:19-30 | S | proposed | 003 |
+| IC-058 | P1 | 4.0 | Security | Executor agents have Bash+Write with no path limit and read-only planner/reviewer have Bash; no hook checks shell writes | agents/haiku-coder.md:4; agents/sonnet-dev.md:4; agents/opus-planner.md:4; agents/opus-reviewer.md:4; hooks/hooks.json:19-30 | S | done | 005 |
 | IC-059 | P2 | 2.0 | Observability & ops | Eval workflow cannot tell a failed run from no baseline; artifact upload ignores missing files | .github/workflows/eval.yml:67-73 | S | proposed | 003 |
 | IC-060 | P1 | 9.0 | UX & accessibility | Autopilot says any BLOCKED batch ends the run but also that only dependent batches are skipped | skills/autopilot/SKILL.md:16,38,40 | S | done | 003 |
 | IC-061 | P1 | 9.0 | UX & accessibility | team and autopilot runs show no progress line per wave or batch | skills/team/SKILL.md:41; skills/autopilot/SKILL.md:36; skills/on/modes.md:11 | S | done | 003 |
