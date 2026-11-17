@@ -924,6 +924,11 @@ function runHook(name, payload, extraEnv = {}) {
       chk('non-jsonl tracePath exit', String(nonJsonl.status), '0');
       const nonJsonlMd = spawnSync(process.execPath, [tracePath, path.join(d, 'r2.json'), '--md'], { encoding: 'utf8', cwd: root });
       chk('non-jsonl tracePath md', (nonJsonlMd.stdout ?? '').trim().includes('| ? | ? |'), true);
+      // tracePath folder missing (results moved): the trace with the same basename next to result.json is used
+      fs.copyFileSync(path.join(d, 't.jsonl'), path.join(d, 'moved-trace.jsonl'));
+      fs.writeFileSync(path.join(d, 'moved.json'), J({ suite: { plugins: [{ version: '9.9.9' }] }, cases: [{ name: 'c3', arms: { with: [{ passed: true, tracePath: path.join(d, 'gone-folder', 'moved-trace.jsonl') }] } }] }));
+      const moved = trace(path.join(d, 'moved.json')).out.split('\n');
+      if (moved[0] !== 'RUN: c3 with #1 PASS' || !moved[1]?.startsWith('TRACE: total 36k tokens')) err('scripts/trace-tokens.mjs', `smoke "moved tracePath fallback": expected RUN line then token lines, got "${moved.slice(0, 2).join(' | ')}"`);
     }
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });

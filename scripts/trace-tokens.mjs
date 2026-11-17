@@ -2,6 +2,7 @@
 // Token trace summary (exits 0; 2 on an unknown --option).
 // Usage: node scripts/trace-tokens.mjs <trace.jsonl | result.json> [--md]
 import { readFileSync, realpathSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const UNREADABLE = 'TRACE: unreadable';
@@ -22,6 +23,15 @@ export function readText(path) {
     process.stderr.write(`trace-tokens: ${e.code || e.message} reading ${path}\n`);
     return null;
   }
+}
+
+// Trace text for one result run: tracePath as given, else the same basename inside the result's folder.
+export function readRunTrace(run, dir) {
+  let text = readText(safeTracePath(run?.tracePath));
+  if (text == null && typeof run?.tracePath === 'string') {
+    text = readText(safeTracePath(join(dir, run.tracePath.split(/[\\/]/).pop())));
+  }
+  return text;
 }
 
 function parseJsonl(text) {
@@ -178,6 +188,7 @@ function main() {
 
   const root = parseResult(text);
   if (!root) return traceLines(text);
+  const dir = dirname(file);
 
   const meta = root.suite ?? {};
   const out = [];
@@ -188,7 +199,7 @@ function main() {
         if (!Array.isArray(runs)) continue;
         runs.forEach((run, i) => {
           out.push(`RUN: ${c.name} ${arm} #${i + 1} ${run.passed === true ? 'PASS' : 'FAIL'}`);
-          out.push(...traceLines(readText(safeTracePath(run.tracePath))));
+          out.push(...traceLines(readRunTrace(run, dir)));
         });
       }
     }
@@ -203,7 +214,7 @@ function main() {
       if (!Array.isArray(runs)) continue;
       const n = runs.length;
       const passed = runs.filter((r) => r.passed === true).length;
-      const analyses = runs.map((r) => analyzeTrace(readText(safeTracePath(r.tracePath))));
+      const analyses = runs.map((r) => analyzeTrace(readRunTrace(r, dir)));
 
       const totals = analyses.filter((a) => a && a.sum != null).map((a) => a.sum);
       const meanTotal = totals.length ? Math.round(mean(totals) / 1000) + 'k' : '?';
