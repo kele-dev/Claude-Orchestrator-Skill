@@ -1231,6 +1231,48 @@ function sessionInfo(cwd, env = {}, raw = false) {
   }
 }
 
+// 8j. Smoke tests: scripts/plan-dag.mjs derives file-disjoint waves from the PRD task table (temp dir only)
+{
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'orch-dag-'));
+  try {
+    const planPath = path.join(root, 'scripts', 'plan-dag.mjs');
+    const fails = (m) => err('scripts/plan-dag.mjs', `smoke ${m}`);
+    if (!exists(planPath)) {
+      fails('missing, cannot smoke test');
+    } else {
+      const run = (args) => spawnSync(process.execPath, [planPath, ...args], { encoding: 'utf8', cwd: root });
+      const prd = path.join(tmp, 'prd.md');
+      fs.writeFileSync(prd, [
+        '| Task | Files | Verify |',
+        '|---|---|---|',
+        '| A | `src/a.js`, `test/a.test.js` | x |',
+        '| B | `src/b.js` | x |',
+        '| C | `src/a.js:10-20` | x |',
+        '| D | `docs/` | x |',
+        '| E | `docs/guide.md` | x |',
+      ].join('\n') + '\n');
+      const r = run([prd]);
+      const want = ['WAVE 1: A [src/a.js, test/a.test.js], B [src/b.js], D [docs/]', 'WAVE 2: C [src/a.js], E [docs/guide.md]', 'PLAN: 5 tasks, 2 waves, max 3 lanes'];
+      if (r.status !== 0 || r.stdout !== `${want.join('\n')}\n`) fails(`default lanes: expected exit 0 and exact plan, got exit ${r.status}: ${JSON.stringify(r.stdout)}`);
+      const r2 = run([prd, '--lanes', '2']);
+      const want2 = ['WAVE 1: A [src/a.js, test/a.test.js], B [src/b.js]', 'WAVE 2: C [src/a.js], D [docs/]', 'WAVE 3: E [docs/guide.md]', 'PLAN: 5 tasks, 3 waves, max 2 lanes'];
+      if (r2.status !== 0 || r2.stdout !== `${want2.join('\n')}\n`) fails(`--lanes 2: expected exit 0 and exact plan, got exit ${r2.status}: ${JSON.stringify(r2.stdout)}`);
+      const j = run([prd, '--json']);
+      let doc = null;
+      try { doc = JSON.parse(j.stdout); } catch { fails('--json output is not JSON'); }
+      if (doc && (j.status !== 0 || doc.waves?.length !== 2)) fails(`--json: expected exit 0 and 2 waves, got exit ${j.status}`);
+      const noFiles = path.join(tmp, 'nofiles.md');
+      fs.writeFileSync(noFiles, '| Task | Verify |\n|---|---|\n| A | x |\n');
+      const nf = run([noFiles]);
+      if (nf.status !== 2) fails(`no Files column: expected exit 2, got ${nf.status}`);
+      const badLanes = run([prd, '--lanes', '9']);
+      if (badLanes.status !== 2) fails(`--lanes 9: expected exit 2, got ${badLanes.status}`);
+    }
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+}
+
 // 9. Eval cases: case.yaml name matches folder, prompt.md and scaffold script exist, graders use a known type with required keys
 // evals/touches.json: keys match the case folders and every prefix is an existing path
 {
