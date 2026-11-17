@@ -16,7 +16,7 @@ disable-model-invocation: true
 - Lessons: each `<store>/lessons/*.md` -> file name + its frontmatter `description` (frontmatter only). Flag whether `learned-map` exists; if missing, suggest `/orchestrator:init`.
 - Checkpoints: each `<store>/checkpoints/*.md` -> name, its `Task:` line, its `Updated:` line. If any exist, suggest `/orchestrator:resume <name>`. Also list legacy `<main>/.claude/orchestrator/checkpoints/*.md`, marked "(legacy)" (`legacy.md` in the `orchestrator:learn` folder; only if legacy files exist).
 - Legacy: flag if `<main>/.claude/skills/learned-*/SKILL.md` or the legacy checkpoints exist, and suggest per `legacy.md` (`orchestrator:learn` folder; only if legacy files exist).
-- Session: delegations so far per agent (haiku-coder, sonnet-dev, opus-reviewer), counted from this conversation; "unknown" after a compaction.
+- Session: delegations so far per agent (haiku-coder, sonnet-dev, opus-planner, opus-reviewer), counted from this conversation; "unknown" after a compaction.
 - Main-session tokens: run `node "${CLAUDE_PLUGIN_ROOT}/scripts/budget.mjs" auto --main` (fall back to the plugin root used for the version) and show its MAIN line as one row; sub-agent total: same command without --main.
 
 ## Caps
