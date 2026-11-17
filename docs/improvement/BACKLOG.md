@@ -1,7 +1,7 @@
 # Improvement Backlog
 
 Project: orchestrator (Claude Code plugin, kele-dev marketplace)
-Last updated: 2026-11-17 (cycle 006)
+Last updated: 2026-11-17 (cycle 007)
 
 Scoring: see the improvement-cycle skill `references/scoring.md`. Score = Impact x Confidence / Effort. P0 >= 8.0 (score-based P0 only for Security/Stability/data integrity) or any override, P1 4.0-7.9 (cap for other dimensions without an override), P2 2.0-3.9, P3 < 2.0. New features are capped at P2 unless the user asked for features that cycle.
 
@@ -19,18 +19,18 @@ Scoring: see the improvement-cycle skill `references/scoring.md`. Score = Impact
 | IC-010 | P1 | 6.0 | DX/CI-CD/dependencies | validate.yml has no permissions block, actions pinned to mutable tags, no Dependabot (also reported under Security) | .github/workflows/validate.yml:1-20; eval.yml:55,57,72; no .github/dependabot.yml | S | done | 002 |
 | IC-011 | P1 | 6.0 | DX/CI-CD/dependencies | CI runs only Node 20 while README promises Node 18+ and current LTS is untested | .github/workflows/validate.yml:19; eval.yml:39,59; README.md:65,68 | S | done | 004 |
 | IC-012 | P1 | 6.0 | UX & accessibility | Indonesian quick-start omits status, budget, init and resume | README.md:135-142 vs README.md:35,41-43; cycle 002: Ringkasan also lacks the Guard limits, Debugging and Guards: active bullets (README.md:68-70) | S | done | 004 |
-| IC-013 | P1 | 6.0 | UX & accessibility | User-visible hook messages are English-only despite reply-in-user-language promise | hooks/long-session.mjs:173,190-193; hooks/guard-edit.mjs:18; README.md:3; hooks/rules.md:12 | S | proposed | 001 |
-| IC-014 | P1 | 6.0 | UX & accessibility | Token and budget symbols (?, UNKNOWN, spent ?) never explained to users | README.md:55,98; skills/on/modes.md:10; scripts/budget.mjs:134-135 | S | proposed | 001 |
-| IC-015 | P1 | 6.0 | UX & accessibility | status delegation count omits opus-planner | skills/status/SKILL.md:18; agents/opus-planner.md | S | proposed | 001 |
-| IC-016 | P1 | 6.0 | UX & accessibility | Deny messages do not name the blocked file; review guard omits its escape hatch | hooks/guard-edit.mjs:18,31; hooks/guard-review.mjs:21 | S | proposed | 001 |
-| IC-017 | P1 | 6.0 | UX & accessibility | resume tells user to run team/autopilot with a placeholder instead of the exact command | skills/resume/SKILL.md:51 vs :29 | S | proposed | 001 |
+| IC-013 | P1 | 6.0 | UX & accessibility | User-visible hook messages are English-only despite reply-in-user-language promise | hooks/long-session.mjs:173,190-193; hooks/guard-edit.mjs:18; README.md:3; hooks/rules.md:12 | S | done | 007 |
+| IC-014 | P1 | 6.0 | UX & accessibility | Token and budget symbols (?, UNKNOWN, spent ?) never explained to users | README.md:55,98; skills/on/modes.md:10; scripts/budget.mjs:134-135 | S | done | 007 |
+| IC-015 | P1 | 6.0 | UX & accessibility | status delegation count omits opus-planner | skills/status/SKILL.md:18; agents/opus-planner.md | S | done | 007 |
+| IC-016 | P1 | 6.0 | UX & accessibility | Deny messages do not name the blocked file; review guard omits its escape hatch | hooks/guard-edit.mjs:18,31; hooks/guard-review.mjs:21 | S | done | 007 |
+| IC-017 | P1 | 6.0 | UX & accessibility | resume tells user to run team/autopilot with a placeholder instead of the exact command | skills/resume/SKILL.md:51 vs :29 | S | done | 007 |
 | IC-018 | P1 | 4.5 | Stability | Transcripts over 16 MB with an old off line are wrongly denied edits | hooks/guard-edit.mjs:94-106 | M | proposed | 001 |
 | IC-019 | P1 | 4.5 | DX/CI-CD/dependencies | Token-regression gate in eval CI is dead: evals/baseline.json not committed | .github/workflows/eval.yml:89; README.md:165; `ls evals/baseline.json` -> No such file | M | proposed | 001 |
 | IC-020 | P1 | 4.0 | Security | Predictable tmp marker files written with writeFileSync (symlink follow) and never cleaned | hooks/long-session.mjs:132,156-157,172,184 | S | done | 006 |
 | IC-021 | P1 | 4.0 | Security | SessionStart injects user-store text into model context unescaped; raw transcript_path in digest command | hooks/session-info.mjs:255-259,262,279-281,293,305 | S | done | 005 |
 | IC-022 | P1 | 4.0 | DX/CI-CD/dependencies | Eval fixture scripts have inconsistent executable bits, unchecked by validate | git ls-files -s evals/*/fixture.sh (5x 100755, 5x 100644); scripts/validate.mjs:802-803 | S | proposed | 001 |
-| IC-023 | P1 | 4.0 | UX & accessibility | /orchestrator:on with no task has no defined behavior | skills/on/SKILL.md:8; README.md:35 | S | proposed | 001 |
-| IC-024 | P1 | 4.0 | UX & accessibility | Chat style rule asks for terse telegraphic and not cryptic in the same bullet | hooks/rules.md:10 | S | proposed | 001 |
+| IC-023 | P1 | 4.0 | UX & accessibility | /orchestrator:on with no task has no defined behavior | skills/on/SKILL.md:8; README.md:35 | S | done | 007 |
+| IC-024 | P1 | 4.0 | UX & accessibility | Chat style rule asks for terse telegraphic and not cryptic in the same bullet | hooks/rules.md:10 | S | done | 007 |
 | IC-025 | P2 | 3.0 | Stability | trim-output blanks stderr and can drop failure lines without keywords | hooks/trim-output.mjs:251,277-283 | M | proposed | 001 |
 | IC-026 | P2 | 3.0 | Performance | long-session re-reads up to 2 MB per prompt and reads whole transcript when no cache | hooks/long-session.mjs:52-61,72-75,98-99,166,186 | M | proposed | 001 |
 | IC-027 | P2 | 3.0 | Code quality & tests | Hook helpers (stdin read, read windows, posInt, sidechain filter) copy-pasted across hooks | hooks/trim-output.mjs:75-78,123; hooks/guard-review.mjs:9-12; hooks/guard-edit.mjs:81-85; hooks/long-session.mjs:22,36,39-48,103-107,122 | M | proposed | 001 |
@@ -95,7 +95,7 @@ Scoring: see the improvement-cycle skill `references/scoring.md`. Score = Impact
 | IC-086 | P1 | 6.0 | DX/CI-CD/dependencies | Always-loaded context headroom is 801 B again and the budget comment lacks 1.13.0 (regression of IC-046) | scripts/validate.mjs:215-217; LF bytes hooks/rules.md 3041 + skills/on/SKILL.md 10658 = 13699 vs 14500 | S | done | 004 |
 | IC-087 | P1 | 6.0 | UX & accessibility | 1.13.0 release notes: Indonesian line omits half the changes and English overstates budget auto (outside git it still walks to root) | README.md:76-81,182; scripts/budget.mjs:42-43 | S | done | 004 |
 | IC-088 | P1 | 4.0 | Observability & ops | budget auto stderr line pollutes 2>&1 output before the offset and exposes the home path | scripts/budget.mjs (process.stderr.write in main); skills/on/modes.md:10 | S | deferred | 004 |
-| IC-089 | P1 | 4.0 | UX & accessibility | Progress line has undefined name placeholders, no delegation counter source and no states for DONE/BUDGET | skills/on/modes.md:12 | S | proposed | 004 |
+| IC-089 | P1 | 4.0 | UX & accessibility | Progress line has undefined name placeholders, no delegation counter source and no states for DONE/BUDGET | skills/on/modes.md:12 | S | done | 007 |
 | IC-090 | P2 | 2.0 | Stability | budget auto git top-level cutoff may miss a transcript of a session launched above the repo (needs investigation) | scripts/budget.mjs:26-45 | S | proposed | 004 |
 | IC-091 | P3 | 1.0 | Performance | budget auto spawns git on every call | scripts/budget.mjs:26-33 | S | proposed | 004 |
 
