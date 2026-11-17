@@ -323,16 +323,28 @@ function runHook(name, payload, extraEnv = {}) {
     env: { ...process.env, ORCH_GUARD: '', ORCH_NO_TRIM: '', CLAUDE_PROJECT_DIR: root, ORCH_STATE_DIR: os.tmpdir(), ...extraEnv },
   });
 }
-{
-  const lines = Array.from({ length: 150 }, (_, i) => (i === 69 ? 'Error: boom'.padEnd(50, '.') : 'x'.repeat(50)));
-  const stdout = lines.join('\n');
-  const trimPayload = (command) => ({
-    hook_event_name: 'PostToolUse',
-    tool_name: 'Bash',
-    tool_input: { command },
-    tool_response: { stdout, stderr: '', interrupted: false },
+// Shared trim-output payload: 150 lines, one 50-char error line at index 69.
+const BIG_STDOUT = Array.from({ length: 150 }, (_, i) => (i === 69 ? 'Error: boom'.padEnd(50, '.') : 'x'.repeat(50))).join('\n');
+const trimPayload = (command) => ({
+  hook_event_name: 'PostToolUse',
+  tool_name: 'Bash',
+  tool_input: { command },
+  tool_response: { stdout: BIG_STDOUT, stderr: '', interrupted: false },
+  cwd: root,
+});
+
+// Shared session-info runner. raw: spawn with only the given env added (no runHook defaults).
+function sessionInfo(cwd, env = {}, raw = false) {
+  const payload = { hook_event_name: 'SessionStart', source: 'startup', cwd };
+  if (!raw) return runHook('session-info.mjs', payload, env);
+  return spawnSync(process.execPath, [path.join(root, 'hooks', 'session-info.mjs')], {
+    input: JSON.stringify(payload),
+    encoding: 'utf8',
     cwd: root,
+    env: { ...process.env, ...env },
   });
+}
+{
   let r = runHook('trim-output.mjs', trimPayload('npm test'));
   if (r) {
     let out = null;
@@ -417,19 +429,19 @@ function runHook(name, payload, extraEnv = {}) {
     }
   }
 
-  r = runHook('session-info.mjs', { hook_event_name: 'SessionStart', source: 'startup', cwd: root });
+  r = sessionInfo(root);
   if (r && (r.status !== 0 || !r.stdout.includes('Orchestrator store:'))) {
     err('hooks/session-info.mjs', `smoke "session-info": exit ${r.status}, expected "Orchestrator store:" in stdout`);
   }
   if (r && !r.stdout.includes('Guards: active')) err('hooks/session-info.mjs', 'smoke "session-info": expected "Guards: active" in stdout');
-  r = runHook('session-info.mjs', { hook_event_name: 'SessionStart', source: 'startup', cwd: root }, { ORCH_GUARD: 'off' });
+  r = sessionInfo(root, { ORCH_GUARD: 'off' });
   if (r && !r.stdout.includes('Guards: off (ORCH_GUARD=off)')) err('hooks/session-info.mjs', 'smoke "session-info ORCH_GUARD=off": expected "Guards: off (ORCH_GUARD=off)" in stdout');
 
   // session-info stale checkpoints (fake HOME and cwd in temp dirs)
   const sh = fs.mkdtempSync(path.join(os.tmpdir(), 'orch-st-'));
   const scwd = fs.mkdtempSync(path.join(os.tmpdir(), 'orch-cwd-'));
   try {
-    const sess = (e) => runHook('session-info.mjs', { hook_event_name: 'SessionStart', source: 'startup', cwd: scwd }, { HOME: sh, USERPROFILE: sh, ORCH_STALE_DAYS: '', ...e })?.stdout ?? '';
+    const sess = (e) => sessionInfo(scwd, { HOME: sh, USERPROFILE: sh, ORCH_STALE_DAYS: '', ...e })?.stdout ?? '';
     const store = /Orchestrator store: (.*)/.exec(sess({}))?.[1]?.trim();
     if (!store) {
       err('hooks/session-info.mjs', 'smoke "session-info stale": no "Orchestrator store:" line');
@@ -470,14 +482,6 @@ function runHook(name, payload, extraEnv = {}) {
 
 // 8a. Kill switches, invalid stdin and project-root fallback
 {
-  const bigStdout = Array.from({ length: 150 }, (_, i) => (i === 69 ? 'Error: boom'.padEnd(50, '.') : 'x'.repeat(50))).join('\n');
-  const trimReq = (command) => ({
-    hook_event_name: 'PostToolUse',
-    tool_name: 'Bash',
-    tool_input: { command },
-    tool_response: { stdout: bigStdout, stderr: '', interrupted: false },
-    cwd: root,
-  });
   const editReq = (file) => ({
     hook_event_name: 'PreToolUse',
     tool_name: 'Edit',
@@ -488,7 +492,7 @@ function runHook(name, payload, extraEnv = {}) {
 
   let r = runHook('guard-edit.mjs', editReq(path.join(root, 'agents', 'x.md')), { ORCH_GUARD: 'off' });
   if (r && r.stdout.trim() !== '') err('hooks/guard-edit.mjs', 'smoke "guard ORCH_GUARD=off": expected empty stdout');
-  r = runHook('trim-output.mjs', trimReq('npm test'), { ORCH_NO_TRIM: '1' });
+  r = runHook('trim-output.mjs', trimPayload('npm test'), { ORCH_NO_TRIM: '1' });
   if (r && r.stdout.trim() !== '') err('hooks/trim-output.mjs', 'smoke "trim ORCH_NO_TRIM=1": expected empty stdout');
 
   // invalid JSON stdin: fail open silently; with ORCH_DEBUG=1 the error goes to stderr
@@ -608,12 +612,7 @@ function runHook(name, payload, extraEnv = {}) {
       const cmd = refText.slice(bodyStart, bodyEnd).split('\n').map((l) => l.trim()).filter(Boolean).join('\n');
       const env = { ...process.env, HOME: shome, USERPROFILE: shome };
       const b = spawnSync('bash', ['-c', cmd], { encoding: 'utf8', cwd: sdir, env });
-      const hook = spawnSync(process.execPath, [path.join(root, 'hooks', 'session-info.mjs')], {
-        input: JSON.stringify({ hook_event_name: 'SessionStart', source: 'startup', cwd: sdir }),
-        encoding: 'utf8',
-        cwd: root,
-        env: { ...env, ORCH_STALE_DAYS: '' },
-      });
+      const hook = sessionInfo(sdir, { HOME: shome, USERPROFILE: shome, ORCH_STALE_DAYS: '' }, true);
       const store = /Orchestrator store: (.*)/.exec(hook.stdout ?? '')?.[1]?.trim();
       const bashOut = (b.stdout ?? '').trim();
       if (!bashOut || !store || bashOut !== store) {
