@@ -804,7 +804,7 @@ function sessionInfo(cwd, env = {}, raw = false) {
         am('m3', { input_tokens: 99999 }, { isSidechain: true }),
       ]);
       chk('main', bud([path.join(tmp, 'main.jsonl'), '--main']).out, 'MAIN: 2 calls, input 3k, cache-read 60k, cache-write 4k, output 2k, context 43k');
-      chk('main known', bud([known, '--main']).out.startsWith('MAIN:') ? 'MAIN:' : 'other', 'MAIN:');
+      chk('main known', bud([known, '--main']).out, 'MAIN: 0 calls');
       const missingMain = bud([path.join(tmp, 'none.jsonl'), '--main']);
       chk('main missing file', missingMain.out, 'MAIN: ? (transcript unreadable)');
       chk('main missing file exit', String(missingMain.status), '0');
@@ -1013,6 +1013,59 @@ function sessionInfo(cwd, env = {}, raw = false) {
   bad('budget.mjs', ['x.jsonl', '--limit', '0'], 'BUDGET: ERROR invalid --limit "0"');
   bad('digest.mjs', ['x.jsonl', '--last', '0'], 'digest: invalid --last "0"', 'stderr');
   bad('trace-tokens.mjs', ['--foo'], 'TRACE: ERROR unknown option --foo');
+}
+
+// 8g. Smoke tests for untested branches: eval-compare --write skips and default baseline, budget --from alignment, trace-tokens unreadable run
+{
+  const d = fs.mkdtempSync(path.join(os.tmpdir(), 'orch-branch-'));
+  try {
+    const J = JSON.stringify;
+    const cmpPath = path.join(root, 'scripts', 'eval-compare.mjs');
+    const budPath = path.join(root, 'scripts', 'budget.mjs');
+    const tracePath = path.join(root, 'scripts', 'trace-tokens.mjs');
+    const run = (script, args) => spawnSync(process.execPath, [script, ...args], { encoding: 'utf8', cwd: root });
+    const tr = path.join(d, 't.jsonl');
+    fs.writeFileSync(tr, [{ type: 'system', subtype: 'init', model: 'm' }, { type: 'result', num_turns: 1, total_cost_usd: 0.1, result: 'x', modelUsage: { m: { inputTokens: 1000, outputTokens: 1000, cacheReadInputTokens: 50000, cacheCreationInputTokens: 48000 } } }].map((x) => J(x)).join('\n') + '\n');
+
+    // eval-compare --write: the unreadable arm (null pair) is skipped
+    const res = path.join(d, 'r.json');
+    fs.writeFileSync(res, J({ suite: { modelOverride: 'm' }, cases: [{ name: 'c1', arms: { with: [{ passed: true, tracePath: tr }], without: [{ passed: true, tracePath: path.join(d, 'gone.jsonl') }] } }] }));
+    const wb = path.join(d, 'wb.json');
+    const w = run(cmpPath, [res, '--write', wb]);
+    let wc = null;
+    try { wc = JSON.parse(fs.readFileSync(wb, 'utf8')).cases; } catch { /* reported below */ }
+    if (w.status !== 0 || !wc || JSON.stringify(Object.keys(wc)) !== '["c1"]' || JSON.stringify(Object.keys(wc.c1)) !== '["with"]') {
+      err('scripts/eval-compare.mjs', `smoke "compare write skips null pairs": expected exit 0 and only c1.with, got exit ${w.status}`);
+    }
+
+    // eval-compare default baseline: evals/baseline.json relative to cwd, missing here
+    const bcwd = path.join(d, 'no-baseline');
+    fs.mkdirSync(bcwd);
+    const nb = spawnSync(process.execPath, [cmpPath, res], { encoding: 'utf8', cwd: bcwd });
+    if (nb.status !== 2 || !(nb.stdout ?? '').startsWith('EVAL-COMPARE: ERROR baseline unreadable: evals/baseline.json')) {
+      err('scripts/eval-compare.mjs', `smoke "compare default baseline missing": expected exit 2 with "EVAL-COMPARE: ERROR baseline unreadable: evals/baseline.json", got exit ${nb.status}`);
+    }
+
+    // budget --from mid-line: the partial first line is dropped, so it matches the next line start
+    const am = (id, out) => J({ type: 'assistant', message: { id, content: [{ type: 'text', text: 't' }], usage: { input_tokens: 1, output_tokens: out } } });
+    const tl = [am('m1', 500), am('m2', 800)];
+    const tf = path.join(d, 'x.jsonl');
+    fs.writeFileSync(tf, tl.join('\n') + '\n');
+    const budAt = (from) => (run(budPath, [tf, '--main', '--from', String(from)]).stdout ?? '').trim();
+    const mid = budAt(5);
+    const aligned = budAt(Buffer.byteLength(tl[0] + '\n'));
+    if (mid !== aligned || !aligned.startsWith('MAIN: 1 calls')) {
+      err('scripts/budget.mjs', `smoke "from mid-line": expected the next-line result "${aligned}", got "${mid}"`);
+    }
+
+    // trace-tokens: a run whose trace cannot be read prints RUN then exactly TRACE: unreadable
+    const ur = path.join(d, 'u.json');
+    fs.writeFileSync(ur, J({ suite: { plugins: [{ version: '9.9.9' }] }, cases: [{ name: 'c5', arms: { with: [{ passed: false, tracePath: path.join(d, 'nope.jsonl') }] } }] }));
+    const ut = (run(tracePath, [ur]).stdout ?? '').trim();
+    if (ut !== 'RUN: c5 with #1 FAIL\nTRACE: unreadable') err('scripts/trace-tokens.mjs', `smoke "unreadable run": expected RUN line then TRACE: unreadable, got "${ut}"`);
+  } finally {
+    fs.rmSync(d, { recursive: true, force: true });
+  }
 }
 
 // 9. Eval cases: case.yaml name matches folder, prompt.md and scaffold script exist, graders use a known type with required keys
