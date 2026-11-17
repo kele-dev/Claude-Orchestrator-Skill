@@ -1,0 +1,14 @@
+{
+  "autopilot-budget-stop": ["skills/autopilot/", "skills/on/", "skills/resume/", "scripts/budget.mjs", "agents/"],
+  "chat-terse": [],
+  "delegation-startup": ["agents/"],
+  "multi-file-batch": ["skills/on/", "agents/"],
+  "on-small-edit": ["skills/on/", "agents/"],
+  "on-sonnet-guardrails": ["skills/on/", "agents/"],
+  "on-sonnet-prd-save": ["skills/on/", "agents/"],
+  "on-learned-errors": ["skills/on/", "skills/learn/", "agents/"],
+  "on-learned-errors-write": ["skills/on/", "skills/learn/", "agents/"],
+  "plain-edit-ablation": [],
+  "status-slash": ["skills/status/", "scripts/budget.mjs"],
+  "team-parallel": ["skills/team/", "skills/on/", "agents/"]
+}

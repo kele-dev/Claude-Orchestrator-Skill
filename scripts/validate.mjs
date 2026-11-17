@@ -1130,7 +1130,43 @@ function sessionInfo(cwd, env = {}, raw = false) {
   }
 }
 
+// 8h. Smoke tests: scripts/eval-select.mjs picks eval cases from changed files
+{
+  const sel = (args) => spawnSync(process.execPath, [path.join(root, 'scripts', 'eval-select.mjs'), ...args], { encoding: 'utf8', cwd: root });
+  const lines = (r) => (r.stdout ?? '').split('\n').filter(Boolean);
+  for (const [f, want] of [['skills/status/SKILL.md', ['status-slash']], ['README.md', []], ['evals/chat-terse/prompt.md', ['chat-terse']]]) {
+    const r = sel(['--files', f]);
+    if (r.status !== 0 || JSON.stringify(lines(r)) !== JSON.stringify(want)) err('scripts/eval-select.mjs', `smoke "select ${f}": expected [${want.join(', ')}] with exit 0, got exit ${r.status} [${lines(r).join(', ')}]`);
+  }
+  for (const [f, n] of [['hooks/guard-edit.mjs', 12], ['skills/init/SKILL.md', 12], ['agents/haiku-coder.md', 9]]) {
+    const r = sel(['--files', f]);
+    if (r.status !== 0 || lines(r).length !== n) err('scripts/eval-select.mjs', `smoke "select ${f}": expected ${n} cases with exit 0, got exit ${r.status} and ${lines(r).length} cases`);
+  }
+  const none = sel([]);
+  if (none.status !== 2) err('scripts/eval-select.mjs', `smoke "select no args": expected exit 2, got ${none.status}`);
+}
+
 // 9. Eval cases: case.yaml name matches folder, prompt.md and scaffold script exist, graders use a known type with required keys
+// evals/touches.json: keys match the case folders and every prefix is an existing path
+{
+  const tf = 'evals/touches.json';
+  let touches = null;
+  if (!exists(path.join(root, tf))) err(tf, 'missing');
+  else {
+    try { touches = JSON.parse(readText(path.join(root, tf))); } catch (e) { err(tf, `cannot parse JSON (${e.message})`); }
+  }
+  if (touches && typeof touches === 'object' && !Array.isArray(touches)) {
+    const cases = listDirs('evals').filter((d) => d !== 'results');
+    const keys = Object.keys(touches);
+    const missing = cases.filter((c) => !keys.includes(c));
+    const extra = keys.filter((k) => !cases.includes(k));
+    if (missing.length || extra.length) err(tf, `keys must match case folders (missing: ${missing.join(', ') || 'none'}; extra: ${extra.join(', ') || 'none'})`);
+    for (const k of keys) {
+      if (!Array.isArray(touches[k])) { err(tf, `${k}: value must be an array of path prefixes`); continue; }
+      for (const p of touches[k]) if (!exists(path.join(root, p))) err(tf, `${k}: prefix "${p}" does not exist`);
+    }
+  }
+}
 const GRADER_TYPES = new Set(['regex', 'tool_order', 'tool_used', 'file_exists', 'llm', 'baseline']);
 const REQUIRED = { regex: ['pattern'], tool_order: ['before', 'after'], tool_used: ['tool'], file_exists: ['path'], llm: [], baseline: ['baseline_file'] };
 for (const c of listDirs('evals').filter((d) => d !== 'results')) {
