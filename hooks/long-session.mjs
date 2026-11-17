@@ -199,7 +199,7 @@ function run(input) {
   const g = contextGrowth(path, size);
   const growth = g ? g.last - g.first : 0;
   const level = levels.filter((t) => growth >= t).length;
-  const say = (line) => JSON.stringify({ systemMessage: line, hookSpecificOutput: { hookEventName: 'UserPromptSubmit', additionalContext: line } });
+  const say = (line) => JSON.stringify({ systemMessage: line, hookSpecificOutput: { hookEventName: 'UserPromptSubmit', additionalContext: `${line} Tell the user in their language.` } });
   if (warned > 0) {
     if (!g || level <= warned) return '';
     writeFileSync(marker, String(level));

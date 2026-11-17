@@ -19,7 +19,7 @@ process.stdin.on('end', () => {
         hookSpecificOutput: {
           hookEventName: 'PreToolUse',
           permissionDecision: 'deny',
-          permissionDecisionReason: `orchestrator: ${missing} does not exist yet. Save the PRD first (the main session may Write to docs/prd/), confirm with ls, then launch orchestrator:opus-reviewer.`,
+          permissionDecisionReason: `orchestrator: ${missing} does not exist yet. Save the PRD first (the main session may Write to docs/prd/), confirm with ls, then launch orchestrator:opus-reviewer. Set ORCH_GUARD=off to bypass. Explain this to the user in their language.`,
         },
       }));
     }

@@ -41,7 +41,7 @@ Uninstall: `claude plugin uninstall orchestrator@kele-dev`. The per-project stor
 
 Orchestration mode is active automatically in every session. Manual commands:
 
-- `/orchestrator:on` - turn on (or `/orchestrator:on <task>` to give a task directly); optional `budget=<N>k` (e.g. `/orchestrator:on budget=50k <task>`) stops before the next group once the budget script reports OVER, with status BUDGET and a checkpoint
+- `/orchestrator:on` - turn on (or `/orchestrator:on <task>` to give a task directly); optional `budget=<N>k` (e.g. `/orchestrator:on budget=50k <task>`) stops before the next group once the budget script reports OVER, with status BUDGET and a checkpoint. See the legend under the token example (Token-saving defaults) for `?` and `UNKNOWN`.
 - `/orchestrator:off` - turn off for the rest of this session (Claude works directly as usual)
 - `/orchestrator:team <task>` - parallel mode: the main session splits the work into lanes that own separate files, Haiku lanes run at the same time, only failed lanes are retried. Caps: 3 lanes (4 only at plan time, when the work has 4 or more independent, file-disjoint parts), 2 fix rounds per lane, raised automatically up to 4 rounds only while fixes make progress (a cap you set, e.g. `lanes=N`, is never raised; optional `budget=<N>k` stops with status BUDGET and a checkpoint once the agents' total tokens reach it). Lanes that need each other's files cooperate through the main session. Add `--dry-run` to see the lane plan first. `isolate=worktree` (opt-in) runs each lane in its own git worktree; needs `worktree.baseRef` set to `"head"` in settings, a clean working tree, and `commit=batch`, otherwise it warns and uses the shared tree; passed lanes are copied back into the main tree.
 - `/orchestrator:autopilot <task>` - autonomous mode: one short clarification round, a PRD, then batch after batch without asking in between, until done or a cap is hit. Caps: 5 batches, 2 fix rounds per batch, raised automatically up to 8 batches / 4 rounds only while work keeps passing (a cap you set, e.g. `batches=N`, is never raised; optional `budget=<N>k` stops with status BUDGET and a checkpoint once the agents' total tokens reach it). Add `--dry-run` to see the plan first.
@@ -62,6 +62,9 @@ Orchestration mode is active automatically in every session. Manual commands:
 - A `learned-map` lesson (max 20 lines) remembers the project layout and commands, so new sessions skip re-exploring.
 - Claude suggests a new session or `/compact` when you switch to an unrelated task.
 - Every report ends with one token line per agent, e.g. `Tokens: audit Explore 96k · batch1 haiku-coder 12k · 3 delegations, total ≈125k`.
+
+`?` means that agent's completion notice had no usage data; `UNKNOWN` (budget) means the total could not be counted because some agents lack usage or the transcript was unreadable.
+
 - Code questions and test-failure triage go to Haiku; the main session reads only a short answer with file:line references.
 - Briefs start with a type (`TYPE: EDIT | CREATE | RUN | TRIAGE | SCAN | COMMIT | APPLY`) that Haiku already knows, so briefs stay short.
 - Before verifying a larger change, Haiku scans the diff for mechanical mistakes; the main session reads only the flagged hunks and the main logic.
@@ -77,6 +80,7 @@ Orchestration mode is active automatically in every session. Manual commands:
 - Guard limits: the edit guard keeps orchestration discipline; it is not a security boundary. It checks only Edit/Write/NotebookEdit (shell writes such as `sed -i` or `>` are not checked), any subagent may edit, and `/orchestrator:off` is user-only (the skill sets `disable-model-invocation: true`). Subagents are not guarded at all: executors (haiku-coder, sonnet-dev) can edit and run any shell command by design, and the read-only agents (opus-planner, opus-reviewer) keep Bash for git and test commands, limited only by their instructions.
 - Debugging: hooks fail open and print nothing on errors; set env `ORCH_DEBUG=1` to write swallowed errors to stderr (top-level failures plus failed file, git and transcript reads in guard-edit, long-session and session-info). Messages are shortened and quoted input is masked; `ORCH_DEBUG=2` prints full stacks (may include input, do not paste publicly).
 - The edit guard and output trim need Node 18+ on PATH. Without Node they do nothing (fail open). macOS desktop app: Node from nvm or Homebrew may be missing from the app's PATH; check that `/orchestrator:status` shows `Guards: active` (the session-start `Guards:` line comes only from the hooks), or install Node system-wide.
+- Hook messages are in English; the model is told to relay them in the user's language.
 - Review guard (`guard-review`): a PreToolUse hook on Agent/Task that denies `orchestrator:opus-reviewer` when its prompt names a `docs/prd/*.md` file that does not exist. It fails open when Node is missing or the check cannot run. Turn it off with env `ORCH_GUARD=off`.
 
 ## What's new (1.9.0 and later)
