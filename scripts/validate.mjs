@@ -419,6 +419,9 @@ function runHook(name, payload, extraEnv = {}) {
   if (r && (r.status !== 0 || !r.stdout.includes('Orchestrator store:'))) {
     err('hooks/session-info.mjs', `smoke "session-info": exit ${r.status}, expected "Orchestrator store:" in stdout`);
   }
+  if (r && !r.stdout.includes('Guards: active')) err('hooks/session-info.mjs', 'smoke "session-info": expected "Guards: active" in stdout');
+  r = runHook('session-info.mjs', { hook_event_name: 'SessionStart', source: 'startup', cwd: root }, { ORCH_GUARD: 'off' });
+  if (r && !r.stdout.includes('Guards: off (ORCH_GUARD=off)')) err('hooks/session-info.mjs', 'smoke "session-info ORCH_GUARD=off": expected "Guards: off (ORCH_GUARD=off)" in stdout');
 
   // session-info stale checkpoints (fake HOME and cwd in temp dirs)
   const sh = fs.mkdtempSync(path.join(os.tmpdir(), 'orch-st-'));
