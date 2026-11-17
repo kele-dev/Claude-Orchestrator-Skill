@@ -75,7 +75,7 @@ function record(input) {
   if (!TIERS.includes(tier)) return;
   const cwd = typeof input?.cwd === 'string' && input.cwd !== '' ? input.cwd : process.cwd();
   const text = typeof input?.last_assistant_message === 'string' ? input.last_assistant_message : lastAssistantText(input?.agent_transcript_path);
-  const ms = [...String(text).matchAll(/\bSTATUS\*{0,2}:?\*{0,2}\s*[:\-]?\s*\**([A-Za-z_]+)/gi)];
+  const ms = [...String(text).matchAll(/^[ \t>*_-]*STATUS[ \t*_]*:[ \t*_]*([A-Za-z_]+)/gim)];
   const status = ms.length ? ms[ms.length - 1][1].toUpperCase() : '?';
 
   const store = storeFor(cwd);
