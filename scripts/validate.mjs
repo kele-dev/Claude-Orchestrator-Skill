@@ -550,6 +550,9 @@ function sessionInfo(cwd, env = {}, raw = false) {
         ['**STATUS:** SUCCESS', 'SUCCESS'],
         ['Status: failed', 'FAILED'],
         ['STATUS: FAILED\nlater\nSTATUS: SUCCESS', 'SUCCESS'],
+        ['  STATUS: FAILED', 'FAILED'],
+        ['the status is fine, all good', '?'],
+        ['Status of work: ok', '?'],
       ];
       for (const [msg, want] of lenient) {
         runHook('ledger.mjs', payload({ agent_type: 'orchestrator:haiku-coder', agent_id: 'a4', last_assistant_message: msg }), homeEnv);
@@ -558,7 +561,7 @@ function sessionInfo(cwd, env = {}, raw = false) {
       }
 
       const stats = spawnSync(process.execPath, [path.join(root, 'hooks', 'ledger.mjs'), '--stats', store], { encoding: 'utf8', cwd: root, env: { ...process.env, ...homeEnv } });
-      if (stats.stdout.trim() !== 'LEDGER: haiku-coder 3/4 pass, sonnet-dev 0/0 pass, 1 unknown') err('hooks/ledger.mjs', `smoke "stats": unexpected output "${stats.stdout.trim()}"`);
+      if (stats.stdout.trim() !== 'LEDGER: haiku-coder 3/5 pass, 2 unknown, sonnet-dev 0/0 pass, 1 unknown') err('hooks/ledger.mjs', `smoke "stats": unexpected output "${stats.stdout.trim()}"`);
       const emptyDir = fs.mkdtempSync(path.join(os.tmpdir(), 'orch-ledger-empty-'));
       const none = spawnSync(process.execPath, [path.join(root, 'hooks', 'ledger.mjs'), '--stats', emptyDir], { encoding: 'utf8', cwd: root, env: { ...process.env, ...homeEnv } });
       if (none.stdout.trim() !== 'LEDGER: no delegations') err('hooks/ledger.mjs', 'smoke "stats empty": expected "LEDGER: no delegations"');
