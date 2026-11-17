@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // PreToolUse hook for Edit/Write/NotebookEdit: denies project edits from the main session while orchestration is on.
-// Fails open on malformed input (prints nothing, exits 0). With no on/off info in the transcript the default is "on".
+// Fails open on malformed input or hook errors (prints nothing, exits 0). Default mode is "on": no on/off info, or an unreadable transcript, means edits are denied.
 import fs from 'fs';
 import { execFileSync } from 'child_process';
 import path from 'path';
