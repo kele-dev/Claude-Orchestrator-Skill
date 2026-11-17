@@ -766,6 +766,8 @@ function runHook(name, payload, extraEnv = {}) {
       const m = path.join(tmp, 'm.jsonl');
       chk('known', bud([known]).out, 'BUDGET: spent 46k (2 agents)');
       chk('mixed limit 40k', bud([mixed, '--limit', '40k']).out, 'BUDGET: spent 46k+? (3 agents, 1 without usage) of 40k: OVER');
+      chk('mark unreadable', bud([path.join(tmp, 'none.jsonl'), '--mark']).out, 'BUDGET: mark ? (transcript unreadable)');
+      chk('from invalid mark', bud([known, '--from', '?', '--limit', '10k']).out, 'BUDGET: spent ? (no valid mark) of 10k: UNKNOWN');
       const missingRes = bud([path.join(tmp, 'none.jsonl')]);
       chk('missing file', missingRes.out, 'BUDGET: spent ? (transcript unreadable)');
       chk('missing file exit', String(missingRes.status), '0');

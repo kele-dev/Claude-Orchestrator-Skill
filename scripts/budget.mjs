@@ -71,18 +71,21 @@ function main() {
   let file = args.find((a, i) => !a.startsWith('--') && args[i - 1] !== '--from' && args[i - 1] !== '--limit');
   if (file === 'auto') file = newestTranscript();
   if (args.includes('--mark')) {
-    let size = 0;
-    try { size = statSync(file).size; } catch { size = 0; }
+    let size;
+    try { size = statSync(file).size; } catch { return 'BUDGET: mark ? (transcript unreadable)'; }
     return `BUDGET: mark ${size}`;
   }
-  const fv = val('--from');
-  const from = /^\d+$/.test(fv ?? '') ? Number(fv) : 0;
   const lm = /^(\d+(?:\.\d+)?)k?$/i.exec(val('--limit') ?? '');
   const limit = lm && Number(lm[1]) > 0 ? Number(lm[1]) : null;
+  const unknownSuffix = limit !== null ? ` of ${limit}k: UNKNOWN` : '';
+  const fv = val('--from');
+  const hasFrom = args.some((a) => a === '--from' || a.startsWith('--from='));
+  if (hasFrom && !/^\d+$/.test(fv ?? '')) return `BUDGET: spent ? (no valid mark)${unknownSuffix}`;
+  const from = /^\d+$/.test(fv ?? '') ? Number(fv) : 0;
 
   const main = args.includes('--main');
   let lines;
-  try { lines = readTranscript(file, from); } catch { return main ? 'MAIN: ? (transcript unreadable)' : 'BUDGET: spent ? (transcript unreadable)'; }
+  try { lines = readTranscript(file, from); } catch { return main ? 'MAIN: ? (transcript unreadable)' : `BUDGET: spent ? (transcript unreadable)${unknownSuffix}`; }
   if (main) return mainUsage(lines);
 
   const launches = new Set();
