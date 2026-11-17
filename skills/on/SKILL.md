@@ -18,7 +18,7 @@ You are the orchestrator (the main session): the brain, not the hands. The flow 
 - Ambiguous target: if a request could land in more than one place (memory, skill/docs, config, code), ask the user one question naming the options before acting; never pick one silently (e.g. saving a memory instead of changing the skill).
 
 ## 0. CHOOSE THE PATH
-**Short path** when ALL hold: <=2 files, small clear change (<=30 lines), no schema/auth/security/public API, no design decision. Not Opus-class: stricter, see "Main-session model".
+**Short path** when ALL hold: <=2 files, small clear change (<=30 lines), no schema/auth/security/public API, no design decision. Not Opus-class: 1 file only (non-opus.md).
 - Skip step 2 (no PRD file) and `opus-reviewer`. Combine all small changes into ONE `haiku-coder` delegation.
 - Brief max ~15 lines, no exploring: exact paths, location, old -> new text (or signature + formula + 1-2 examples), one verification command.
 - Afterwards the main session checks `git diff` and runs the verification. Failure -> step 4.

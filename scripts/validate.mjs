@@ -320,7 +320,7 @@ function runHook(name, payload, extraEnv = {}) {
     input: JSON.stringify(payload),
     encoding: 'utf8',
     cwd: root,
-    env: { ...process.env, ORCH_GUARD: '', ORCH_NO_TRIM: '', CLAUDE_PROJECT_DIR: root, ...extraEnv },
+    env: { ...process.env, ORCH_GUARD: '', ORCH_NO_TRIM: '', CLAUDE_PROJECT_DIR: root, ORCH_STATE_DIR: os.tmpdir(), ...extraEnv },
   });
 }
 {
@@ -697,6 +697,17 @@ function runHook(name, payload, extraEnv = {}) {
     if (r8 && !r8.stdout.includes('2 delegations')) err('hooks/long-session.mjs', 'smoke "long incremental 2": expected "2 delegations" in stdout');
     if (fs.existsSync(sidFCount)) err('hooks/long-session.mjs', 'smoke "long incremental 2": expected .count file removed');
 
+    // IC-020: with ORCH_STATE_DIR empty, markers go to the private per-user dir (0700 on non-Windows)
+    const sidS = `${sidA}-s`;
+    const stateTag = String(process.getuid?.() ?? os.userInfo().username).replace(/[^A-Za-z0-9_-]/g, '');
+    const stateMarker = path.join(os.tmpdir(), `orchestrator-${stateTag}`, `orchestrator-long-${sidS}`);
+    const rs = runHook('long-session.mjs', longPayload(sidS), { ORCH_LONG: '', ORCH_LONG_DELEGATIONS: '', ORCH_LONG_BYTES: '5', ORCH_STATE_DIR: '' });
+    if (rs && !rs.stdout.includes('systemMessage')) err('hooks/long-session.mjs', 'smoke "long state dir": expected systemMessage in stdout');
+    if (!fs.existsSync(stateMarker)) err('hooks/long-session.mjs', 'smoke "long state dir": expected marker in per-user state dir');
+    if (process.platform !== 'win32' && fs.existsSync(stateMarker) && (fs.statSync(path.dirname(stateMarker)).mode & 0o777) !== 0o700) err('hooks/long-session.mjs', 'smoke "long state dir": expected state dir mode 0700');
+    fs.rmSync(stateMarker, { force: true });
+    fs.rmSync(`${stateMarker}.count`, { force: true });
+
     const usageTranscript = (cacheRead2) => {
       const usageLines = [
         { type: 'assistant', message: { usage: { input_tokens: 10, cache_read_input_tokens: 1000 } } },
@@ -905,6 +916,14 @@ function runHook(name, payload, extraEnv = {}) {
       const missing = spawnSync(process.execPath, [tracePath, path.join(d, 'none.jsonl')], { encoding: 'utf8', cwd: root });
       chk('missing file', (missing.stdout ?? '').trim(), 'TRACE: unreadable');
       chk('missing file exit', String(missing.status), '0');
+      // tracePath must end in .jsonl: a non-.jsonl file is treated as unreadable (no read, no crash)
+      fs.writeFileSync(path.join(d, 'x.txt'), fs.readFileSync(path.join(d, 't.jsonl'), 'utf8'));
+      fs.writeFileSync(path.join(d, 'r2.json'), J({ suite: { plugins: [{ version: '9.9.9' }] }, cases: [{ name: 'c2', arms: { with: [{ passed: true, tracePath: path.join(d, 'x.txt') }] } }] }));
+      const nonJsonl = spawnSync(process.execPath, [tracePath, path.join(d, 'r2.json')], { encoding: 'utf8', cwd: root });
+      chk('non-jsonl tracePath', (nonJsonl.stdout ?? '').trim(), 'RUN: c2 with #1 PASS\nTRACE: unreadable');
+      chk('non-jsonl tracePath exit', String(nonJsonl.status), '0');
+      const nonJsonlMd = spawnSync(process.execPath, [tracePath, path.join(d, 'r2.json'), '--md'], { encoding: 'utf8', cwd: root });
+      chk('non-jsonl tracePath md', (nonJsonlMd.stdout ?? '').trim().includes('| ? | ? |'), true);
     }
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
@@ -962,6 +981,12 @@ function runHook(name, payload, extraEnv = {}) {
         if (empty.status !== 0 || !(empty.stdout ?? '').includes('EVAL-COMPARE: EMPTY')) err('scripts/eval-compare.mjs', `smoke "compare all skipped": expected exit 0 with "EVAL-COMPARE: EMPTY", got ${empty.status}`);
         const emptyStrict = run(res3, b, '--strict');
         if (emptyStrict.status !== 2) err('scripts/eval-compare.mjs', `smoke "compare all skipped --strict": expected exit 2, got ${emptyStrict.status}`);
+        // non-.jsonl tracePath (direct or basename fallback) is never read
+        fs.writeFileSync(path.join(d, 'x.txt'), fs.readFileSync(tr, 'utf8'));
+        const res4 = path.join(d, 'r4.json');
+        fs.writeFileSync(res4, J({ suite: { modelOverride: 'm' }, cases: [{ name: 'c1', arms: { with: [{ passed: true, tracePath: path.join(d, 'x.txt') }] } }] }));
+        const nonJsonl = run(res4, b);
+        if (nonJsonl.status !== 0 || !(nonJsonl.stdout ?? '').includes('EVAL-COMPARE: EMPTY')) err('scripts/eval-compare.mjs', `smoke "compare non-jsonl tracePath": expected exit 0 with "EVAL-COMPARE: EMPTY", got ${nonJsonl.status}`);
         const b3 = path.join(d, 'b3.json');
         fs.writeFileSync(b3, J({ model: 'm', cases: { c1: { with: n }, c2: { with: 100 } } }));
         const missingStrict = run(res, b3, '--strict');

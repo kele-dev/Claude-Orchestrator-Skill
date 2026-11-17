@@ -9,6 +9,11 @@ const UNREADABLE = 'TRACE: unreadable';
 const mean = (arr) => arr.reduce((a, b) => a + b, 0) / arr.length;
 const isNum = (v) => typeof v === 'number' && Number.isFinite(v);
 
+// tracePath comes from result JSON: accept only a string ending in .jsonl (case-insensitive), else null.
+export function safeTracePath(p) {
+  return typeof p === 'string' && /\.jsonl$/i.test(p) ? p : null;
+}
+
 export function readText(path) {
   if (typeof path !== 'string') return null;
   try {
@@ -176,7 +181,7 @@ function main() {
         if (!Array.isArray(runs)) continue;
         runs.forEach((run, i) => {
           out.push(`RUN: ${c.name} ${arm} #${i + 1} ${run.passed === true ? 'PASS' : 'FAIL'}`);
-          out.push(...traceLines(readText(run.tracePath)));
+          out.push(...traceLines(readText(safeTracePath(run.tracePath))));
         });
       }
     }
@@ -191,7 +196,7 @@ function main() {
       if (!Array.isArray(runs)) continue;
       const n = runs.length;
       const passed = runs.filter((r) => r.passed === true).length;
-      const analyses = runs.map((r) => analyzeTrace(readText(r.tracePath)));
+      const analyses = runs.map((r) => analyzeTrace(readText(safeTracePath(r.tracePath))));
 
       const totals = analyses.filter((a) => a && a.sum != null).map((a) => a.sum);
       const meanTotal = totals.length ? Math.round(mean(totals) / 1000) + 'k' : '?';

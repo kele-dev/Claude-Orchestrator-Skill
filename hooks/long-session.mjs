@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 // UserPromptSubmit hook: warns when the context has grown (assistant message.usage tokens), then again at higher thresholds (ORCH_LONG_REPEAT),
 // or, without usage data, when the transcript is large; also warns on delegation count.
-// Delegation count is incremental: the byte offset and count are cached in a tmp .count file, and only new bytes are read.
+// Delegation count is incremental: the byte offset and count are cached in a .count file, and only new bytes are read.
+// Marker and .count files live in ORCH_STATE_DIR, or else in a private per-user dir under tmpdir (mode 0700, not a symlink, owned by the current user).
 // Fails open: on any error or unexpected input it prints nothing and exits 0.
-import { closeSync, existsSync, openSync, readFileSync, readSync, rmSync, statSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { closeSync, existsSync, lstatSync, mkdirSync, openSync, readFileSync, readSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { tmpdir, userInfo } from 'node:os';
 import { join } from 'node:path';
 
 const fmt = (e) => process.env.ORCH_DEBUG === '2' ? String(e?.stack ?? e) : `${e?.name ?? 'Error'}: ${String(e?.message ?? e).replace(/"[^"]*"/g, '"…"').slice(0, 200)}`;
@@ -156,12 +157,36 @@ function readLevel(marker) {
   try { const s = readFileSync(marker, 'utf8').trim(); return /^[1-9]\d*$/.test(s) ? Number(s) : 1; } catch (e) { dbg(e); return 1; }
 }
 
+// State dir for markers: ORCH_STATE_DIR when set, else a per-user dir under tmpdir. Returns null (fail open) when the dir cannot be used.
+// The ownership/symlink safety check applies to the default per-user dir only; an explicit ORCH_STATE_DIR is trusted as the user's choice.
+function stateDir() {
+  const explicit = process.env.ORCH_STATE_DIR;
+  const tag = String(process.getuid?.() ?? userInfo().username).replace(/[^A-Za-z0-9_-]/g, '');
+  const dir = explicit || join(tmpdir(), `orchestrator-${tag}`);
+  try {
+    mkdirSync(dir, { recursive: true, mode: 0o700 });
+    if (!explicit && process.platform !== 'win32') {
+      const st = lstatSync(dir);
+      if (!st.isDirectory() || st.isSymbolicLink() || (process.getuid && st.uid !== process.getuid())) {
+        dbg(new Error('unsafe state dir ' + dir));
+        return null;
+      }
+    }
+  } catch (e) {
+    dbg(e);
+    return null;
+  }
+  return dir;
+}
+
 function run(input) {
   if (process.env.ORCH_LONG === 'off') return '';
 
   const id = String(input?.session_id ?? '').replace(/[^A-Za-z0-9-]/g, '');
   if (id === '') return '';
-  const marker = join(tmpdir(), `orchestrator-long-${id}`);
+  const dir = stateDir();
+  if (dir === null) return '';
+  const marker = join(dir, `orchestrator-long-${id}`);
   const countPath = `${marker}.count`;
   const path = input?.transcript_path;
   if (typeof path !== 'string' || path === '') return '';

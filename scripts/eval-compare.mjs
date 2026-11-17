@@ -5,7 +5,7 @@
 // --strict (CI): a model mismatch or an EMPTY result exits 2, and any MISSING pair fails (exit 1).
 import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { analyzeTrace, readText } from './trace-tokens.mjs';
+import { analyzeTrace, readText, safeTracePath } from './trace-tokens.mjs';
 
 function fail(msg) {
   process.stdout.write(`EVAL-COMPARE: ERROR ${msg}\n`);
@@ -25,9 +25,9 @@ function loadJson(path) {
 function armTokens(runs, dir) {
   const totals = [];
   for (const run of Array.isArray(runs) ? runs : []) {
-    let text = readText(run?.tracePath);
+    let text = readText(safeTracePath(run?.tracePath));
     if (text == null && typeof run?.tracePath === 'string') {
-      text = readText(join(dir, run.tracePath.split(/[\\/]/).pop()));
+      text = readText(safeTracePath(join(dir, run.tracePath.split(/[\\/]/).pop())));
     }
     const a = analyzeTrace(text);
     if (a && a.sum != null) totals.push(a.sum);
