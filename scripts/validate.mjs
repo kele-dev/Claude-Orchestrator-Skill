@@ -546,8 +546,19 @@ function sessionInfo(cwd, env = {}, raw = false) {
       const last = ledgerLines();
       if (last.length !== 2 || JSON.parse(last[1]).status !== '?') err('hooks/ledger.mjs', 'smoke "no message": expected sonnet-dev line with status "?"');
 
+      const lenient = [
+        ['**STATUS:** SUCCESS', 'SUCCESS'],
+        ['Status: failed', 'FAILED'],
+        ['STATUS: FAILED\nlater\nSTATUS: SUCCESS', 'SUCCESS'],
+      ];
+      for (const [msg, want] of lenient) {
+        runHook('ledger.mjs', payload({ agent_type: 'orchestrator:haiku-coder', agent_id: 'a4', last_assistant_message: msg }), homeEnv);
+        const got = JSON.parse(ledgerLines().at(-1)).status;
+        if (got !== want) err('hooks/ledger.mjs', `smoke "lenient STATUS": ${JSON.stringify(msg)} expected ${want}, got ${got}`);
+      }
+
       const stats = spawnSync(process.execPath, [path.join(root, 'hooks', 'ledger.mjs'), '--stats', store], { encoding: 'utf8', cwd: root, env: { ...process.env, ...homeEnv } });
-      if (stats.stdout.trim() !== 'LEDGER: haiku-coder 1/1 pass, sonnet-dev 0/1 pass') err('hooks/ledger.mjs', `smoke "stats": unexpected output "${stats.stdout.trim()}"`);
+      if (stats.stdout.trim() !== 'LEDGER: haiku-coder 3/4 pass, sonnet-dev 0/0 pass, 1 unknown') err('hooks/ledger.mjs', `smoke "stats": unexpected output "${stats.stdout.trim()}"`);
       const emptyDir = fs.mkdtempSync(path.join(os.tmpdir(), 'orch-ledger-empty-'));
       const none = spawnSync(process.execPath, [path.join(root, 'hooks', 'ledger.mjs'), '--stats', emptyDir], { encoding: 'utf8', cwd: root, env: { ...process.env, ...homeEnv } });
       if (none.stdout.trim() !== 'LEDGER: no delegations') err('hooks/ledger.mjs', 'smoke "stats empty": expected "LEDGER: no delegations"');
