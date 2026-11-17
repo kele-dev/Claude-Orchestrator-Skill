@@ -1,7 +1,7 @@
 # Improvement Backlog
 
 Project: orchestrator (Claude Code plugin, kele-dev marketplace)
-Last updated: 2026-11-17 (cycle 003)
+Last updated: 2026-11-17 (cycle 004)
 
 Scoring: see the improvement-cycle skill `references/scoring.md`. Score = Impact x Confidence / Effort. P0 >= 8.0 (score-based P0 only for Security/Stability/data integrity) or any override, P1 4.0-7.9 (cap for other dimensions without an override), P2 2.0-3.9, P3 < 2.0. New features are capped at P2 unless the user asked for features that cycle.
 
@@ -17,8 +17,8 @@ Scoring: see the improvement-cycle skill `references/scoring.md`. Score = Impact
 | IC-008 | P1 | 6.0 | Security | Edit guard limits undocumented (model can call orchestrator:off, Bash edits uncovered); header says fail open but unreadable transcript denies | hooks/guard-edit.mjs:3,28-29,91-93,142-148 | S | done | 001 |
 | IC-009 | P1 | 6.0 | Security | Eval job exposes ANTHROPIC_API_KEY to an agent with Bash and hides failed AppArmor sysctl with or-true | .github/workflows/eval.yml:64,80,86 | S | done | 002 |
 | IC-010 | P1 | 6.0 | DX/CI-CD/dependencies | validate.yml has no permissions block, actions pinned to mutable tags, no Dependabot (also reported under Security) | .github/workflows/validate.yml:1-20; eval.yml:55,57,72; no .github/dependabot.yml | S | done | 002 |
-| IC-011 | P1 | 6.0 | DX/CI-CD/dependencies | CI runs only Node 20 while README promises Node 18+ and current LTS is untested | .github/workflows/validate.yml:19; eval.yml:39,59; README.md:65,68 | S | deferred | 001 |
-| IC-012 | P1 | 6.0 | UX & accessibility | Indonesian quick-start omits status, budget, init and resume | README.md:135-142 vs README.md:35,41-43; cycle 002: Ringkasan also lacks the Guard limits, Debugging and Guards: active bullets (README.md:68-70) | S | deferred | 001 |
+| IC-011 | P1 | 6.0 | DX/CI-CD/dependencies | CI runs only Node 20 while README promises Node 18+ and current LTS is untested | .github/workflows/validate.yml:19; eval.yml:39,59; README.md:65,68 | S | done | 004 |
+| IC-012 | P1 | 6.0 | UX & accessibility | Indonesian quick-start omits status, budget, init and resume | README.md:135-142 vs README.md:35,41-43; cycle 002: Ringkasan also lacks the Guard limits, Debugging and Guards: active bullets (README.md:68-70) | S | done | 004 |
 | IC-013 | P1 | 6.0 | UX & accessibility | User-visible hook messages are English-only despite reply-in-user-language promise | hooks/long-session.mjs:173,190-193; hooks/guard-edit.mjs:18; README.md:3; hooks/rules.md:12 | S | proposed | 001 |
 | IC-014 | P1 | 6.0 | UX & accessibility | Token and budget symbols (?, UNKNOWN, spent ?) never explained to users | README.md:55,98; skills/on/modes.md:10; scripts/budget.mjs:134-135 | S | proposed | 001 |
 | IC-015 | P1 | 6.0 | UX & accessibility | status delegation count omits opus-planner | skills/status/SKILL.md:18; agents/opus-planner.md | S | proposed | 001 |
@@ -60,7 +60,7 @@ Scoring: see the improvement-cycle skill `references/scoring.md`. Score = Impact
 | IC-051 | P0 | 9.0 | Stability | budget.mjs --mark prints `mark 0` when the transcript is unreadable, so later spend covers the whole session | scripts/budget.mjs:72-76 | S | done | 003 |
 | IC-052 | P1 | 6.0 | Stability | budget.mjs auto picks the newest jsonl, which can be a parallel session or a parent project's transcript, with no warning | scripts/budget.mjs:11-37,72 | S | done | 003 |
 | IC-053 | P1 | 9.0 | DX/CI-CD/dependencies | eval-compare prints PASS when nothing was measured (all SKIP/NEW, model mismatch exits 0, missing arms unreported) | scripts/eval-compare.mjs:98-120 | S | done | 003 |
-| IC-054 | P1 | 6.0 | Observability & ops | budget/trace-tokens drop the failure cause and resolved file on unreadable transcripts | scripts/budget.mjs:85,140; scripts/trace-tokens.mjs:15-17,218-222 | S | deferred | 003 |
+| IC-054 | P1 | 6.0 | Observability & ops | budget/trace-tokens drop the failure cause and resolved file on unreadable transcripts | scripts/budget.mjs:85,140; scripts/trace-tokens.mjs:15-17,218-222 | S | done | 004 |
 | IC-055 | P2 | 3.0 | Performance | readTranscript loads the whole file even with --from; digest reads all for the last 60 messages | scripts/transcript.mjs:7-10; scripts/digest.mjs:16-17 | M | proposed | 003 |
 | IC-056 | P1 | 4.0 | Security | eval-compare and trace-tokens read tracePath from result JSON without confining it to the results folder | scripts/trace-tokens.mjs:190,205; scripts/eval-compare.mjs:16,51 | S | proposed | 003 |
 | IC-057 | P1 | 4.0 | DX/CI-CD/dependencies | validate.yml has no timeout-minutes or concurrency on a 3-OS matrix | .github/workflows/validate.yml:11-20 | S | proposed | 003 |
@@ -76,7 +76,7 @@ Scoring: see the improvement-cycle skill `references/scoring.md`. Score = Impact
 | IC-067 | P1 | 6.0 | UX & accessibility | --dry-run stops after an undefined "stage" and never defines how to continue | skills/team/SKILL.md:19; skills/autopilot/SKILL.md:19 | S | proposed | 003 |
 | IC-068 | P1 | 6.0 | UX & accessibility | README install/update/uninstall lacks prerequisites (Node 18+, git 2.31+, bash), restart and store cleanup notes | README.md:8-29,46,65,70 | S | proposed | 003 |
 | IC-069 | P1 | 6.0 | UX & accessibility | Short-path file limit is <=2 in on/SKILL.md but 1 for non-Opus elsewhere | skills/on/SKILL.md:21; skills/on/non-opus.md:4; README.md:157 | S | proposed | 003 |
-| IC-070 | P2 | 2.0 | UX & accessibility | Budget rule in modes.md is one ~250-word bullet | skills/on/modes.md:10 | M | proposed | 003 |
+| IC-070 | P1 | 4.5 | UX & accessibility | Budget rule in modes.md is one ~250-word bullet that contradicts itself (never sum notices vs sum notices), gives UNKNOWN no action, uses three stop wordings, and tells the model to pass an unquoted `?` (shell glob) | skills/on/modes.md:10; skills/autopilot/SKILL.md:44; README.md:35; scripts/budget.mjs:151 | M | done | 004 |
 | IC-071 | P2 | 3.0 | UX & accessibility | Ideas doc says open: none while ideas 13-17 are open | docs/ideas/token-saving.md:3,46-53 | S | proposed | 003 |
 | IC-072 | P2 | 3.0 | New features | Proposal: read guard for large whole-file main-session reads (idea 14) | docs/ideas/token-saving.md:49 | M | proposed | 003 |
 | IC-073 | P2 | 2.0 | New features | Proposal: trim statistics row in status (idea 15) | docs/ideas/token-saving.md:50; skills/status/SKILL.md:12-26 | M | proposed | 003 |
@@ -88,8 +88,16 @@ Scoring: see the improvement-cycle skill `references/scoring.md`. Score = Impact
 | IC-079 | P1 | 6.0 | Code quality & tests | Untested branches in eval-compare, trace-tokens, transcript; MAIN assertion accepts any output | scripts/eval-compare.mjs:84-87,98,109-110; scripts/trace-tokens.mjs:140,209-210; scripts/transcript.mjs:12; scripts/validate.mjs:786 | S | proposed | 003 |
 | IC-080 | P2 | 3.0 | DX/CI-CD/dependencies | README says CI runs on every push; it runs on main pushes and PRs only | README.md:173; .github/workflows/validate.yml:4-6 | S | proposed | 003 |
 | IC-081 | P1 | 4.0 | DX/CI-CD/dependencies | Eval CI pins Claude Code 2.1.318 while trace fields were measured on 2.1.317 | .github/workflows/eval.yml:47; evals/README.md:52 | S | proposed | 003 |
-| IC-082 | P1 | 6.0 | DX/CI-CD/dependencies | .gitignore misses evals/ci-result.json (token and cost data) | .gitignore:1; evals/README.md:34 | S | deferred | 003 |
+| IC-082 | P1 | 6.0 | DX/CI-CD/dependencies | .gitignore misses evals/ci-result.json (token and cost data) | .gitignore:1; evals/README.md:34 | S | done | 004 |
 | IC-083 | P1 | 6.0 | Code quality & tests | Script CLIs mishandle bad args (unguarded --write, --limit 0, --last 0, unknown flags) | scripts/eval-compare.mjs:4,88; scripts/budget.mjs:80-81; scripts/digest.mjs:11; scripts/trace-tokens.mjs:162 | S | proposed | 003 |
+| IC-084 | P1 | 6.0 | DX/CI-CD/dependencies | eval-compare still exits 0 on EMPTY, model SKIP and MISSING pairs, so the CI gate stays green (regression of IC-053, partial); proposal: --strict and a verdict file | scripts/eval-compare.mjs:98-100,129-131; .github/workflows/eval.yml:64,69-71; evals/README.md:110 | S | done | 004 |
+| IC-085 | P1 | 9.0 | UX & accessibility | Autopilot FINAL CHECK FAILED has no owner, brief or cap counter, and team has no final-check outcome (extends IC-062) | skills/autopilot/SKILL.md:40; skills/on/modes.md:13-14; skills/team/SKILL.md:55-56 | S | done | 004 |
+| IC-086 | P1 | 6.0 | DX/CI-CD/dependencies | Always-loaded context headroom is 801 B again and the budget comment lacks 1.13.0 (regression of IC-046) | scripts/validate.mjs:215-217; LF bytes hooks/rules.md 3041 + skills/on/SKILL.md 10658 = 13699 vs 14500 | S | done | 004 |
+| IC-087 | P1 | 6.0 | UX & accessibility | 1.13.0 release notes: Indonesian line omits half the changes and English overstates budget auto (outside git it still walks to root) | README.md:76-81,182; scripts/budget.mjs:42-43 | S | done | 004 |
+| IC-088 | P1 | 4.0 | Observability & ops | budget auto stderr line pollutes 2>&1 output before the offset and exposes the home path | scripts/budget.mjs (process.stderr.write in main); skills/on/modes.md:10 | S | deferred | 004 |
+| IC-089 | P1 | 4.0 | UX & accessibility | Progress line has undefined name placeholders, no delegation counter source and no states for DONE/BUDGET | skills/on/modes.md:12 | S | proposed | 004 |
+| IC-090 | P2 | 2.0 | Stability | budget auto git top-level cutoff may miss a transcript of a session launched above the repo (needs investigation) | scripts/budget.mjs:26-45 | S | proposed | 004 |
+| IC-091 | P3 | 1.0 | Performance | budget auto spawns git on every call | scripts/budget.mjs:26-33 | S | proposed | 004 |
 
 ## Status legend
 
