@@ -1,7 +1,7 @@
 # Improvement Backlog
 
 Project: orchestrator (Claude Code plugin, kele-dev marketplace)
-Last updated: 2026-11-17 (cycle 002)
+Last updated: 2026-11-17 (cycle 003)
 
 Scoring: see the improvement-cycle skill `references/scoring.md`. Score = Impact x Confidence / Effort. P0 >= 8.0 (score-based P0 only for Security/Stability/data integrity) or any override, P1 4.0-7.9 (cap for other dimensions without an override), P2 2.0-3.9, P3 < 2.0. New features are capped at P2 unless the user asked for features that cycle.
 
@@ -39,7 +39,7 @@ Scoring: see the improvement-cycle skill `references/scoring.md`. Score = Impact
 | IC-030 | P2 | 2.0 | Stability | guard-review PRD_PATH regex may go quadratic on long path-like prompts (needs investigation) | hooks/guard-review.mjs:158,189 | S | proposed | 001 |
 | IC-031 | P2 | 2.0 | Observability & ops | rules hook depends on cat and hooks on node PATH with no failure signal | hooks/hooks.json:8 | S | proposed | 001 |
 | IC-032 | P2 | 2.0 | Performance | Every Bash/Edit tool call spawns Node (~70-80 ms measured) | hooks/hooks.json:22-27,44-50; measured node -e 0 65-75 ms | M | proposed | 001 |
-| IC-033 | P2 | 2.0 | UX & accessibility | Windows Git Bash instruction gives no default path or fallback | skills/on/SKILL.md:30; skills/init/SKILL.md:37 | M | proposed | 001 |
+| IC-033 | P2 | 2.0 | UX & accessibility | Windows Git Bash instruction gives no default path or fallback | skills/on/SKILL.md:30; skills/init/SKILL.md:37; cycle 003 proposal: generate verify.ps1 when bash is missing (skills/init/SKILL.md:37) | M | proposed | 001 |
 | IC-034 | P2 | 2.0 | New features | Proposal: in-plugin help command and changelogs moved out of README | skills/ (no help); README.md:31-46,71-117,143-166 | M | proposed | 001 |
 | IC-035 | P2 | 2.0 | New features | Proposal: store key from repo identity instead of truncated path | hooks/session-info.mjs:52; skills/learn/reference.md:12; docs/ideas/token-saving.md:52 | M | proposed | 001 |
 | IC-036 | P3 | 1.0 | Stability | long-session marker and cache writes are non-atomic | hooks/long-session.mjs:132,148,172,184 | S | proposed | 001 |
@@ -57,6 +57,39 @@ Scoring: see the improvement-cycle skill `references/scoring.md`. Score = Impact
 | IC-048 | P1 | 4.0 | Stability | New smoke tests write ~3 MB of temp fixtures with unguarded cleanup and a tmpdir scan in finally | scripts/validate.mjs section 8a2/8a3 finally blocks | S | proposed | 002 |
 | IC-049 | P3 | 1.0 | Performance | validate.mjs gained ~15 child spawns per run (estimate, unmeasured) | scripts/validate.mjs:461-616 | S | proposed | 002 |
 | IC-050 | P3 | 1.0 | New features | Proposal: ORCH_DEBUG writes to a debug log file because hook stderr on exit 0 is not shown in chat | README.md:69 | M | proposed | 002 |
+| IC-051 | P0 | 9.0 | Stability | budget.mjs --mark prints `mark 0` when the transcript is unreadable, so later spend covers the whole session | scripts/budget.mjs:72-76 | S | done | 003 |
+| IC-052 | P1 | 6.0 | Stability | budget.mjs auto picks the newest jsonl, which can be a parallel session or a parent project's transcript, with no warning | scripts/budget.mjs:11-37,72 | S | done | 003 |
+| IC-053 | P1 | 9.0 | DX/CI-CD/dependencies | eval-compare prints PASS when nothing was measured (all SKIP/NEW, model mismatch exits 0, missing arms unreported) | scripts/eval-compare.mjs:98-120 | S | done | 003 |
+| IC-054 | P1 | 6.0 | Observability & ops | budget/trace-tokens drop the failure cause and resolved file on unreadable transcripts | scripts/budget.mjs:85,140; scripts/trace-tokens.mjs:15-17,218-222 | S | deferred | 003 |
+| IC-055 | P2 | 3.0 | Performance | readTranscript loads the whole file even with --from; digest reads all for the last 60 messages | scripts/transcript.mjs:7-10; scripts/digest.mjs:16-17 | M | proposed | 003 |
+| IC-056 | P1 | 4.0 | Security | eval-compare and trace-tokens read tracePath from result JSON without confining it to the results folder | scripts/trace-tokens.mjs:190,205; scripts/eval-compare.mjs:16,51 | S | proposed | 003 |
+| IC-057 | P1 | 4.0 | DX/CI-CD/dependencies | validate.yml has no timeout-minutes or concurrency on a 3-OS matrix | .github/workflows/validate.yml:11-20 | S | proposed | 003 |
+| IC-058 | P1 | 4.0 | Security | Executor agents have Bash+Write with no path limit and read-only planner/reviewer have Bash; no hook checks shell writes | agents/haiku-coder.md:4; agents/sonnet-dev.md:4; agents/opus-planner.md:4; agents/opus-reviewer.md:4; hooks/hooks.json:19-30 | S | proposed | 003 |
+| IC-059 | P2 | 2.0 | Observability & ops | Eval workflow cannot tell a failed run from no baseline; artifact upload ignores missing files | .github/workflows/eval.yml:67-73 | S | proposed | 003 |
+| IC-060 | P1 | 9.0 | UX & accessibility | Autopilot says any BLOCKED batch ends the run but also that only dependent batches are skipped | skills/autopilot/SKILL.md:16,38,40 | S | done | 003 |
+| IC-061 | P1 | 9.0 | UX & accessibility | team and autopilot runs show no progress line per wave or batch | skills/team/SKILL.md:41; skills/autopilot/SKILL.md:36; skills/on/modes.md:11 | S | done | 003 |
+| IC-062 | P1 | 9.0 | UX & accessibility | Autopilot has no path when every batch passes but the final project check fails | skills/autopilot/SKILL.md:38-43; skills/on/modes.md:12 | S | done | 003 |
+| IC-063 | P1 | 9.0 | UX & accessibility | Non-Opus reviewer rule: autopilot says never per batch, non-opus.md/reference.md say final or batch diff | skills/autopilot/SKILL.md:18; skills/on/non-opus.md:5; skills/on/reference.md:29; agents/opus-reviewer.md:3 | S | done | 003 |
+| IC-064 | P1 | 6.0 | UX & accessibility | init has no path for a failed Haiku pass or zero verified commands; report omits store path and --refresh | skills/init/SKILL.md:16-17,33,37,40-42 | S | proposed | 003 |
+| IC-065 | P1 | 6.0 | UX & accessibility | learn promises "say remove that" but has no remove command | skills/learn/SKILL.md:4,35; skills/learn/reference.md:14-17 | S | proposed | 003 |
+| IC-066 | P2 | 3.0 | UX & accessibility | isolate=worktree precondition worded differently in README and team skill | README.md:37; skills/team/SKILL.md:21 | S | proposed | 003 |
+| IC-067 | P1 | 6.0 | UX & accessibility | --dry-run stops after an undefined "stage" and never defines how to continue | skills/team/SKILL.md:19; skills/autopilot/SKILL.md:19 | S | proposed | 003 |
+| IC-068 | P1 | 6.0 | UX & accessibility | README install/update/uninstall lacks prerequisites (Node 18+, git 2.31+, bash), restart and store cleanup notes | README.md:8-29,46,65,70 | S | proposed | 003 |
+| IC-069 | P1 | 6.0 | UX & accessibility | Short-path file limit is <=2 in on/SKILL.md but 1 for non-Opus elsewhere | skills/on/SKILL.md:21; skills/on/non-opus.md:4; README.md:157 | S | proposed | 003 |
+| IC-070 | P2 | 2.0 | UX & accessibility | Budget rule in modes.md is one ~250-word bullet | skills/on/modes.md:10 | M | proposed | 003 |
+| IC-071 | P2 | 3.0 | UX & accessibility | Ideas doc says open: none while ideas 13-17 are open | docs/ideas/token-saving.md:3,46-53 | S | proposed | 003 |
+| IC-072 | P2 | 3.0 | New features | Proposal: read guard for large whole-file main-session reads (idea 14) | docs/ideas/token-saving.md:49 | M | proposed | 003 |
+| IC-073 | P2 | 2.0 | New features | Proposal: trim statistics row in status (idea 15) | docs/ideas/token-saving.md:50; skills/status/SKILL.md:12-26 | M | proposed | 003 |
+| IC-074 | P1 | 9.0 | Code quality & tests | budget UNDER and UNKNOWN verdicts are never asserted | scripts/budget.mjs:133-136; scripts/validate.mjs:766-776 | S | done | 003 |
+| IC-075 | P1 | 6.0 | Code quality & tests | trace-tokens lacks the tracePath basename fallback that eval-compare has | scripts/trace-tokens.mjs:178,193; scripts/eval-compare.mjs:27-29 | S | proposed | 003 |
+| IC-076 | P1 | 6.0 | DX/CI-CD/dependencies | evals README says guard-review enforces reviewer-after-PRD order; it only checks the PRD exists | evals/README.md:26; hooks/guard-review.mjs:32-45 | S | proposed | 003 |
+| IC-077 | P1 | 6.0 | Code quality & tests | Weak checkpoint grader still counts toward autopilot-budget-stop pass rate | evals/autopilot-budget-stop/graders/checkpoint.md:1-5; evals/README.md:96 | S | proposed | 003 |
+| IC-078 | P1 | 4.5 | Code quality & tests | Validator skips nested grader keys and never checks grader enums or min/max | scripts/validate.mjs:38-40,972-975 | M | proposed | 003 |
+| IC-079 | P1 | 6.0 | Code quality & tests | Untested branches in eval-compare, trace-tokens, transcript; MAIN assertion accepts any output | scripts/eval-compare.mjs:84-87,98,109-110; scripts/trace-tokens.mjs:140,209-210; scripts/transcript.mjs:12; scripts/validate.mjs:786 | S | proposed | 003 |
+| IC-080 | P2 | 3.0 | DX/CI-CD/dependencies | README says CI runs on every push; it runs on main pushes and PRs only | README.md:173; .github/workflows/validate.yml:4-6 | S | proposed | 003 |
+| IC-081 | P1 | 4.0 | DX/CI-CD/dependencies | Eval CI pins Claude Code 2.1.318 while trace fields were measured on 2.1.317 | .github/workflows/eval.yml:47; evals/README.md:52 | S | proposed | 003 |
+| IC-082 | P1 | 6.0 | DX/CI-CD/dependencies | .gitignore misses evals/ci-result.json (token and cost data) | .gitignore:1; evals/README.md:34 | S | deferred | 003 |
+| IC-083 | P1 | 6.0 | Code quality & tests | Script CLIs mishandle bad args (unguarded --write, --limit 0, --last 0, unknown flags) | scripts/eval-compare.mjs:4,88; scripts/budget.mjs:80-81; scripts/digest.mjs:11; scripts/trace-tokens.mjs:162 | S | proposed | 003 |
 
 ## Status legend
 
