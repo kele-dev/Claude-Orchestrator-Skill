@@ -48,7 +48,7 @@ After writing a checkpoint because the session is long, or at a stop the user wi
 - No checkpoints found: say so in one line, search no further, and offer to start the task fresh with `orchestrator:on`.
 - Verify cheaply: current branch matches, `git log --oneline -5`, `git status --porcelain`. Then `git fetch -q` and `git log --oneline <recorded base or last verified commit>..origin/<main branch>`: if new commits there touch files the checkpoint names (`git diff --stat <that commit> origin/<main branch>`), say in max 3 lines which plan items may already be done, and ask before continuing.
 - Trust PASS items unless git contradicts them.
-- Do not re-plan and do not re-read the project. Continue at Next step. If the recorded mode is team or autopilot, those modes are user-invoked only: do not continue in that mode; tell the user in one line to run `/orchestrator:team ...` or `/orchestrator:autopilot ...` with the remaining task and caps from the checkpoint. Otherwise continue in `on`.
+- Do not re-plan and do not re-read the project. Continue at Next step. If the recorded mode is team or autopilot, those modes are user-invoked only: do not continue in that mode; tell the user in one line to run the exact `/orchestrator:team` or `/orchestrator:autopilot` command with the remaining task and every recorded argument from the checkpoint (caps, commit=batch, budget, isolate), in its own `text` code block (never a shell block), like the resume command above. Otherwise continue in `on`.
 - If git contradicts the checkpoint, report the mismatch in max 3 lines and ask.
 
 ## Finishing
