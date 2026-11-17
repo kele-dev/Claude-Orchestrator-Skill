@@ -7,6 +7,8 @@ import { closeSync, existsSync, openSync, readFileSync, readSync, rmSync, statSy
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+const dbg = (e) => { if (process.env.ORCH_DEBUG === '1') process.stderr.write(`orchestrator long-session: ${e?.stack ?? e}\n`); };
+
 let raw = '';
 process.stdin.setEncoding('utf8');
 process.stdin.on('data', (d) => { raw += d; });
@@ -16,7 +18,7 @@ process.stdin.on('end', () => {
     if (out) process.stdout.write(out + '\n');
   } catch (e) {
     // fail open
-    if (process.env.ORCH_DEBUG === '1') process.stderr.write(`orchestrator long-session: ${e?.stack ?? e}\n`);
+    dbg(e);
   }
 });
 
@@ -79,7 +81,8 @@ function contextGrowth(path, size) {
     } finally {
       closeSync(fd);
     }
-  } catch {
+  } catch (e) {
+    dbg(e);
     return null;
   }
 }
@@ -91,7 +94,8 @@ function countDelegations(path, size, cachePath) {
   try {
     const c = JSON.parse(readFileSync(cachePath, 'utf8'));
     if (Number.isInteger(c?.offset) && Number.isInteger(c?.count) && c.offset >= 0 && c.count >= 0 && c.offset <= size) cache = c;
-  } catch {
+  } catch (e) {
+    dbg(e);
     // missing or invalid cache: start from zero
   }
   let next;
@@ -126,12 +130,14 @@ function countDelegations(path, size, cachePath) {
       count += content.filter((p) => p?.type === 'tool_use' && (p.name === 'Agent' || p.name === 'Task')).length;
     }
     next = { offset: cache.offset + lastNL + 1, count };
-  } catch {
+  } catch (e) {
+    dbg(e);
     return cache.count;
   }
   try {
     writeFileSync(cachePath, JSON.stringify(next));
-  } catch {
+  } catch (e) {
+    dbg(e);
     // ignore cache write errors
   }
   return next.count;
@@ -146,7 +152,7 @@ function repeatLevels(v, first) {
 }
 // Highest warning level already shown (marker content); an empty or invalid marker (older versions) counts as 1.
 function readLevel(marker) {
-  try { const s = readFileSync(marker, 'utf8').trim(); return /^[1-9]\d*$/.test(s) ? Number(s) : 1; } catch { return 1; }
+  try { const s = readFileSync(marker, 'utf8').trim(); return /^[1-9]\d*$/.test(s) ? Number(s) : 1; } catch (e) { dbg(e); return 1; }
 }
 
 function run(input) {
@@ -185,7 +191,8 @@ function run(input) {
   writeFileSync(marker, String(g ? Math.max(1, level) : levels.length));
   try {
     rmSync(countPath, { force: true });
-  } catch {
+  } catch (e) {
+    dbg(e);
     // ignore cleanup errors
   }
   const tail = ' Write a checkpoint per orchestrator:resume and hand off per orchestrator:resume (summary plus a new-session card running /orchestrator:resume <slug>).';
