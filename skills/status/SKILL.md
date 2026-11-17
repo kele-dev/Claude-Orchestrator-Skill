@@ -18,7 +18,7 @@ disable-model-invocation: true
 - Legacy: flag if `<main>/.claude/skills/learned-*/SKILL.md` or the legacy checkpoints exist, and suggest per `legacy.md` (`orchestrator:learn` folder; only if legacy files exist).
 - Session: delegations so far per agent (haiku-coder, sonnet-dev, opus-planner, opus-reviewer), counted from this conversation; "unknown" after a compaction.
 - Main-session tokens: run `node "${CLAUDE_PLUGIN_ROOT}/scripts/budget.mjs" auto --main` (fall back to the plugin root used for the version) and show its MAIN line as one row; sub-agent total: same command without --main.
-- Delegation ledger: run `node "${CLAUDE_PLUGIN_ROOT}/hooks/ledger.mjs" --stats "<store>"` and show its LEDGER line as one row (pass rate per tier from <store>/delegations.jsonl, written by the SubagentStop hook).
+- Delegation ledger: run `node "${CLAUDE_PLUGIN_ROOT}/hooks/ledger.mjs" --stats "<store>"` and show its LEDGER line as one row (pass rate per tier from <store>/delegations.jsonl, written by the SubagentStop hook; unknown = no STATUS line found, not counted as a failure).
 
 ## Caps
 - Show the defaults and ceilings from `caps.md` in this skill's folder (it mirrors the `## Budget` bullets of `team` and `autopilot`; read those only if `caps.md` is missing); never restate numbers from memory. A cap the user sets (`lanes=N`, `batches=N`) is never raised.
