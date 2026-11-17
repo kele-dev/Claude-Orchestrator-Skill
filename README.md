@@ -70,6 +70,9 @@ Orchestration mode is active automatically in every session. Manual commands:
 
 ## What's new (1.9.0 and later)
 
+### 1.12.2
+- Slash commands for the user go in text blocks, never shell blocks (Run button ran them in PowerShell).
+
 ### 1.12.1
 - Short-path review rules apply only to non-Opus main sessions; the review guard accepts absolute and quoted PRD paths with spaces.
 - Session start prints `Map: none` when the project has no learned-map, so Claude suggests `/orchestrator:init` first.
@@ -164,6 +167,7 @@ If you previously installed via `install.ps1`, delete `haiku-coder.md`, `sonnet-
 - Baru di 1.11.1: saat sesi panjang atau tugas berhenti, Claude menulis checkpoint, memberi ringkasan maks 5 baris, lalu langsung menawarkan card sesi baru yang menjalankan `/orchestrator:resume <slug>` (bila tool sesi tersedia, mis. desktop app); selain itu perintahnya dicetak untuk dijalankan di sesi baru.
 - Baru di 1.12.0: aturan dipisah (aturan non-Opus di `non-opus.md`, aturan token situasional di `reference.md` dibaca bila perlu), validator punya batas ukuran konteks, `scripts/eval-compare.mjs` membandingkan token eval dengan baseline (jadwal CI opsional; baseline belum di-commit, jadi langkah compare di CI tetap nonaktif sampai pemilik repo menjalankan eval dan meng-commit output `--write`), dan checkpoint basi ditandai sesuai `ORCH_STALE_DAYS` (default 14).
 - Baru di 1.12.1: aturan jalur pendek hanya berlaku untuk sesi utama non-Opus dan guard review menerima path PRD absolut atau berkutip yang berspasi; sesi dimulai dengan `Map: none` bila learned-map belum ada sehingga Claude menyarankan `/orchestrator:init` dulu; trim output hanya memotong perintah baca, listing, dan cari di atas 300 baris; dan `scripts/budget.mjs --main` melaporkan pemakaian token sesi utama (panggilan, cache baca/tulis, output, konteks saat ini) yang ditampilkan `/orchestrator:status`.
+- Baru di 1.12.2: perintah slash untuk pengguna ditaruh di blok teks, tidak pernah di blok shell (tombol Run menjalankannya di PowerShell).
 - Mode orkestrasi aktif otomatis di setiap sesi.
 
 ## Maintainers

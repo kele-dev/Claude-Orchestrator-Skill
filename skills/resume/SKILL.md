@@ -26,7 +26,7 @@ Arguments: $ARGUMENTS
 After writing a checkpoint because the session is long, or at a stop the user will continue later:
 - Summary, max 5 lines: task, what is done (PASS items, commit, PR), what is open, next step.
 - If a tool that starts a new session is available (e.g. the desktop app's `start_session`), offer it right away as a card the user starts (fresh context, short title, prompt `/orchestrator:resume <slug>`); never start it yourself.
-- Otherwise print `/orchestrator:resume <slug>` in its own code block, to run in a new session.
+- Otherwise print `/orchestrator:resume <slug>` in its own `text` code block (never `bash`/`sh`/`powershell`: a Run button would send it to the shell) and tell the user to open a new session and type it in its chat box.
 - Task DONE (no checkpoint): no card; at most suggest a new session in one line.
 
 ## Content (max 40 lines)
