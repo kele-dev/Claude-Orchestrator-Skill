@@ -214,7 +214,8 @@ for (const [f, h] of headingChecks) {
 // Raising it is a deliberate decision: state the release and reason in this comment.
 // v1.12.0: measured 13146 B after the non-opus.md / situational split, plus about 1 KB headroom.
 // v1.12.1 (improvement cycle 002): measured 13320 B after the ask-first and chat-commit rule edits; raised to 14500 B to restore about 1 KB headroom.
-const CONTEXT_BUDGET_BYTES = 14500;
+// v1.13.0: measured 13699 B after the slash-command rule in hooks/rules.md (PR #18); raised to 14700 B to keep about 1 KB headroom.
+const CONTEXT_BUDGET_BYTES = 14700;
 const lfBytes = (t) => Buffer.byteLength(t.replace(/\r\n/g, '\n'));
 if (exists(path.join(root, 'hooks/rules.md')) && exists(path.join(root, 'skills/on/SKILL.md'))) {
   const n = lfBytes(readText(path.join(root, 'hooks/rules.md'))) + lfBytes(readText(path.join(root, 'skills/on/SKILL.md')));
