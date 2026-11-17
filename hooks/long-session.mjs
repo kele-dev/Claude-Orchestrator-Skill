@@ -157,13 +157,15 @@ function readLevel(marker) {
   try { const s = readFileSync(marker, 'utf8').trim(); return /^[1-9]\d*$/.test(s) ? Number(s) : 1; } catch (e) { dbg(e); return 1; }
 }
 
-// State dir for markers: ORCH_STATE_DIR when set, else a per-user dir under tmpdir. Returns null (fail open) when the dir is unsafe.
+// State dir for markers: ORCH_STATE_DIR when set, else a per-user dir under tmpdir. Returns null (fail open) when the dir cannot be used.
+// The ownership/symlink safety check applies to the default per-user dir only; an explicit ORCH_STATE_DIR is trusted as the user's choice.
 function stateDir() {
+  const explicit = process.env.ORCH_STATE_DIR;
   const tag = String(process.getuid?.() ?? userInfo().username).replace(/[^A-Za-z0-9_-]/g, '');
-  const dir = process.env.ORCH_STATE_DIR || join(tmpdir(), `orchestrator-${tag}`);
+  const dir = explicit || join(tmpdir(), `orchestrator-${tag}`);
   try {
     mkdirSync(dir, { recursive: true, mode: 0o700 });
-    if (process.platform !== 'win32') {
+    if (!explicit && process.platform !== 'win32') {
       const st = lstatSync(dir);
       if (!st.isDirectory() || st.isSymbolicLink() || (process.getuid && st.uid !== process.getuid())) {
         dbg(new Error('unsafe state dir ' + dir));
