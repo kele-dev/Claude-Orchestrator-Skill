@@ -23,5 +23,5 @@ disable-model-invocation: true
 - Show the defaults and ceilings from `caps.md` in this skill's folder (it mirrors the `## Budget` bullets of `team` and `autopilot`; read those only if `caps.md` is missing); never restate numbers from memory. A cap the user sets (`lanes=N`, `batches=N`) is never raised.
 
 ## Report
-- One table `Item | Value`, max 12 rows, then at most 2 suggestion lines (init / resume / legacy).
+- One table `Item | Value`, max 16 rows (put the caps in one row if more are needed), then at most 2 suggestion lines (init / resume / legacy).
 - No preamble. Reply in the user's language.
