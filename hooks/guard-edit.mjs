@@ -13,12 +13,14 @@ process.stdin.setEncoding('utf8');
 process.stdin.on('data', (d) => { raw += d; });
 process.stdin.on('end', () => {
   try {
-    if (shouldDeny(JSON.parse(raw))) {
+    const input = JSON.parse(raw);
+    if (shouldDeny(input)) {
+      const target = input.tool_input?.file_path ?? input.tool_input?.notebook_path;
       process.stdout.write(JSON.stringify({
         hookSpecificOutput: {
           hookEventName: 'PreToolUse',
           permissionDecision: 'deny',
-          permissionDecisionReason: 'orchestrator: the main session must not edit project files. Delegate this change to orchestrator:haiku-coder. docs/prd/ is writable: the main session may Write/Edit PRD files there itself (e.g. a PRD from orchestrator:opus-planner). /orchestrator:off disables this guard.',
+          permissionDecisionReason: `orchestrator: the main session must not edit ${target} (project file). Delegate this change to orchestrator:haiku-coder. docs/prd/ is writable: the main session may Write/Edit PRD files there itself (e.g. a PRD from orchestrator:opus-planner). /orchestrator:off disables this guard. Set ORCH_GUARD=off to bypass.`,
         },
       }));
     }
