@@ -1,7 +1,7 @@
 ---
 name: learn
 description: "Saves and maintains reusable orchestrator lessons (verify commands, failure causes, brief pitfalls, conventions) in the per-project store. Use at the end of a task, on /orchestrator:learn, or when the user says remember this."
-argument-hint: "[list | add <lesson> | prune]"
+argument-hint: "[list | add <lesson> | remove <lesson or line> | prune]"
 ---
 
 # Project lessons
