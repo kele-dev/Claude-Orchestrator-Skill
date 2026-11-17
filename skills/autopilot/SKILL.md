@@ -13,7 +13,7 @@ Autopilot is `orchestrator:on` without stopping between batches (the main sessio
 
 ## Budget (defaults; the user may override them in the arguments, e.g. `batches=8`)
 - Clarification: one round only, at most 3 questions, asked at the start and only if the answers would change the design. Otherwise decide yourself and record the assumptions in the PRD.
-- Max batches: 5, raised automatically up to 8: if the plan, or work discovered on the way, needs more than 5, continue without asking, but only while every finished batch passed. Any BLOCKED batch ends the extension. If more are needed past the cap, report and ask whether to continue.
+- Max batches: 5, raised automatically up to 8: if the plan, or work discovered on the way, needs more than 5, continue without asking, but only while every finished batch passed. Any BLOCKED batch ends the automatic raise (the cap stays where it is). If more are needed past the cap, report and ask whether to continue.
 - Max fix rounds per batch: 2, raised automatically up to 4 (see `modes.md`).
 - `opus-reviewer`: at most once on the PRD and once on the final diff, and only for large work (>5 tasks, or touches schema/auth/security). Never per batch. Not Opus-class: the `orchestrator:on` reviewer rules (PRD before the first delegation, final diff) apply whatever the size.
 - `--dry-run`: stop after stage 2 and show the PRD and batch plan.
@@ -37,7 +37,7 @@ Ask the questions (if any) in one go. After the answers, do not ask again until 
 
 ## 4. STOP conditions (the only times you stop or ask)
 - DONE: all batches pass and the final project-level check (full test/build/lint, if any) passes.
-- BLOCKED: a batch hit its fix cap. Do not start later batches that depend on it; report.
+- BLOCKED: a batch hit its fix cap. Skip later batches that depend on it, finish the independent ones, then stop and report with status BLOCKED.
 - DECISION NEEDED: an architecture decision or user input that cannot be safely assumed. Stop and ask.
 - BATCH LIMIT: the batch cap was reached with work left. Report and ask whether to continue.
 - BUDGET: budget=<N>k reached; checkpoint and report per modes.md (Budget).
