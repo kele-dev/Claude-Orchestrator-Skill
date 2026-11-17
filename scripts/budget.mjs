@@ -2,6 +2,7 @@
 // Sum sub-agent token usage from a Claude Code transcript (JSONL), or main-session usage with --main. Always exits 0.
 // Usage: node scripts/budget.mjs <transcript.jsonl|auto> [--mark] [--main] [--from <bytes>] [--limit <N>k]
 import { statSync, readdirSync, realpathSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import os from 'node:os';
 import path from 'node:path';
 import { readTranscript, entries } from './transcript.mjs';
@@ -21,16 +22,24 @@ function newestJsonl(dir) {
   return best;
 }
 
-// Newest *.jsonl of this project's transcript dir: cwd (and its realpath), then each parent up to root.
-// undefined if nothing found (treated as unreadable).
+// Newest *.jsonl of this project's transcript dir: cwd (and its realpath), then each parent up to the
+// git top level of cwd (stops after checking it; compared case-insensitively on win32/darwin), or up to
+// root when git fails. undefined if nothing found (treated as unreadable).
 function newestTranscript() {
   const base = process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), '.claude');
+  let top;
+  try {
+    top = path.resolve(execFileSync('git', ['rev-parse', '--show-toplevel'], { stdio: ['ignore', 'pipe', 'ignore'], encoding: 'utf8', timeout: 3000 }).trim());
+  } catch { top = undefined; }
+  const fold = process.platform === 'win32' || process.platform === 'darwin';
+  const same = (a, b) => (fold ? a.toLowerCase() === b.toLowerCase() : a === b);
   const starts = [process.cwd()];
   try { const real = realpathSync(process.cwd()); if (real !== starts[0]) starts.push(real); } catch { /* cwd only */ }
   for (const start of starts) {
     for (let dir = start; ; dir = path.dirname(dir)) {
       const found = newestJsonl(path.join(base, 'projects', dir.replace(/[^A-Za-z0-9]/g, '-')));
       if (found) return found;
+      if (top !== undefined && same(path.resolve(dir), top)) break;
       if (path.dirname(dir) === dir) break;
     }
   }
@@ -69,7 +78,10 @@ function main() {
     return args[i].includes('=') ? args[i].slice(name.length + 1) : args[i + 1];
   };
   let file = args.find((a, i) => !a.startsWith('--') && args[i - 1] !== '--from' && args[i - 1] !== '--limit');
-  if (file === 'auto') file = newestTranscript();
+  if (file === 'auto') {
+    file = newestTranscript();
+    if (file) process.stderr.write(`budget: auto -> ${file}\n`);
+  }
   if (args.includes('--mark')) {
     let size;
     try { size = statSync(file).size; } catch { return 'BUDGET: mark ? (transcript unreadable)'; }
