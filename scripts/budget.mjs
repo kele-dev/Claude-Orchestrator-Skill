@@ -68,7 +68,17 @@ function mainUsage(lines) {
   }
   const ctx = (last.input_tokens ?? 0) + (last.cache_read_input_tokens ?? 0) + (last.cache_creation_input_tokens ?? 0);
   const k = (n) => Math.round(n / 1000);
-  return `MAIN: ${msgs.size} calls, input ${k(inp)}k, cache-read ${k(cr)}k, cache-write ${k(cw)}k, output ${k(out)}k, context ${k(ctx)}k`;
+  // Cache break: previous call read >=10k cached tokens, this call reads <50% of that while context stays >=70% of the previous call's (compaction shrinks context, so it is excluded).
+  const cacheRead = (x) => x.cache_read_input_tokens ?? 0;
+  const context = (x) => (x.input_tokens ?? 0) + cacheRead(x) + (x.cache_creation_input_tokens ?? 0);
+  const list = [...msgs.values()];
+  const breaks = [];
+  for (let i = 1; i < list.length; i++) {
+    const p = list[i - 1], c = list[i];
+    if (cacheRead(p) >= 10000 && cacheRead(c) < 0.5 * cacheRead(p) && context(c) >= 0.7 * context(p)) breaks.push(i + 1);
+  }
+  const brk = breaks.length ? `, cache-breaks ${breaks.length} (calls ${breaks.slice(0, 5).join(', ')})` : '';
+  return `MAIN: ${msgs.size} calls, input ${k(inp)}k, cache-read ${k(cr)}k, cache-write ${k(cw)}k, output ${k(out)}k, context ${k(ctx)}k${brk}`;
 }
 
 function main() {

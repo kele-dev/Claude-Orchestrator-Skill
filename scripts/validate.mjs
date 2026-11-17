@@ -857,6 +857,19 @@ function sessionInfo(cwd, env = {}, raw = false) {
       const missingMain = bud([path.join(tmp, 'none.jsonl'), '--main']);
       chk('main missing file', missingMain.out, 'MAIN: ? (transcript unreadable)');
       chk('main missing file exit', String(missingMain.status), '0');
+      w('mainbreak.jsonl', [
+        am('b1', { input_tokens: 1000, cache_read_input_tokens: 50000, cache_creation_input_tokens: 0, output_tokens: 100 }),
+        am('b2', { input_tokens: 1000, cache_read_input_tokens: 50000, cache_creation_input_tokens: 0, output_tokens: 100 }),
+        am('b3', { input_tokens: 1000, cache_read_input_tokens: 1000, cache_creation_input_tokens: 49000, output_tokens: 100 }),
+      ]);
+      const mainBreak = bud([path.join(tmp, 'mainbreak.jsonl'), '--main']).out;
+      chk('main cache-break', mainBreak, 'MAIN: 3 calls, input 3k, cache-read 101k, cache-write 49k, output 0k, context 51k, cache-breaks 1 (calls 3)');
+      w('maincompact.jsonl', [
+        am('c1', { input_tokens: 1000, cache_read_input_tokens: 50000, output_tokens: 100 }),
+        am('c2', { input_tokens: 1000, cache_read_input_tokens: 5000, cache_creation_input_tokens: 2000, output_tokens: 100 }),
+      ]);
+      const mainCompact = bud([path.join(tmp, 'maincompact.jsonl'), '--main']).out;
+      chk('main compaction no break', String(mainCompact.includes('cache-breaks')), 'false');
 
       // auto mode: newest transcript of the project dir
       const autoCwd = fs.realpathSync(fs.mkdtempSync(path.join(tmp, 'auto-cwd-')));

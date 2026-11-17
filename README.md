@@ -101,7 +101,7 @@ Orchestration mode is active automatically in every session. Manual commands:
 - Short-path review rules apply only to non-Opus main sessions; the review guard accepts absolute and quoted PRD paths with spaces.
 - Session start prints `Map: none` when the project has no learned-map, so Claude suggests `/orchestrator:init` first.
 - Output trim: read, list and search commands at the start of a statement are line-trimmed only above 300 lines.
-- `scripts/budget.mjs --main` reports main-session token usage (calls, cache read/write, output, current context); `/orchestrator:status` shows it.
+- `scripts/budget.mjs --main` reports main-session token usage (calls, cache read/write, output, current context); it also flags cache breaks (a call whose cache read drops below half of the previous call's while context stays at least 70% as large); `/orchestrator:status` shows it.
 
 ### 1.12.0
 - Always-loaded rules are split: non-Opus PRD rules moved to `skills/on/non-opus.md`, and situational token rules moved to `skills/on/reference.md` (read on demand, so they may be followed less often).
