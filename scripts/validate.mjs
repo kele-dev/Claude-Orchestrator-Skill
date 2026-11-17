@@ -457,6 +457,61 @@ function runHook(name, payload, extraEnv = {}) {
   }
 }
 
+// 8a. Kill switches, invalid stdin and project-root fallback
+{
+  const bigStdout = Array.from({ length: 150 }, (_, i) => (i === 69 ? 'Error: boom'.padEnd(50, '.') : 'x'.repeat(50))).join('\n');
+  const trimReq = (command) => ({
+    hook_event_name: 'PostToolUse',
+    tool_name: 'Bash',
+    tool_input: { command },
+    tool_response: { stdout: bigStdout, stderr: '', interrupted: false },
+    cwd: root,
+  });
+  const editReq = (file) => ({
+    hook_event_name: 'PreToolUse',
+    tool_name: 'Edit',
+    tool_input: { file_path: file },
+    transcript_path: path.join(root, 'no-such-transcript.jsonl'),
+    cwd: root,
+  });
+
+  let r = runHook('guard-edit.mjs', editReq(path.join(root, 'agents', 'x.md')), { ORCH_GUARD: 'off' });
+  if (r && r.stdout.trim() !== '') err('hooks/guard-edit.mjs', 'smoke "guard ORCH_GUARD=off": expected empty stdout');
+  r = runHook('trim-output.mjs', trimReq('npm test'), { ORCH_NO_TRIM: '1' });
+  if (r && r.stdout.trim() !== '') err('hooks/trim-output.mjs', 'smoke "trim ORCH_NO_TRIM=1": expected empty stdout');
+
+  // invalid JSON stdin: fail open silently; with ORCH_DEBUG=1 the error goes to stderr
+  const rawHook = (name, env) => spawnSync(process.execPath, [path.join(root, 'hooks', name)], { input: '{bad' + 'x'.repeat(3100), encoding: 'utf8', cwd: root, env: { ...process.env, ORCH_DEBUG: '', ...env } });
+  for (const [name, prefix] of [['trim-output.mjs', 'orchestrator trim-output:'], ['guard-edit.mjs', 'orchestrator guard-edit:']]) {
+    const quiet = rawHook(name, {});
+    if (quiet.status !== 0 || quiet.stdout.trim() !== '' || quiet.stderr.trim() !== '') {
+      err(`hooks/${name}`, `smoke "invalid stdin": expected exit 0 with empty stdout and stderr (exit ${quiet.status})`);
+    }
+    const loud = rawHook(name, { ORCH_DEBUG: '1' });
+    if (!(loud.stderr ?? '').startsWith(prefix)) err(`hooks/${name}`, `smoke "invalid stdin ORCH_DEBUG=1": expected stderr starting with "${prefix}"`);
+  }
+
+  // project-root fallback: no CLAUDE_PROJECT_DIR, so the git top level of cwd is the project root
+  if (spawnSync('git', ['--version']).status === 0) {
+    const gtmp = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'orch-root-')));
+    try {
+      spawnSync('git', ['init', '-q'], { cwd: gtmp });
+      const tp = path.join(gtmp, 'transcript.jsonl');
+      fs.writeFileSync(tp, JSON.stringify({ type: 'user', message: { content: 'hello' } }) + '\n');
+      const payload = { hook_event_name: 'PreToolUse', tool_name: 'Edit', tool_input: { file_path: path.join(gtmp, 'a.txt') }, transcript_path: tp, cwd: gtmp };
+      const g = spawnSync(process.execPath, [path.join(root, 'hooks', 'guard-edit.mjs')], {
+        input: JSON.stringify(payload),
+        encoding: 'utf8',
+        cwd: gtmp,
+        env: { ...process.env, ORCH_GUARD: '', CLAUDE_PROJECT_DIR: '' },
+      });
+      if (!(g.stdout ?? '').includes('"deny"')) err('hooks/guard-edit.mjs', 'smoke "guard root fallback": expected deny for a project file without CLAUDE_PROJECT_DIR');
+    } finally {
+      fs.rmSync(gtmp, { recursive: true, force: true });
+    }
+  }
+}
+
 // 8b. Script smoke tests: digest.mjs and long-session.mjs
 {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'orch-validate-'));
