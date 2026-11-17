@@ -1184,6 +1184,53 @@ function sessionInfo(cwd, env = {}, raw = false) {
   if (none.status !== 2) err('scripts/eval-select.mjs', `smoke "select no args": expected exit 2, got ${none.status}`);
 }
 
+// 8i. Smoke tests: scripts/otel-export.mjs writes GenAI spans without message content (temp dir only)
+{
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'orch-otel-'));
+  try {
+    const exportPath = path.join(root, 'scripts', 'otel-export.mjs');
+    const fails = (m) => err('scripts/otel-export.mjs', `smoke ${m}`);
+    if (!exists(exportPath)) {
+      fails('missing, cannot smoke test');
+    } else {
+      const J = JSON.stringify;
+      const transcript = path.join(tmp, 'otel.jsonl');
+      fs.writeFileSync(transcript, [
+        J({ type: 'assistant', timestamp: '2026-01-01T00:00:00Z', message: { id: 'm1', content: [{ type: 'tool_use', id: 't1', name: 'Bash', input: { command: 'SECRET-CMD' } }], usage: { input_tokens: 100, cache_read_input_tokens: 1000, cache_creation_input_tokens: 0, output_tokens: 50 } } }),
+        J({ type: 'user', timestamp: '2026-01-01T00:00:02Z', message: { content: [{ type: 'tool_result', tool_use_id: 't1', content: 'SECRET-OUT' }] } }),
+        J({ type: 'assistant', timestamp: '2026-01-01T00:00:03Z', message: { id: 'm2', content: [{ type: 'tool_use', id: 't2', name: 'Agent', input: { subagent_type: 'orchestrator:haiku-coder', prompt: 'SECRET-PROMPT' } }], usage: { input_tokens: 10, cache_read_input_tokens: 1100, cache_creation_input_tokens: 0, output_tokens: 20 } } }),
+        J({ type: 'user', timestamp: '2026-01-01T00:00:09Z', message: { content: [{ type: 'tool_result', tool_use_id: 't2', is_error: true, content: 'SECRET-ERR' }] } }),
+        J({ type: 'assistant', isSidechain: true, timestamp: '2026-01-01T00:00:10Z', message: { id: 's1', content: [{ type: 'text', text: 'SECRET-SIDE' }], usage: { input_tokens: 99999 } } }),
+      ].join('\n') + '\n');
+      const r = spawnSync(process.execPath, [exportPath, transcript], { encoding: 'utf8', cwd: root });
+      if (r.status !== 0) fails(`exit ${r.status}, expected 0`);
+      let doc = null;
+      try { doc = JSON.parse(r.stdout); } catch { fails('output is not JSON'); }
+      if (doc) {
+        const spans = doc.resourceSpans?.[0]?.scopeSpans?.[0]?.spans ?? [];
+        const attr = (s, k) => s.attributes.find((a) => a.key === k)?.value;
+        const rootSpan = spans.find((s) => !s.parentSpanId);
+        const bash = spans.find((s) => s.name === 'execute_tool Bash');
+        const agent = spans.find((s) => s.name === 'invoke_agent orchestrator:haiku-coder');
+        const dur = bash ? Number(BigInt(bash.endTimeUnixNano) - BigInt(bash.startTimeUnixNano)) : null;
+        const chk = (name, ok) => { if (!ok) fails(`"${name}" failed`); };
+        chk('3 spans', spans.length === 3);
+        chk('root input_tokens 2210', rootSpan && attr(rootSpan, 'gen_ai.usage.input_tokens')?.intValue === '2210');
+        chk('root output_tokens 70', rootSpan && attr(rootSpan, 'gen_ai.usage.output_tokens')?.intValue === '70');
+        chk('span names', bash && agent);
+        chk('children parent is root', rootSpan && spans.filter((s) => s.parentSpanId).every((s) => s.parentSpanId === rootSpan.spanId));
+        chk('Bash duration 2s', dur === 2000000000);
+        chk('Agent status error', agent?.status?.code === 2);
+        chk('no content captured', !r.stdout.includes('SECRET'));
+      }
+      const missing = spawnSync(process.execPath, [exportPath, path.join(tmp, 'none.jsonl')], { encoding: 'utf8', cwd: root });
+      if (missing.status !== 2) fails(`missing file: expected exit 2, got ${missing.status}`);
+    }
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+}
+
 // 9. Eval cases: case.yaml name matches folder, prompt.md and scaffold script exist, graders use a known type with required keys
 // evals/touches.json: keys match the case folders and every prefix is an existing path
 {
