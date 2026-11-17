@@ -110,3 +110,7 @@ Compare: `node scripts/eval-compare.mjs <current.json> [baseline.json] [--thresh
 Exit codes: 0 pass (or skipped), 1 at least one pair is OVER, 2 unreadable file or bad arguments.
 
 The CI step runs only when `evals/baseline.json` exists. There is no schedule trigger. To opt in, add this under `on:` in `.github/workflows/eval.yml`: `schedule: [{cron: '0 3 * * 1'}]`. Warning: this spends the API key every week (the run uses the default inputs); it is the owner's decision.
+
+## Run only affected cases
+
+`evals/touches.json` maps each case folder to the repo path prefixes it depends on (an empty list means the case never reruns on repo changes). `node scripts/eval-select.mjs --base <git-ref>` (or `--files a,b`) prints the affected case names. A change under `hooks/` or `.claude-plugin/`, or an unmapped `skills/` or `agents/` path, selects every case. A full run is still available with `--case "*"`.
