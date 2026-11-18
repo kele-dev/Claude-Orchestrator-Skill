@@ -75,8 +75,8 @@ function record(input) {
   if (!TIERS.includes(tier)) return;
   const cwd = typeof input?.cwd === 'string' && input.cwd !== '' ? input.cwd : process.cwd();
   const text = typeof input?.last_assistant_message === 'string' ? input.last_assistant_message : lastAssistantText(input?.agent_transcript_path);
-  const m = /^\s*STATUS:\s*([A-Z_]+)/m.exec(text);
-  const status = m ? m[1] : '?';
+  const ms = [...String(text).matchAll(/^[ \t>*_-]*STATUS[ \t*_]*:[ \t*_]*([A-Za-z_]+)/gim)];
+  const status = ms.length ? ms[ms.length - 1][1].toUpperCase() : '?';
 
   const store = storeFor(cwd);
   mkdirSync(store, { recursive: true });
@@ -85,7 +85,7 @@ function record(input) {
   appendFileSync(file, JSON.stringify({ ts: new Date().toISOString(), tier, status, agent_id: String(input?.agent_id ?? '') }) + '\n');
 }
 
-// Pass rate per tier from <store>/delegations.jsonl; bad lines and unknown tiers are skipped.
+// Pass rate per tier from <store>/delegations.jsonl; bad lines and unknown tiers are skipped. "?" (no STATUS found) is unknown, not a failure.
 function stats(dir) {
   if (typeof dir !== 'string' || dir === '') return NONE;
   const counts = new Map();
@@ -99,15 +99,22 @@ function stats(dir) {
         continue;
       }
       if (!TIERS.includes(r?.tier)) continue;
-      const c = counts.get(r.tier) ?? { pass: 0, total: 0 };
-      c.total++;
-      if (r.status === 'SUCCESS' || r.status === 'PASS') c.pass++;
+      const c = counts.get(r.tier) ?? { pass: 0, decided: 0, unknown: 0 };
+      if (r.status === '?') {
+        c.unknown++;
+      } else {
+        c.decided++;
+        if (r.status === 'SUCCESS' || r.status === 'PASS') c.pass++;
+      }
       counts.set(r.tier, c);
     }
   } catch (e) {
     dbg(e);
   }
-  const parts = TIERS.filter((t) => counts.has(t)).map((t) => `${t} ${counts.get(t).pass}/${counts.get(t).total} pass`);
+  const parts = TIERS.filter((t) => counts.has(t)).map((t) => {
+    const c = counts.get(t);
+    return `${t} ${c.pass}/${c.decided} pass${c.unknown > 0 ? `, ${c.unknown} unknown` : ''}`;
+  });
   return parts.length ? `LEDGER: ${parts.join(', ')}` : NONE;
 }
 
