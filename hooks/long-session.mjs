@@ -4,10 +4,9 @@
 // Delegation count is incremental: the byte offset and count are cached in a .count file, and only new bytes are read.
 // Marker, .count and .growth (usage scan state) files live in ORCH_STATE_DIR, or else in a private per-user dir under tmpdir (mode 0700, not a symlink, owned by the current user).
 // Fails open: on any error or unexpected input it prints nothing and exits 0.
-import { closeSync, existsSync, lstatSync, mkdirSync, openSync, readFileSync, rmSync, statSync } from 'node:fs';
-import { tmpdir, userInfo } from 'node:os';
+import { closeSync, existsSync, openSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { join } from 'node:path';
-import { isMainAssistant, makeDbg, posInt, readBytes, readStdin, writeAtomic } from './lib.mjs';
+import { isMainAssistant, makeDbg, posInt, readBytes, readStdin, stateDir, writeAtomic } from './lib.mjs';
 
 const dbg = makeDbg('long-session');
 
@@ -176,28 +175,6 @@ function repeatLevels(v, first) {
 // Highest warning level already shown (marker content); an empty or invalid marker (older versions) counts as 1.
 function readLevel(marker) {
   try { const s = readFileSync(marker, 'utf8').trim(); return /^[1-9]\d*$/.test(s) ? Number(s) : 1; } catch (e) { dbg(e); return 1; }
-}
-
-// State dir for markers: ORCH_STATE_DIR when set, else a per-user dir under tmpdir. Returns null (fail open) when the dir cannot be used.
-// The ownership/symlink safety check applies to the default per-user dir only; an explicit ORCH_STATE_DIR is trusted as the user's choice.
-function stateDir() {
-  const explicit = process.env.ORCH_STATE_DIR;
-  const tag = String(process.getuid?.() ?? userInfo().username).replace(/[^A-Za-z0-9_-]/g, '');
-  const dir = explicit || join(tmpdir(), `orchestrator-${tag}`);
-  try {
-    mkdirSync(dir, { recursive: true, mode: 0o700 });
-    if (!explicit && process.platform !== 'win32') {
-      const st = lstatSync(dir);
-      if (!st.isDirectory() || st.isSymbolicLink() || (process.getuid && st.uid !== process.getuid())) {
-        dbg(new Error('unsafe state dir ' + dir));
-        return null;
-      }
-    }
-  } catch (e) {
-    dbg(e);
-    return null;
-  }
-  return dir;
 }
 
 function run(input) {

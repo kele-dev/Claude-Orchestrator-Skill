@@ -1,7 +1,7 @@
 // Shared helpers for the orchestrator hooks (stdin read, debug output, env ints, bounded file reads, transcript entry filter).
 import { execFileSync } from 'node:child_process';
-import { appendFileSync, existsSync, readSync, renameSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
-import { homedir, tmpdir } from 'node:os';
+import { appendFileSync, existsSync, lstatSync, mkdirSync, readSync, renameSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
+import { homedir, tmpdir, userInfo } from 'node:os';
 import { dirname, join } from 'node:path';
 
 // One-line error text; full stack when ORCH_DEBUG=2, quoted strings redacted otherwise.
@@ -20,6 +20,30 @@ export const makeDbg = (name) => (e) => {
     if (size + line.length <= DEBUG_LOG_MAX) appendFileSync(file, line);
   } catch { /* debug logging must never fail a hook */ }
 };
+
+const stateDbg = makeDbg('state-dir');
+
+// State dir for markers: ORCH_STATE_DIR when set, else a per-user dir under tmpdir. Returns null (fail open) when the dir cannot be used.
+// The ownership/symlink safety check applies to the default per-user dir only; an explicit ORCH_STATE_DIR is trusted as the user's choice.
+export function stateDir() {
+  const explicit = process.env.ORCH_STATE_DIR;
+  const tag = String(process.getuid?.() ?? userInfo().username).replace(/[^A-Za-z0-9_-]/g, '');
+  const dir = explicit || join(tmpdir(), `orchestrator-${tag}`);
+  try {
+    mkdirSync(dir, { recursive: true, mode: 0o700 });
+    if (!explicit && process.platform !== 'win32') {
+      const st = lstatSync(dir);
+      if (!st.isDirectory() || st.isSymbolicLink() || (process.getuid && st.uid !== process.getuid())) {
+        stateDbg(new Error('unsafe state dir ' + dir));
+        return null;
+      }
+    }
+  } catch (e) {
+    stateDbg(e);
+    return null;
+  }
+  return dir;
+}
 
 // Positive integer from an env-style string, else the default.
 export const posInt = (v, d) => (/^[1-9]\d*$/.test(v ?? '') ? Number(v) : d);

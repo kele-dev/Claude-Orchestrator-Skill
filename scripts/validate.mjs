@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 // Validates the orchestrator plugin layout, manifests, skills, agents, hooks and cross-references.
+import crypto from 'crypto';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
@@ -601,7 +602,8 @@ function sessionInfo(cwd, env = {}, raw = false) {
     const small = path.join(rdir, 'small.txt');
     fs.writeFileSync(big, Array.from({ length: 2500 }, () => 'yyyyyyyyy').join('\n'));
     fs.writeFileSync(small, 'hello\n');
-    const rd = (file, extra = {}, env = {}, tool = {}) => runHook('guard-read.mjs', { hook_event_name: 'PreToolUse', tool_name: 'Read', tool_input: { file_path: file, ...tool }, session_id: sid, cwd: root, ...extra }, env);
+    const rstate = path.join(rdir, 'state');
+    const rd = (file, extra = {}, env = {}, tool = {}) => runHook('guard-read.mjs', { hook_event_name: 'PreToolUse', tool_name: 'Read', tool_input: { file_path: file, ...tool }, session_id: sid, cwd: root, ...extra }, { ORCH_STATE_DIR: rstate, ...env });
     const denies = (g) => g && g.stdout.includes('"permissionDecision":"deny"');
     try {
       if (!denies(rd(big))) err('hooks/guard-read.mjs', 'smoke "read big first": expected deny');
@@ -620,6 +622,18 @@ function sessionInfo(cwd, env = {}, raw = false) {
       if (denies(rd(bigPdf, { session_id: sid + '-c' }, {}, { pages: '1-5' }))) err('hooks/guard-read.mjs', 'smoke "read large pdf with pages": expected allow');
       if (denies(rd(bigPng, { session_id: sid + '-c' }))) err('hooks/guard-read.mjs', 'smoke "read large png": expected allow');
       if (denies(rd(bigPdf, { session_id: sid + '-c' }))) err('hooks/guard-read.mjs', 'smoke "read large pdf": expected allow');
+      // marker is written in the state dir and a symlink planted at the marker path is never followed
+      const sid4 = sid + '-d';
+      const mk = (f, s) => path.join(rstate, `orchestrator-read-${s}-${crypto.createHash('sha1').update(f).digest('hex').slice(0, 16)}`);
+      if (!fs.existsSync(mk(big, sid))) err('hooks/guard-read.mjs', 'smoke "read marker": expected a marker in the state dir');
+      const victim = path.join(rdir, 'victim.txt');
+      fs.writeFileSync(victim, 'keep');
+      let linked = true;
+      try { fs.symlinkSync(victim, mk(big, sid4)); } catch { linked = false; }
+      if (linked) {
+        if (denies(rd(big, { session_id: sid4 }))) err('hooks/guard-read.mjs', 'smoke "read marker symlink": expected allow');
+        if (fs.readFileSync(victim, 'utf8') !== 'keep') err('hooks/guard-read.mjs', 'smoke "read marker symlink": symlink target was overwritten');
+      }
     } finally {
       for (const s of [sid, sid + '-b', sid + '-c']) {
         for (const f of fs.readdirSync(os.tmpdir())) if (f.startsWith(`orchestrator-read-${s}-`)) rmQuiet(path.join(os.tmpdir(), f));
