@@ -244,8 +244,14 @@ for (const s of ['off', 'team', 'autopilot', 'status']) {
   const fm = frontmatter(f);
   if (fm && fm['disable-model-invocation'] !== 'true') err(f, 'frontmatter must set disable-model-invocation: true');
 }
-if (exists(path.join(root, 'README.md')) && plugin && !readText(path.join(root, 'README.md')).includes(`Baru di ${plugin.version}`)) {
+// Exact version token: "Baru di 1.13.0" must not match "Baru di 1.13.01" or "Baru di 1.13.0-rc" (a trailing sentence period is fine).
+const readmeHasVersion = (text, v) => new RegExp(`Baru di ${v.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![0-9A-Za-z+-]|\\.[0-9A-Za-z])`).test(text);
+if (exists(path.join(root, 'README.md')) && plugin && !readmeHasVersion(readText(path.join(root, 'README.md')), String(plugin.version))) {
   err('README.md', `missing "Baru di ${plugin.version}"`);
+}
+// pure in-memory checks of the matcher
+for (const [text, v, want] of [['- Baru di 1.13.0: x', '1.13.0', true], ['Baru di 1.13.0.', '1.13.0', true], ['Baru di 1.13.01', '1.13.0', false], ['Baru di 1.13.0.1', '1.13.0', false], ['Baru di 11.13.0', '1.13.0', false], ['Baru di 1.13.0-rc.1', '1.13.0', false]]) {
+  if (readmeHasVersion(text, v) !== want) err('scripts/validate.mjs', `README version matcher: "${text}" vs ${v} expected ${want}`);
 }
 
 // 7b. Stop names in skills/on/modes.md must be listed in autopilot's STOP section and resume's "When to write" section
