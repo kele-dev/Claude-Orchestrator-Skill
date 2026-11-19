@@ -6,7 +6,7 @@ Per-version release notes. The README keeps only the current version's "Baru di"
 
 ### 1.14.0
 - New: `/orchestrator:help`; read guard (a main-session whole-file read of a file over 2000 lines or 100 KB is denied once per file; `ORCH_READ_GUARD=off` turns it off); TRIM statistics row in `/orchestrator:status`; `ORCH_DEBUG` also writes `<tmpdir>/orchestrator-debug.log`; store key from the git remote URL for new stores (an existing path-based store keeps being used); release notes moved to CHANGELOG.md.
-- Fixed: edit guard on transcripts over 16 MB; trim keeps the first 10 lines of failed commands; budget `auto` finds transcripts of sessions started above the repo, and its stderr line is shown only with `ORCH_DEBUG` or `--verbose`; rules hook no longer needs `cat` and warns when node is missing; atomic state writes; Windows Git Bash default path and verify.ps1 fallback.
+- Fixed: edit guard on transcripts over 16 MB; trim keeps the first 10 lines of failed commands; budget `auto` finds transcripts of sessions started above the repo, and its stderr line is shown only with `ORCH_DEBUG` or `--verbose`; rules hook no longer needs `cat` and warns when node is missing; atomic state writes; Windows Git Bash default path and verify.ps1 fallback; ledger parses STATUS only at line start with a colon, leniently, and counts unknown separately.
 - CI: validate.yml timeout and concurrency; eval workflow warns when the baseline is missing and fails when no result file exists; Claude Code pinned to 2.1.317.
 
 ### 1.13.0

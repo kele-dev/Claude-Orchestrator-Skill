@@ -18,7 +18,7 @@ disable-model-invocation: true
 - Legacy: flag if `<main>/.claude/skills/learned-*/SKILL.md` or the legacy checkpoints exist, and suggest per `legacy.md` (`orchestrator:learn` folder; only if legacy files exist).
 - Session: delegations so far per agent (haiku-coder, sonnet-dev, opus-planner, opus-reviewer), counted from this conversation; "unknown" after a compaction.
 - Main-session tokens: run `node "${CLAUDE_PLUGIN_ROOT}/scripts/budget.mjs" auto --main` (fall back to the plugin root used for the version) and show its MAIN line as one row; sub-agent total: same command without --main.
-- Delegation ledger: run `node "${CLAUDE_PLUGIN_ROOT}/hooks/ledger.mjs" --stats "<store>"` and show its LEDGER line as one row (pass rate per tier from <store>/delegations.jsonl, written by the SubagentStop hook).
+- Delegation ledger: run `node "${CLAUDE_PLUGIN_ROOT}/hooks/ledger.mjs" --stats "<store>"` and show its LEDGER line as one row (pass rate per tier from <store>/delegations.jsonl, written by the SubagentStop hook; unknown = no STATUS line found, not counted as a failure).
 - Trim savings: run `node "${CLAUDE_PLUGIN_ROOT}/hooks/trim-output.mjs" --stats "<store>"` and show its TRIM line as one row (trims and bytes saved this session, from the newest `trim-stats-*.jsonl`).
 
 ## Caps
