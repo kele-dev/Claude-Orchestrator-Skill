@@ -39,6 +39,7 @@ Same delegation: also copy missing legacy topics (`legacy.md` in the `orchestrat
 ## 5. Write the map (same delegation)
 - Write `<store>/lessons/learned-map.md` in the `learn` format: the frontmatter description line plus at most 20 lesson lines (shorter is fine). Do not repeat facts CLAUDE.md already states.
 - Also write `<store>/verify.sh` (bash, LF line endings, portable to bash 3.2 on macOS): `set -o pipefail`; for each **verified** test/lint/typecheck command, capture its output (`2>&1`) and print `PASS <name>`, or on failure `FAIL <name>` followed by the last 15 lines of its output; end with one line `VERIFY: PASS (n/m)` or `VERIFY: FAIL (n/m)` and exit non-zero on any failure. No broken or not-run commands. Run it once and confirm the last line.
+- On Windows without Git Bash (check `C:\Program Files\Git\bin\bash.exe`), also write `<store>/verify.ps1` with the same checks and output format (`PASS`/`FAIL` lines, final `VERIFY:` line, non-zero exit on failure); `on` runs it with PowerShell when bash is missing.
 - Add one map line: `Verify: bash <absolute store path>/verify.sh`, using the absolute store path from the brief, never the literal `<store>` (counts toward the 20 lines).
 
 ## 6. Report
