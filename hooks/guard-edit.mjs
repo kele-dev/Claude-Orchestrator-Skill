@@ -151,16 +151,55 @@ function orchestrationOff(transcriptPath) {
     text = nl === -1 ? '' : text.slice(nl + 1);
   }
   let mode = lastMode(text);
-  if (mode === null && partial) {
-    if (size > 16 * 1024 * 1024) return false;
-    try {
-      mode = lastMode(fs.readFileSync(transcriptPath, 'utf8'));
-    } catch (e) {
-      dbg(e);
-      return false;
+  if (mode === null && partial && skip > 0) mode = scanOlder(transcriptPath, size - len + skip);
+  return mode === 'off';
+}
+
+// Scan [0, end) backwards in fixed chunks (bounded memory and time) for the latest mode marker.
+function scanOlder(transcriptPath, end) {
+  const CHUNK = 1024 * 1024;
+  const MAX_CARRY = 32 * 1024 * 1024;
+  const deadline = Date.now() + 2000;
+  let fd;
+  try {
+    fd = fs.openSync(transcriptPath, 'r');
+    let pos = end;
+    let carry = Buffer.alloc(0);
+    while (pos > 0 && Date.now() < deadline) {
+      const start = Math.max(0, pos - CHUNK);
+      const chunk = Buffer.alloc(pos - start);
+      let got = 0;
+      while (got < chunk.length) {
+        const n = fs.readSync(fd, chunk, got, chunk.length - got, start + got);
+        if (n <= 0) break;
+        got += n;
+      }
+      const data = Buffer.concat([chunk.subarray(0, got), carry]);
+      let body = data;
+      if (start > 0) {
+        const i = data.indexOf(10);
+        if (i === -1) {
+          carry = data.length > MAX_CARRY ? Buffer.alloc(0) : data;
+          pos = start;
+          continue;
+        }
+        carry = data.subarray(0, i);
+        body = data.subarray(i + 1);
+      } else {
+        carry = Buffer.alloc(0);
+      }
+      const mode = lastMode(body.toString('utf8'));
+      if (mode) return mode;
+      pos = start;
+    }
+  } catch (e) {
+    dbg(e);
+  } finally {
+    if (fd !== undefined) {
+      try { fs.closeSync(fd); } catch { /* ignore */ }
     }
   }
-  return mode === 'off';
+  return null;
 }
 
 function lastMode(text) {

@@ -633,6 +633,20 @@ function sessionInfo(cwd, env = {}, raw = false) {
     });
     if (g && g.stdout.trim() !== '') err('hooks/guard-edit.mjs', 'smoke "guard large transcript off": expected empty stdout');
 
+    // guard-edit: >16 MB transcript with the off line at the very start must still be seen (chunked backward scan)
+    const hugeTranscript = path.join(tmp, 'huge-off.jsonl');
+    const bigFiller = filler + '\n';
+    fs.writeFileSync(hugeTranscript, offLine + '\n' + bigFiller.repeat(Math.ceil((17 * 1024 * 1024) / bigFiller.length)));
+    const gh = runHook('guard-edit.mjs', {
+      hook_event_name: 'PreToolUse',
+      tool_name: 'Edit',
+      tool_input: { file_path: path.join(root, 'agents', 'x.md') },
+      transcript_path: hugeTranscript,
+      cwd: root,
+    });
+    if (gh && gh.stdout.trim() !== '') err('hooks/guard-edit.mjs', 'smoke "guard >16 MB transcript off at start": expected empty stdout');
+    try { fs.rmSync(hugeTranscript, { force: true }); } catch { /* ignore */ }
+
     // long-session: over 1 MB, usage at head and tail only, filler in the middle forces head/tail windows
     const usage = (cacheRead) => JSON.stringify({ type: 'assistant', message: { usage: { input_tokens: 10, cache_read_input_tokens: cacheRead } } });
     const longPath = path.join(tmp, 'long-large.jsonl');
