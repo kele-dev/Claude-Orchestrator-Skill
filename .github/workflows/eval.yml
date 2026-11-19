@@ -57,6 +57,7 @@ jobs:
           fi
 
       - name: Run eval
+        id: eval
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           CASE: ${{ inputs.case || '*' }}
@@ -66,13 +67,21 @@ jobs:
         run: |
           claude plugin eval . --case "$CASE" --runs "$RUNS" --ablation none --scaffold --trust-plugin --allow-tools Bash Edit Write --model "$MODEL" --judge-model claude-haiku-5-5 --max-cost-usd "$MAX_COST" --no-publish --json evals/ci-result.json
 
+      - name: Require eval result
+        if: always() && steps.eval.conclusion != 'skipped'
+        run: |
+          if [ ! -s evals/ci-result.json ]; then
+            echo "::error::The eval run produced no evals/ci-result.json (the Run eval step failed or was cancelled). This is a failed run, not a missing baseline."
+            exit 1
+          fi
+
       - name: Warn when baseline is missing
-        if: hashFiles('evals/baseline.json') == ''
+        if: success() && hashFiles('evals/baseline.json') == ''
         run: |
           echo "::warning::evals/baseline.json is missing, so the token-regression gate is SKIPPED. To create it: download ci-result.json and its trace files from a CI eval run, run 'node scripts/eval-compare.mjs ci-result.json --write evals/baseline.json', and commit evals/baseline.json (see evals/README.md)."
 
       - name: Compare tokens with baseline
-        if: hashFiles('evals/baseline.json') != ''
+        if: success() && hashFiles('evals/baseline.json') != ''
         run: node scripts/eval-compare.mjs evals/ci-result.json evals/baseline.json --threshold 15 --strict
 
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -82,4 +91,4 @@ jobs:
           path: |
             evals/ci-result.json
             evals/results/
-          if-no-files-found: ignore
+          if-no-files-found: warn
