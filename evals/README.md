@@ -50,6 +50,7 @@ Results under `evals/results/` are git-ignored.
 ## Grader notes
 
 - `tool_used`/`tool_order` scope as confirmed by R1: count tool calls of the main session and of subagents (CLI 2.1.317); for main-session-only checks use `regex` with `target: trace` and `"parent_tool_use_id":null` (examples: `team-parallel/graders/no-main-edit.md`, `on-sonnet-prd-save/graders/prd-write-main.md`).
+- The Claude Code version pinned in `.github/workflows/eval.yml` and the version the trace fields were measured on (2.1.317) must move together.
 - `no-main-edit` graders in `on-small-edit` and `on-sonnet-guardrails` were converted to trace-based (`regex`, `target: trace`) in 1.11.0; they previously failed on correct delegation (see R1, main 0 Edit, subagent 2). Verified live: R1b `on-small-edit` PASS (all 4 graders); before the fix, R1 failed with "Edit called 2x" (main 0, subagent 2).
 - `target: trace` pilot: R9 `prd-write-main` grader true, local regex true; R4 `no-main-edit` grader true, local regex true. They agree on positive and negative-absent cases only; a negative-hit case was not seen.
 - Writes to `<store>` (checkpoints, lessons) land outside the run directory; the local sandbox denies them, so `checkpoint-written` and `save-written` FAIL there by design. R10 (extra grant for store writes) was not run, so the grant is untested and no `--allow-tools` flags are recorded.

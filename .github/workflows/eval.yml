@@ -44,7 +44,7 @@ jobs:
           sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || echo "::warning::could not relax the AppArmor user-namespace restriction; the Claude sandbox may fail"
 
       - name: Install Claude Code
-        run: npm install -g @anthropic-ai/claude-code@2.1.318
+        run: npm install -g @anthropic-ai/claude-code@2.1.317
 
       # The eval agent runs with Bash and can read ANTHROPIC_API_KEY from its environment: use a dedicated key with a low spend limit, and keep this workflow workflow_dispatch-only.
       - name: Check secret
