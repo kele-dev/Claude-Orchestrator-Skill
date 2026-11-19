@@ -756,7 +756,7 @@ function sessionInfo(cwd, env = {}, raw = false) {
   const sidC = `${sidA}-c`;
   const sidD = `${sidA}-d`;
   const sidE = `${sidA}-e`;
-  const markers = [sidA, sidB, sidC, sidD, sidE, `${sidA}-f`].flatMap((s) => [path.join(os.tmpdir(), `orchestrator-long-${s}`), path.join(os.tmpdir(), `orchestrator-long-${s}.count`)]);
+  const markers = [sidA, sidB, sidC, sidD, sidE, `${sidA}-f`, `${sidA}-m`, `${sidA}-n`].flatMap((s) => [path.join(os.tmpdir(), `orchestrator-long-${s}`), path.join(os.tmpdir(), `orchestrator-long-${s}.count`), path.join(os.tmpdir(), `orchestrator-long-${s}.growth`)]);
   markers.push(...['g', 'h', 'i', 'j', 'k'].flatMap((s) => [path.join(os.tmpdir(), `orchestrator-long-${sidA}-${s}`), path.join(os.tmpdir(), `orchestrator-long-${sidA}-${s}.count`)]));
   try {
     const digestPath = path.join(root, 'scripts', 'digest.mjs');
@@ -846,6 +846,35 @@ function sessionInfo(cwd, env = {}, raw = false) {
     const r5 = runHook('long-session.mjs', { hook_event_name: 'UserPromptSubmit', session_id: sidD, transcript_path: flatPath, cwd: root }, { ORCH_LONG: '', ORCH_LONG_DELEGATIONS: '', ORCH_LONG_BYTES: '5', ORCH_LONG_TOKENS: '' });
     if (r5 && r5.stdout.trim() !== '') err('hooks/long-session.mjs', 'smoke "long usage flat": expected empty stdout (usage present overrides bytes)');
 
+    {
+      // usage growth is incremental: the scanned offset and first/last usage are cached; only appended bytes are read on the next prompt
+      const usageLine = (cacheRead) => JSON.stringify({ type: 'assistant', message: { usage: { input_tokens: 10, cache_read_input_tokens: cacheRead } } }) + '\n';
+      const incGrowth = path.join(tmp, 'inc-growth.jsonl');
+      const growthCache = path.join(os.tmpdir(), `orchestrator-long-${sidA}-m.growth`);
+      const growthEnv = { ORCH_LONG: '', ORCH_LONG_DELEGATIONS: '', ORCH_LONG_BYTES: '999999999', ORCH_LONG_TOKENS: '' };
+      const growthRun = (sid) => runHook('long-session.mjs', { hook_event_name: 'UserPromptSubmit', session_id: sid, transcript_path: incGrowth, cwd: root }, growthEnv);
+      fs.writeFileSync(incGrowth, [10000, 10100, 10200].map(usageLine).join(''));
+      const g1 = growthRun(`${sidA}-m`);
+      if (g1 && g1.stdout.trim() !== '') err('hooks/long-session.mjs', 'smoke "long growth incremental 1": expected empty stdout');
+      let cached = null;
+      try {
+        cached = JSON.parse(fs.readFileSync(growthCache, 'utf8'));
+      } catch {
+        err('hooks/long-session.mjs', 'smoke "long growth incremental 1": expected .growth cache file');
+      }
+      if (cached && cached.offset !== fs.statSync(incGrowth).size) err('hooks/long-session.mjs', 'smoke "long growth incremental 1": expected cached offset at end of file');
+      // same-length edit of the first line, before the cached offset: a full re-read would see a different first usage
+      fs.writeFileSync(incGrowth, [99999, 10100, 10200].map(usageLine).join(''));
+      fs.appendFileSync(incGrowth, usageLine(141000));
+      const g2 = growthRun(`${sidA}-m`);
+      if (g2 && !g2.stdout.includes('+131k')) err('hooks/long-session.mjs', 'smoke "long growth incremental 2": expected "+131k" from the cached first usage plus appended bytes');
+      // shrunk file: cache is ignored and the bounded read gives the right answer
+      fs.writeFileSync(path.join(os.tmpdir(), `orchestrator-long-${sidA}-n.growth`), JSON.stringify({ offset: 9999, first: 1, last: 2, check: '' }));
+      fs.writeFileSync(incGrowth, [10000, 141000].map(usageLine).join(''));
+      const g3 = growthRun(`${sidA}-n`);
+      if (g3 && !g3.stdout.includes('+131k')) err('hooks/long-session.mjs', 'smoke "long growth shrunk file": expected "+131k" via the bounded read');
+    }
+
     // long repeat smoke: [suffix, ORCH_LONG_REPEAT, write marker first, [growth, expect ('' = empty stdout), noReminder]]
     const repeatSteps = [
       ['g', '', false, [[130000, '+130k', true], [130000, '', false], [260000, 'reminder 1 of 2', false], [260000, '', false], [400000, 'reminder 2 of 2', false], [900000, '', false]]],
@@ -871,6 +900,10 @@ function sessionInfo(cwd, env = {}, raw = false) {
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
     for (const m of markers) fs.rmSync(m, { force: true });
+    // repeat-smoke sessions (sidA-g ... sidA-k) leave markers and .growth caches too
+    for (const f of fs.readdirSync(os.tmpdir())) {
+      if (f.startsWith(`orchestrator-long-${sidA}`)) rmQuiet(path.join(os.tmpdir(), f));
+    }
   }
 }
 

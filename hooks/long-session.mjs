@@ -2,7 +2,7 @@
 // UserPromptSubmit hook: warns when the context has grown (assistant message.usage tokens), then again at higher thresholds (ORCH_LONG_REPEAT),
 // or, without usage data, when the transcript is large; also warns on delegation count.
 // Delegation count is incremental: the byte offset and count are cached in a .count file, and only new bytes are read.
-// Marker and .count files live in ORCH_STATE_DIR, or else in a private per-user dir under tmpdir (mode 0700, not a symlink, owned by the current user).
+// Marker, .count and .growth (usage scan state) files live in ORCH_STATE_DIR, or else in a private per-user dir under tmpdir (mode 0700, not a symlink, owned by the current user).
 // Fails open: on any error or unexpected input it prints nothing and exits 0.
 import { closeSync, existsSync, lstatSync, mkdirSync, openSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir, userInfo } from 'node:os';
@@ -21,32 +21,71 @@ readStdin((raw) => {
   }
 });
 
+// Context tokens of one transcript line (main-session assistant usage), or null.
+function usageTokens(line) {
+  if (!line.includes('"usage"')) return null;
+  let entry;
+  try {
+    entry = JSON.parse(line);
+  } catch {
+    return null;
+  }
+  const u = entry?.message?.usage;
+  if (!isMainAssistant(entry) || !u || typeof u !== 'object') return null;
+  return (u.input_tokens || 0) + (u.cache_read_input_tokens || 0) + (u.cache_creation_input_tokens || 0);
+}
+
+const CHECK_BYTES = 64;
+const checkOf = (fd, offset) => readBytes(fd, offset - Math.min(offset, CHECK_BYTES), Math.min(offset, CHECK_BYTES)).toString('base64');
+
+// Cached scan state { offset, first, last, check } from a previous prompt; null unless the file still has the same bytes before the offset (a shrunk or rewritten file invalidates it).
+function loadGrowthCache(fd, cachePath, size) {
+  try {
+    const c = JSON.parse(readFileSync(cachePath, 'utf8'));
+    const ok = Number.isInteger(c?.offset) && c.offset > 0 && c.offset <= size && Number.isInteger(c.first) && Number.isInteger(c.last) && typeof c.check === 'string';
+    return ok && checkOf(fd, c.offset) === c.check ? c : null;
+  } catch (e) {
+    dbg(e);
+    return null;
+  }
+}
+
 // Context growth from assistant message.usage: { first, last } tokens, or null when no usage entries are found.
-function contextGrowth(path, size) {
+// Incremental: the scanned byte offset, the first usage and the latest usage are cached, so a later prompt reads only the bytes appended since.
+// Without a valid cache (first prompt, shrunk or rewritten file) it reads a bounded head window and tail window (1 MB each).
+function contextGrowth(path, size, cachePath) {
   const WINDOW = 1024 * 1024;
-  const usageTokens = (line) => {
-    if (!line.includes('"usage"')) return null;
-    let entry;
+  const save = (fd, offset, first, last) => {
     try {
-      entry = JSON.parse(line);
-    } catch {
-      return null;
+      writeFileSync(cachePath, JSON.stringify({ offset, first, last, check: checkOf(fd, offset) }));
+    } catch (e) {
+      dbg(e);
+      // ignore cache write errors
     }
-    const u = entry?.message?.usage;
-    if (!isMainAssistant(entry) || !u || typeof u !== 'object') return null;
-    return (u.input_tokens || 0) + (u.cache_read_input_tokens || 0) + (u.cache_creation_input_tokens || 0);
   };
-  const readRange = (fd, start, len) => readBytes(fd, start, len).toString('utf8');
   try {
     const fd = openSync(path, 'r');
     try {
+      const c = loadGrowthCache(fd, cachePath, size);
+      if (c) {
+        const buf = readBytes(fd, c.offset, size - c.offset);
+        const lastNL = buf.lastIndexOf(0x0a);
+        if (lastNL === -1) return { first: c.first, last: c.last };
+        let last = c.last;
+        for (const line of buf.toString('utf8', 0, lastNL).split('\n')) {
+          const t = usageTokens(line);
+          if (t !== null) last = t;
+        }
+        save(fd, c.offset + lastNL + 1, c.first, last);
+        return { first: c.first, last };
+      }
       const len = Math.min(size, WINDOW);
-      let head = readRange(fd, 0, len);
+      let head = readBytes(fd, 0, len).toString('utf8');
       if (size > len) {
         const nl = head.lastIndexOf('\n');
         head = nl === -1 ? '' : head.slice(0, nl);
       }
-      let tail = readRange(fd, size - len, len);
+      let tail = readBytes(fd, size - len, len).toString('utf8');
       if (size > len) {
         const nl = tail.indexOf('\n');
         tail = nl === -1 ? '' : tail.slice(nl + 1);
@@ -65,6 +104,8 @@ function contextGrowth(path, size) {
         if (t !== null) last = t;
       }
       if (first === null || last === null) return null;
+      const lastNL = tail.lastIndexOf('\n');
+      if (lastNL !== -1) save(fd, size - Buffer.byteLength(tail.slice(lastNL + 1)), first, last);
       return { first, last };
     } finally {
       closeSync(fd);
@@ -176,7 +217,7 @@ function run(input) {
   const warned = existsSync(marker) ? readLevel(marker) : 0;
   if (warned >= levels.length) return '';
   const size = statSync(path).size;
-  const g = contextGrowth(path, size);
+  const g = contextGrowth(path, size, `${marker}.growth`);
   const growth = g ? g.last - g.first : 0;
   const level = levels.filter((t) => growth >= t).length;
   const say = (line) => JSON.stringify({ systemMessage: line, hookSpecificOutput: { hookEventName: 'UserPromptSubmit', additionalContext: `${line} Tell the user in their language.` } });
