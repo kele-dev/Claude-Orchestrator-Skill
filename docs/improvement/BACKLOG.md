@@ -1,7 +1,7 @@
 # Improvement Backlog
 
 Project: orchestrator (Claude Code plugin, kele-dev marketplace)
-Last updated: 2026-11-19 (cycle 010)
+Last updated: 2026-11-20 (cycle 010 follow-up)
 
 Scoring: see the improvement-cycle skill `references/scoring.md`. Score = Impact x Confidence / Effort. P0 >= 8.0 (score-based P0 only for Security/Stability/data integrity) or any override, P1 4.0-7.9 (cap for other dimensions without an override), P2 2.0-3.9, P3 < 2.0. New features are capped at P2 unless the user asked for features that cycle.
 
@@ -38,7 +38,7 @@ Scoring: see the improvement-cycle skill `references/scoring.md`. Score = Impact
 | IC-029 | P2 | 3.0 | UX & accessibility | Legacy heading still says removal planned in v1.8.0 (plugin is 1.12.1) | skills/learn/legacy.md:3 | S | done | 010 |
 | IC-030 | P2 | 2.0 | Stability | guard-review PRD_PATH regex may go quadratic on long path-like prompts (needs investigation) | hooks/guard-review.mjs:158,189 | S | done | 010 |
 | IC-031 | P2 | 2.0 | Observability & ops | rules hook depends on cat and hooks on node PATH with no failure signal | hooks/hooks.json:8 | S | done | 010 |
-| IC-032 | P2 | 2.0 | Performance | Every Bash/Edit tool call spawns Node (~70-80 ms measured) | hooks/hooks.json:22-27,44-50; measured node -e 0 65-75 ms | M | blocked | 010 |
+| IC-032 | P2 | 2.0 | Performance | Every Bash/Edit tool call spawns Node (~70-80 ms measured) | hooks/hooks.json:22-27,44-50; measured node -e 0 65-75 ms; re-assessed 2026-11-20: every tool call must reach trim/guards, so no matcher can narrow | M | blocked | 010 |
 | IC-033 | P2 | 2.0 | UX & accessibility | Windows Git Bash instruction gives no default path or fallback | skills/on/SKILL.md:30; skills/init/SKILL.md:37; cycle 003 proposal: generate verify.ps1 when bash is missing (skills/init/SKILL.md:37) | M | done | 010 |
 | IC-034 | P2 | 2.0 | New features | Proposal: in-plugin help command and changelogs moved out of README | skills/ (no help); README.md:31-46,71-117,143-166 | M | done | 010 |
 | IC-035 | P2 | 2.0 | New features | Proposal: store key from repo identity instead of truncated path | hooks/session-info.mjs:52; skills/learn/reference.md:12; docs/ideas/token-saving.md:52 | M | done | 010 |
@@ -104,9 +104,9 @@ Scoring: see the improvement-cycle skill `references/scoring.md`. Score = Impact
 | IC-095 | P1 | 4.0 | New features | Proposal: delegation outcome ledger that turns past PASS/FAIL per tier into routing hints | hooks/hooks.json:32,42; https://arxiv.org/abs/2607.00053 | M | done | 009 |
 | IC-096 | P2 | 3.0 | New features | Proposal: export orchestration runs as OpenTelemetry GenAI spans (invoke_agent, execute_tool, token usage) | scripts/trace-tokens.mjs:79,128; https://github.com/open-telemetry/semantic-conventions-genai | M | done | 009 |
 | IC-097 | P2 | 2.0 | New features | Proposal: PRD task table compiled into a file-dependency DAG that derives parallel lanes and skips unchanged tasks | skills/team/SKILL.md:3; https://arxiv.org/pdf/2603.16104v1 | L | done | 009 |
-| IC-098 | P2 | 3.0 | Code quality & tests | validate.mjs (~1500 lines, shared top-level state) still one file; split into modules deferred from IC-028 | scripts/validate.mjs | M | proposed | 010 |
+| IC-098 | P2 | 3.0 | Code quality & tests | validate.mjs (~1500 lines, shared top-level state) still one file; split into modules deferred from IC-028 | scripts/validate.mjs | M | done | 010 |
 | IC-099 | P1 | 6.0 | DX/CI-CD/dependencies | Cycle 010 features (read guard, help skill, store key, trim stats, debug log) have no CHANGELOG entry and version is still 1.13.0, so plugin update will not ship them | .claude-plugin/plugin.json:4; CHANGELOG.md | S | done | 010 |
-| IC-100 | P3 | 1.0 | Code quality & tests | Eval fixtures on-learned-errors and on-learned-errors-write compute the store key with the old path-only bash rule | evals/on-learned-errors/fixture.sh; evals/on-learned-errors-write/fixture.sh | S | proposed | 010 |
+| IC-100 | P3 | 1.0 | Code quality & tests | Eval fixtures on-learned-errors and on-learned-errors-write compute the store key with the old path-only bash rule | evals/on-learned-errors/fixture.sh; evals/on-learned-errors-write/fixture.sh | S | done | 010 |
 
 ## Status legend
 
