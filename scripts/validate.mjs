@@ -665,6 +665,33 @@ function sessionInfo(cwd, env = {}, raw = false) {
     if (gh && gh.stdout.trim() !== '') err('hooks/guard-edit.mjs', 'smoke "guard >16 MB transcript off at start": expected empty stdout');
     try { fs.rmSync(hugeTranscript, { force: true }); } catch { /* ignore */ }
 
+    // guard-edit: >512 KB transcript with no mode marker in the window must not throw; no marker at all means not off, so deny
+    const midTranscript = path.join(tmp, 'mid-none.jsonl');
+    fs.writeFileSync(midTranscript, Array.from({ length: 1000 }, () => filler + '\n').join(''));
+    const gm = runHook('guard-edit.mjs', {
+      hook_event_name: 'PreToolUse',
+      tool_name: 'Edit',
+      tool_input: { file_path: path.join(root, 'agents', 'x.md') },
+      transcript_path: midTranscript,
+      cwd: root,
+    });
+    if (gm && !gm.stdout.includes('"permissionDecision":"deny"')) err('hooks/guard-edit.mjs', 'smoke "guard 1 MB transcript no marker": expected deny');
+    try { fs.rmSync(midTranscript, { force: true }); } catch { /* ignore */ }
+
+    // guard-edit: >512 KB transcript whose only marker is orchestrator:on at the start must deny (chunked scan finds on, not off)
+    const onLine = JSON.stringify({ type: 'user', message: { content: '<command-message>orchestrator:on</command-message>\n<command-name>/orchestrator:on</command-name>' } });
+    const onTranscript = path.join(tmp, 'mid-on.jsonl');
+    fs.writeFileSync(onTranscript, onLine + '\n' + Array.from({ length: 1000 }, () => filler + '\n').join(''));
+    const go = runHook('guard-edit.mjs', {
+      hook_event_name: 'PreToolUse',
+      tool_name: 'Edit',
+      tool_input: { file_path: path.join(root, 'agents', 'x.md') },
+      transcript_path: onTranscript,
+      cwd: root,
+    });
+    if (go && !go.stdout.includes('"permissionDecision":"deny"')) err('hooks/guard-edit.mjs', 'smoke "guard 1 MB transcript on at start": expected deny');
+    try { fs.rmSync(onTranscript, { force: true }); } catch { /* ignore */ }
+
     // long-session: over 1 MB, usage at head and tail only, filler in the middle forces head/tail windows
     const usage = (cacheRead) => JSON.stringify({ type: 'assistant', message: { usage: { input_tokens: 10, cache_read_input_tokens: cacheRead } } });
     const longPath = path.join(tmp, 'long-large.jsonl');

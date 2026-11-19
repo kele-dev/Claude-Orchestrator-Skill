@@ -121,12 +121,14 @@ function orchestrationOff(transcriptPath) {
   const WINDOW = 512 * 1024;
   let text;
   let size = 0;
+  let len = 0;
+  let skip = 0;
   let partial = false;
   try {
     const fd = fs.openSync(transcriptPath, 'r');
     try {
       size = fs.fstatSync(fd).size;
-      const len = Math.min(size, WINDOW);
+      len = Math.min(size, WINDOW);
       text = readBytes(fd, size - len, len).toString('utf8');
       partial = size > len;
     } finally {
@@ -138,6 +140,7 @@ function orchestrationOff(transcriptPath) {
   }
   if (partial) {
     const nl = text.indexOf('\n');
+    skip = nl === -1 ? len : nl + 1;
     text = nl === -1 ? '' : text.slice(nl + 1);
   }
   let mode = lastMode(text);
