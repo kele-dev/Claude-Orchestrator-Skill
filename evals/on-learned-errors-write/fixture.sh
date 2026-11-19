@@ -30,7 +30,7 @@ cat > package.json <<'JSON'
 JSON
 git add -A
 git commit -qm init
-store=$(m=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null) && m=$(dirname "$m") || m=$(pwd -W 2>/dev/null || pwd); h=$(cygpath -m ~ 2>/dev/null || echo ~); k=$(printf %s "$m" | tr A-Z a-z | sed 's/[^a-z0-9][^a-z0-9]*/-/g' | tr -d '\n' | tail -c 80); echo "$h/.claude/orchestrator/$k")
+store=$(m=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null) && m=$(dirname "$m") || m=$(pwd -W 2>/dev/null || pwd); h=$(cygpath -m ~ 2>/dev/null || echo ~); o="$h/.claude/orchestrator"; k=$(printf %s "$m" | tr A-Z a-z | sed 's/[^a-z0-9][^a-z0-9]*/-/g' | tr -d '\n' | tail -c 80); r=$(git config --get remote.origin.url 2>/dev/null | head -n 1 | tr A-Z a-z | sed -e 's|^[a-z][a-z0-9+.-]*://||' -e 's|^[^/]*@||' -e 's|/*$||' -e 's|\.git$||' -e 's|/*$||' -e 's/[^a-z0-9][^a-z0-9]*/-/g' | tr -d '\n' | tail -c 80); if [ -n "$r" ] && [ ! -d "$o/$k" ]; then k=$r; fi; echo "$o/$k")
 mkdir -p "$store/lessons"
 cat > "$store/lessons/learned-errors.md" <<'MD'
 ---
