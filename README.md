@@ -109,7 +109,7 @@ Orchestration mode is active automatically in every session. Manual commands:
 ### 1.12.0
 - Always-loaded rules are split: non-Opus PRD rules moved to `skills/on/non-opus.md`, and situational token rules moved to `skills/on/reference.md` (read on demand, so they may be followed less often).
 - Validator size budget: `CONTEXT_BUDGET_BYTES` caps `hooks/rules.md` + `skills/on/SKILL.md`.
-- `scripts/eval-compare.mjs` compares eval token totals with a stored baseline; the scheduled run is opt-in. The eval baseline is not committed yet, so the CI compare step stays inactive until the owner runs the eval once and commits the `--write` output.
+- `scripts/eval-compare.mjs` compares eval token totals with a stored baseline; the scheduled run is opt-in. The eval baseline is not committed yet, so the CI compare step is skipped (the run emits a `::warning::` annotation). To activate it: run the `eval` workflow once, download the `eval-results` artifact, run `node scripts/eval-compare.mjs ci-result.json --write evals/baseline.json` with the trace files next to `ci-result.json`, and commit `evals/baseline.json` (details in `evals/README.md`).
 - Stale checkpoints (older than `ORCH_STALE_DAYS`, default 14) are marked in the session-info line.
 
 ### 1.11.0

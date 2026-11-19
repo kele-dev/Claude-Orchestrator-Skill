@@ -66,6 +66,11 @@ jobs:
         run: |
           claude plugin eval . --case "$CASE" --runs "$RUNS" --ablation none --scaffold --trust-plugin --allow-tools Bash Edit Write --model "$MODEL" --judge-model claude-haiku-5-5 --max-cost-usd "$MAX_COST" --no-publish --json evals/ci-result.json
 
+      - name: Warn when baseline is missing
+        if: hashFiles('evals/baseline.json') == ''
+        run: |
+          echo "::warning::evals/baseline.json is missing, so the token-regression gate is SKIPPED. To create it: download ci-result.json and its trace files from a CI eval run, run 'node scripts/eval-compare.mjs ci-result.json --write evals/baseline.json', and commit evals/baseline.json (see evals/README.md)."
+
       - name: Compare tokens with baseline
         if: hashFiles('evals/baseline.json') != ''
         run: node scripts/eval-compare.mjs evals/ci-result.json evals/baseline.json --threshold 15 --strict

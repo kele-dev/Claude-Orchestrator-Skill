@@ -104,7 +104,7 @@ Create a baseline: download `ci-result.json` from a CI eval run together with it
 
     node scripts/eval-compare.mjs ci-result.json --write evals/baseline.json
 
-and commit `evals/baseline.json`. It exits 2 and writes nothing when no trace was readable. If a `tracePath` in the result file no longer exists, the script also tries the same file name inside the result file's own folder.
+and commit `evals/baseline.json`. Exact steps: (1) trigger the `eval` workflow (Actions, Run workflow) with the repository secret `ANTHROPIC_API_KEY` set; (2) download the `eval-results` artifact and keep `ci-result.json` and the trace files in one folder; (3) run the command above from the repo root; (4) `git add evals/baseline.json`, commit and push. Until then the CI gate is skipped and the run prints a `::warning::` annotation. It exits 2 and writes nothing when no trace was readable. If a `tracePath` in the result file no longer exists, the script also tries the same file name inside the result file's own folder.
 
 Compare: `node scripts/eval-compare.mjs <current.json> [baseline.json] [--threshold 15]`. A pair is OVER when now is strictly greater than base * (1 + threshold/100). NEW (not in baseline) and SKIP (no readable trace) never fail. If both files name a model and the models differ, the compare is skipped. The summary counts measured and not-compared pairs; EMPTY (nothing measured) warns but does not fail. Baseline pairs missing from the current run print MISSING. With `--strict` (used in CI), EMPTY and a model mismatch exit 2 and MISSING pairs fail.
 
