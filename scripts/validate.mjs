@@ -901,6 +901,8 @@ if (spawnSync('git', ['--version']).status === 0) {
     const oldKey = fwdSlash(legacy).toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(-80);
     fs.mkdirSync(path.join(shome, '.claude', 'orchestrator', oldKey), { recursive: true });
     check('old path dir kept', legacy, base + oldKey);
+    fs.mkdirSync(path.join(shome, '.claude', 'orchestrator', 'example-com-legacy-proj'), { recursive: true });
+    check('path dir wins when remote dir also exists', legacy, base + oldKey);
     check('no remote uses path key', mkRepo(null), base + fwdSlash(dirs[dirs.length - 1]).toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(-80));
   } finally {
     for (const d of dirs) rmQuiet(d, { recursive: true });

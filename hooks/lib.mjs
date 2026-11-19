@@ -68,7 +68,7 @@ export function remoteKey(url) {
 }
 
 // Per-project store: key from the git remote origin URL (so clones and worktrees of one repo share a store), else the path slug.
-// Backward compatible: when the remote-key dir does not exist but the old path-slug dir does, the old dir is kept.
+// Backward compatible: an existing path-slug dir always wins; the remote key is used only when that dir does not exist.
 // Mirrors skills/learn/reference.md "## Store command". Returns { main, store }; main = main checkout path with forward slashes.
 export function storeInfo(cwd) {
   const git = (args) => execFileSync('git', args, { cwd, timeout: 3000, stdio: ['ignore', 'pipe', 'ignore'], encoding: 'utf8' }).trim();
@@ -88,7 +88,7 @@ export function storeInfo(cwd) {
   }
   const base = homedir().replace(/\\/g, '/') + '/.claude/orchestrator/';
   const pathKey = main.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(-80);
-  const useRemote = remote !== '' && (existsSync(base + remote) || !existsSync(base + pathKey));
+  const useRemote = remote !== '' && !existsSync(base + pathKey);
   return { main, store: base + (useRemote ? remote : pathKey) };
 }
 
