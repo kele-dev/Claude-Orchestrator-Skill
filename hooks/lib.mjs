@@ -1,6 +1,6 @@
 // Shared helpers for the orchestrator hooks (stdin read, debug output, env ints, bounded file reads, transcript entry filter).
 import { execFileSync } from 'node:child_process';
-import { existsSync, readSync } from 'node:fs';
+import { existsSync, readSync, renameSync, unlinkSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname } from 'node:path';
 
@@ -12,6 +12,17 @@ export const makeDbg = (name) => (e) => { if (process.env.ORCH_DEBUG === '1' || 
 
 // Positive integer from an env-style string, else the default.
 export const posInt = (v, d) => (/^[1-9]\d*$/.test(v ?? '') ? Number(v) : d);
+
+// Atomic write: temp file (flag 'wx', so an existing file or symlink is never followed) then rename over the target; fails silently.
+export function writeAtomic(path, data) {
+  const tmp = `${path}.${process.pid}.tmp`;
+  try {
+    writeFileSync(tmp, data, { flag: 'wx' });
+    renameSync(tmp, path);
+  } catch {
+    try { unlinkSync(tmp); } catch { /* ignore */ }
+  }
+}
 
 // Reads all of stdin as utf8 and passes it to cb.
 export function readStdin(cb) {

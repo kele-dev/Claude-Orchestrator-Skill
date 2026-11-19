@@ -3,7 +3,7 @@
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { fileURLToPath } from 'url';
+import { fileURLToPath, pathToFileURL } from 'url';
 import { spawnSync } from 'child_process';
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
@@ -1022,6 +1022,30 @@ if (spawnSync('git', ['--version']).status === 0) {
       fs.writeFileSync(incGrowth, [10000, 141000].map(usageLine).join(''));
       const g3 = growthRun(`${sidA}-n`);
       if (g3 && !g3.stdout.includes('+131k')) err('hooks/long-session.mjs', 'smoke "long growth shrunk file": expected "+131k" via the bounded read');
+    }
+
+    {
+      // writeAtomic: replaces content, leaves no temp file, never follows a symlink at the target, fails silently on a stale temp file
+      const { writeAtomic } = await import(pathToFileURL(path.join(root, 'hooks', 'lib.mjs')).href);
+      const wa = path.join(tmp, 'atomic.txt');
+      fs.writeFileSync(wa, 'old');
+      writeAtomic(wa, 'new');
+      if (fs.readFileSync(wa, 'utf8') !== 'new') err('hooks/lib.mjs', 'writeAtomic: expected the target replaced with new content');
+      if (fs.readdirSync(tmp).some((f) => f.startsWith('atomic.txt.') && f.endsWith('.tmp'))) err('hooks/lib.mjs', 'writeAtomic: expected no leftover temp file');
+      const victim = path.join(tmp, 'atomic-victim.txt');
+      const link = path.join(tmp, 'atomic-link.txt');
+      fs.writeFileSync(victim, 'keep');
+      let linked = false;
+      try { fs.symlinkSync(victim, link); linked = true; } catch { /* no symlink permission: skip */ }
+      if (linked) {
+        writeAtomic(link, 'new');
+        if (fs.readFileSync(victim, 'utf8') !== 'keep') err('hooks/lib.mjs', 'writeAtomic: expected a symlink target to stay untouched');
+      }
+      const stale = path.join(tmp, 'atomic-stale.txt');
+      fs.writeFileSync(stale, 'old');
+      fs.writeFileSync(`${stale}.${process.pid}.tmp`, 'x');
+      writeAtomic(stale, 'new');
+      if (fs.readFileSync(stale, 'utf8') !== 'old') err('hooks/lib.mjs', 'writeAtomic: expected a silent no-op when the temp file already exists');
     }
 
     // long repeat smoke: [suffix, ORCH_LONG_REPEAT, write marker first, [growth, expect ('' = empty stdout), noReminder]]

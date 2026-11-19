@@ -4,10 +4,10 @@
 // Delegation count is incremental: the byte offset and count are cached in a .count file, and only new bytes are read.
 // Marker, .count and .growth (usage scan state) files live in ORCH_STATE_DIR, or else in a private per-user dir under tmpdir (mode 0700, not a symlink, owned by the current user).
 // Fails open: on any error or unexpected input it prints nothing and exits 0.
-import { closeSync, existsSync, lstatSync, mkdirSync, openSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { closeSync, existsSync, lstatSync, mkdirSync, openSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { tmpdir, userInfo } from 'node:os';
 import { join } from 'node:path';
-import { isMainAssistant, makeDbg, posInt, readBytes, readStdin } from './lib.mjs';
+import { isMainAssistant, makeDbg, posInt, readBytes, readStdin, writeAtomic } from './lib.mjs';
 
 const dbg = makeDbg('long-session');
 
@@ -57,7 +57,7 @@ function contextGrowth(path, size, cachePath) {
   const WINDOW = 1024 * 1024;
   const save = (fd, offset, first, last) => {
     try {
-      writeFileSync(cachePath, JSON.stringify({ offset, first, last, check: checkOf(fd, offset) }));
+      writeAtomic(cachePath, JSON.stringify({ offset, first, last, check: checkOf(fd, offset) }));
     } catch (e) {
       dbg(e);
       // ignore cache write errors
@@ -158,7 +158,7 @@ function countDelegations(path, size, cachePath) {
     return cache.count;
   }
   try {
-    writeFileSync(cachePath, JSON.stringify(next));
+    writeAtomic(cachePath, JSON.stringify(next));
   } catch (e) {
     dbg(e);
     // ignore cache write errors
@@ -223,7 +223,7 @@ function run(input) {
   const say = (line) => JSON.stringify({ systemMessage: line, hookSpecificOutput: { hookEventName: 'UserPromptSubmit', additionalContext: `${line} Tell the user in their language.` } });
   if (warned > 0) {
     if (!g || level <= warned) return '';
-    writeFileSync(marker, String(level));
+    writeAtomic(marker, String(level));
     return say(`orchestrator: this session is very long (+${Math.round(growth / 1000)}k context tokens; reminder ${level - 1} of ${levels.length - 1}). Every turn re-reads the whole context. If a multi-step task is in progress, write a checkpoint per orchestrator:resume now (one haiku-coder delegation, bundled with any due housekeeping) and hand off per orchestrator:resume (summary plus a new-session card running /orchestrator:resume <slug>); otherwise suggest a new session or /compact in one line.`);
   }
 
@@ -235,7 +235,7 @@ function run(input) {
   const isLong = tokensLong || delegations >= delegLimit || (!g && size >= bytesLimit);
   if (!isLong) return '';
 
-  writeFileSync(marker, String(g ? Math.max(1, level) : levels.length));
+  writeAtomic(marker, String(g ? Math.max(1, level) : levels.length));
   try {
     rmSync(countPath, { force: true });
   } catch (e) {
