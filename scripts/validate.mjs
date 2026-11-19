@@ -583,6 +583,17 @@ function sessionInfo(cwd, env = {}, raw = false) {
   }
 
   {
+    // IC-050: ORCH_DEBUG=1 also appends a redacted line to <tmpdir>/orchestrator-debug.log (hook prefix, no stdin content)
+    const dtmp = fs.mkdtempSync(path.join(os.tmpdir(), 'orch-dbglog-'));
+    const dl = rawHook('long-session.mjs', { ORCH_DEBUG: '1', TMPDIR: dtmp, TMP: dtmp, TEMP: dtmp });
+    let logText = null;
+    try { logText = fs.readFileSync(path.join(dtmp, 'orchestrator-debug.log'), 'utf8'); } catch { /* reported below */ }
+    if (dl.status !== 0 || logText === null) err('hooks/lib.mjs', 'smoke "debug log": expected exit 0 and <tmpdir>/orchestrator-debug.log');
+    else if (!logText.startsWith('orchestrator long-session:') || logText.includes('xxxxxxxx')) err('hooks/lib.mjs', 'smoke "debug log": expected the hook prefix and no stdin content');
+    fs.rmSync(dtmp, { recursive: true, force: true });
+  }
+
+  {
     // IC-072: read guard denies a whole-file main-session Read of a large file once per session; repeat, small file, subagent, ranged read and kill switch pass
     const rdir = fs.mkdtempSync(path.join(os.tmpdir(), 'orch-readguard-'));
     const sid = `smoke-read-${process.pid}-${Date.now()}`;

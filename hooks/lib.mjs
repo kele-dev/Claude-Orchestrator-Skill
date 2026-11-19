@@ -1,14 +1,25 @@
 // Shared helpers for the orchestrator hooks (stdin read, debug output, env ints, bounded file reads, transcript entry filter).
 import { execFileSync } from 'node:child_process';
-import { existsSync, readSync, renameSync, unlinkSync, writeFileSync } from 'node:fs';
-import { homedir } from 'node:os';
-import { dirname } from 'node:path';
+import { appendFileSync, existsSync, readSync, renameSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
+import { homedir, tmpdir } from 'node:os';
+import { dirname, join } from 'node:path';
 
 // One-line error text; full stack when ORCH_DEBUG=2, quoted strings redacted otherwise.
 export const fmt = (e) => process.env.ORCH_DEBUG === '2' ? String(e?.stack ?? e) : `${e?.name ?? 'Error'}: ${String(e?.message ?? e).replace(/"[^"]*"/g, '"…"').slice(0, 200)}`;
 
-// Debug printer for one hook: writes to stderr only when ORCH_DEBUG is 1 or 2.
-export const makeDbg = (name) => (e) => { if (process.env.ORCH_DEBUG === '1' || process.env.ORCH_DEBUG === '2') process.stderr.write(`orchestrator ${name}: ${fmt(e)}\n`); };
+// Debug printer for one hook: only when ORCH_DEBUG is 1 or 2. Writes the redacted line to stderr (not shown in chat on exit 0)
+// and appends it to <tmpdir>/orchestrator-debug.log, which stops growing at 256 KB.
+export const DEBUG_LOG_MAX = 256 * 1024;
+export const makeDbg = (name) => (e) => {
+  if (process.env.ORCH_DEBUG !== '1' && process.env.ORCH_DEBUG !== '2') return;
+  const line = `orchestrator ${name}: ${fmt(e)}\n`;
+  process.stderr.write(line);
+  try {
+    const file = join(tmpdir(), 'orchestrator-debug.log');
+    const size = existsSync(file) ? statSync(file).size : 0;
+    if (size + line.length <= DEBUG_LOG_MAX) appendFileSync(file, line);
+  } catch { /* debug logging must never fail a hook */ }
+};
 
 // Positive integer from an env-style string, else the default.
 export const posInt = (v, d) => (/^[1-9]\d*$/.test(v ?? '') ? Number(v) : d);
