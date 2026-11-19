@@ -1,16 +1,27 @@
 // Shared transcript (JSONL) helpers for digest.mjs and budget.mjs.
-import { readFileSync } from 'node:fs';
+import { closeSync, fstatSync, openSync, readFileSync, readSync } from 'node:fs';
 
-// Returns string[] lines; throws if unreadable. With from > 0, starts at that byte offset
+// Returns string[] lines; throws if unreadable. With from > 0, reads only the bytes from that offset on (plus the one byte before it)
 // and drops the partial first line unless the byte before the offset is a newline.
 export function readTranscript(file, from = 0) {
-  const buf = readFileSync(file);
-  if (!(from > 0)) return buf.toString('utf8').split('\n');
-  if (from >= buf.length) return [];
-  const text = buf.subarray(from).toString('utf8');
-  const lines = text.split('\n');
-  if (buf[from - 1] !== 0x0a) lines.shift();
-  return lines;
+  if (!(from > 0)) return readFileSync(file).toString('utf8').split('\n');
+  const fd = openSync(file, 'r');
+  try {
+    const size = fstatSync(fd).size;
+    if (from >= size) return [];
+    const buf = Buffer.alloc(size - from + 1);
+    let got = 0;
+    while (got < buf.length) {
+      const n = readSync(fd, buf, got, buf.length - got, from - 1 + got);
+      if (n <= 0) break;
+      got += n;
+    }
+    const lines = buf.toString('utf8', 1, got).split('\n');
+    if (buf[0] !== 0x0a) lines.shift();
+    return lines;
+  } finally {
+    closeSync(fd);
+  }
 }
 
 // Yields parsed objects; skips blank/unparsable lines and sidechain entries.
