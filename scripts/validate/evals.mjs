@@ -39,6 +39,24 @@ const { root, err, exists, readText, frontmatter, listDirs, listMd } = ctx;
     }
   }
 }
+// 9b. Eval fixtures that compute the store key must use the bash store command from skills/learn/reference.md
+{
+  const ref = 'skills/learn/reference.md';
+  if (!exists(path.join(root, ref))) err(ref, 'missing');
+  else {
+    const fence = /```bash\r?\n([\s\S]*?)```/.exec(readText(path.join(root, ref)));
+    if (!fence) err(ref, 'bash store command fence missing');
+    else {
+      const want = `store=$(${fence[1].split(/\r?\n/)[0].trim()})`;
+      for (const c of listDirs('evals').filter((d) => d !== 'results')) {
+        const f = `evals/${c}/fixture.sh`;
+        if (!exists(path.join(root, f))) continue;
+        const bad = readText(path.join(root, f)).split(/\r?\n/).some((l) => l.trim().startsWith('store=$(') && l.trim() !== want);
+        if (bad) err(f, 'store= line must wrap the bash store command from skills/learn/reference.md');
+      }
+    }
+  }
+}
 const GRADER_TYPES = new Set(['regex', 'tool_order', 'tool_used', 'file_exists', 'llm', 'baseline']);
 const REQUIRED = { regex: ['pattern'], tool_order: ['before', 'after'], tool_used: ['tool'], file_exists: ['path'], llm: [], baseline: ['baseline_file'] };
 // Grader frontmatter as a tree: top-level "key: value" plus indented "key: value" children (nested keys such as target.source).
