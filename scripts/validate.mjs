@@ -365,6 +365,18 @@ function sessionInfo(cwd, env = {}, raw = false) {
       err('hooks/trim-output.mjs', 'smoke "trim npm test": output not trimmed or lost the error line');
     }
   }
+  {
+    // failed command: keyword-less failure lines near the start survive in the trimmed middle
+    const failBody = (tailLine) => Array.from({ length: 150 }, (_, i) => (i === 6 ? 'fatal: not a git repository'.padEnd(50, '.') : i === 149 ? tailLine.padEnd(50, '.') : 'x'.repeat(50))).join('\n');
+    const failOut = (stdout, extra = {}) => {
+      const res = runHook('trim-output.mjs', { ...trimPayload('git status'), tool_response: { stdout, stderr: '', interrupted: false, ...extra } });
+      if (!res || res.stdout.trim() === '') return '';
+      return JSON.parse(res.stdout).hookSpecificOutput.updatedToolOutput.stdout;
+    };
+    if (!failOut(failBody('x'), { exit_code: 1 }).includes('fatal: not a git repository')) err('hooks/trim-output.mjs', 'smoke "trim failed exit code": expected keyword-less line 6 kept when the exit code is non-zero');
+    if (!failOut(failBody('Error: boom')).includes('fatal: not a git repository')) err('hooks/trim-output.mjs', 'smoke "trim failed keyword": expected keyword-less line 6 kept when an error line exists');
+    if (failOut(failBody('x')).includes('fatal: not a git repository')) err('hooks/trim-output.mjs', 'smoke "trim success": line 6 must still be trimmed when the command did not fail');
+  }
   r = runHook('trim-output.mjs', trimPayload('git diff'));
   if (r && r.stdout.trim() !== '') err('hooks/trim-output.mjs', 'smoke "git diff untouched": expected empty stdout');
   {
