@@ -1187,6 +1187,26 @@ if (spawnSync('git', ['--version']).status === 0) {
       const autoSub = path.join(autoCwd, 'sub');
       fs.mkdirSync(autoSub, { recursive: true });
       chk('auto from subfolder', auto(autoCfg, [], autoSub), 'BUDGET: spent 12k (1 agent)');
+      // session launched above the repo: the transcript lives under the parent dir slug, cwd is inside a git repo below it
+      if (spawnSync('git', ['--version']).status === 0) {
+        const above = fs.realpathSync(fs.mkdtempSync(path.join(tmp, 'above-')));
+        const repoDir = path.join(above, 'repo');
+        fs.mkdirSync(repoDir, { recursive: true });
+        if (spawnSync('git', ['init', '-q'], { cwd: repoDir }).status === 0) {
+          const aboveCfg = path.join(tmp, 'above-cfg');
+          const slug = (d) => d.replace(/[^A-Za-z0-9]/g, '-');
+          const parentProj = path.join(aboveCfg, 'projects', slug(above));
+          fs.mkdirSync(parentProj, { recursive: true });
+          fs.writeFileSync(path.join(parentProj, 'parent.jsonl'), one(7000));
+          chk('auto parent of git top level', auto(aboveCfg, [], repoDir), 'BUDGET: spent 7k (1 agent)');
+          // the closest match still wins over the parent one
+          const repoProj = path.join(aboveCfg, 'projects', slug(repoDir));
+          fs.mkdirSync(repoProj, { recursive: true });
+          fs.writeFileSync(path.join(repoProj, 'repo.jsonl'), one(3000));
+          fs.utimesSync(path.join(repoProj, 'repo.jsonl'), new Date(Date.now() - 60000), new Date(Date.now() - 60000));
+          chk('auto closest match preferred', auto(aboveCfg, [], repoDir), 'BUDGET: spent 3k (1 agent)');
+        }
+      }
     }
 
     // guard-review smoke

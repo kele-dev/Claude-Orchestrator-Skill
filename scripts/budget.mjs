@@ -43,8 +43,9 @@ function gitTop(cwd) {
 }
 
 // Newest *.jsonl of this project's transcript dir: cwd (and its realpath), then each parent up to the
-// git top level of cwd (stops after checking it; compared case-insensitively on win32/darwin), or up to
-// root when git fails. undefined if nothing found (treated as unreadable).
+// git top level of cwd (compared case-insensitively on win32/darwin), or up to root when git fails; when
+// nothing matched inside the repo, the parent dirs above the top level are tried (closest first).
+// undefined if nothing found (treated as unreadable).
 function newestTranscript() {
   const base = process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), '.claude');
   const top = gitTop(process.cwd());
@@ -52,12 +53,23 @@ function newestTranscript() {
   const same = (a, b) => (fold ? a.toLowerCase() === b.toLowerCase() : a === b);
   const starts = [process.cwd()];
   try { const real = realpathSync(process.cwd()); if (real !== starts[0]) starts.push(real); } catch { /* cwd only */ }
+  const above = []; // parent dirs above the git top level, searched only when nothing inside the repo matched (session launched above the repo)
   for (const start of starts) {
     for (let dir = start; ; dir = path.dirname(dir)) {
       const found = newestJsonl(path.join(base, 'projects', dir.replace(/[^A-Za-z0-9]/g, '-')));
       if (found) return found;
-      if (top !== undefined && same(path.resolve(dir), top)) break;
+      if (top !== undefined && same(path.resolve(dir), top)) {
+        for (let up = dir; path.dirname(up) !== up;) above.push(up = path.dirname(up));
+        break;
+      }
       if (path.dirname(dir) === dir) break;
+    }
+  }
+  for (const dir of above) {
+    const found = newestJsonl(path.join(base, 'projects', dir.replace(/[^A-Za-z0-9]/g, '-')));
+    if (found) {
+      if (process.env.ORCH_DEBUG || process.argv.includes('--verbose')) process.stderr.write('budget: auto found no transcript inside the git repo; using one from a parent dir\n');
+      return found;
     }
   }
   return undefined;
