@@ -105,7 +105,7 @@ Scoring: see the improvement-cycle skill `references/scoring.md`. Score = Impact
 | IC-096 | P2 | 3.0 | New features | Proposal: export orchestration runs as OpenTelemetry GenAI spans (invoke_agent, execute_tool, token usage) | scripts/trace-tokens.mjs:79,128; https://github.com/open-telemetry/semantic-conventions-genai | M | done | 009 |
 | IC-097 | P2 | 2.0 | New features | Proposal: PRD task table compiled into a file-dependency DAG that derives parallel lanes and skips unchanged tasks | skills/team/SKILL.md:3; https://arxiv.org/pdf/2603.16104v1 | L | done | 009 |
 | IC-098 | P2 | 3.0 | Code quality & tests | validate.mjs (~1500 lines, shared top-level state) still one file; split into modules deferred from IC-028 | scripts/validate.mjs | M | proposed | 010 |
-| IC-099 | P1 | 6.0 | DX/CI-CD/dependencies | Cycle 010 features (read guard, help skill, store key, trim stats, debug log) have no CHANGELOG entry and version is still 1.13.0, so plugin update will not ship them | .claude-plugin/plugin.json:4; CHANGELOG.md | S | proposed | 010 |
+| IC-099 | P1 | 6.0 | DX/CI-CD/dependencies | Cycle 010 features (read guard, help skill, store key, trim stats, debug log) have no CHANGELOG entry and version is still 1.13.0, so plugin update will not ship them | .claude-plugin/plugin.json:4; CHANGELOG.md | S | done | 010 |
 | IC-100 | P3 | 1.0 | Code quality & tests | Eval fixtures on-learned-errors and on-learned-errors-write compute the store key with the old path-only bash rule | evals/on-learned-errors/fixture.sh; evals/on-learned-errors-write/fixture.sh | S | proposed | 010 |
 
 ## Status legend
