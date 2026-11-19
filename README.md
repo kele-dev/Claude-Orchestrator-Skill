@@ -207,7 +207,7 @@ If you previously installed via `install.ps1`, delete `haiku-coder.md`, `sonnet-
 
 ## Maintainers
 
-Releasing: bump `version` in `.claude-plugin/plugin.json` and `marketplace.json` on every release so `claude plugin update` picks it up. Run `node scripts/validate.mjs` before pushing (Node 18+, no dependencies); CI runs the same check on every push and pull request. Add the new `Baru di X.Y.Z` line after the newest one at the end of the list (the validator requires ascending order).
+Releasing: bump `version` in `.claude-plugin/plugin.json` and `marketplace.json` on every release so `claude plugin update` picks it up. Run `node scripts/validate.mjs` before pushing (Node 18+, no dependencies); CI runs the same check on pushes to `main` and on pull requests. Add the new `Baru di X.Y.Z` line after the newest one at the end of the list (the validator requires ascending order).
 
 ## License
 
