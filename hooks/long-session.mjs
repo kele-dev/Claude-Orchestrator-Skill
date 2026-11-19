@@ -2,19 +2,15 @@
 // UserPromptSubmit hook: warns when the context has grown (assistant message.usage tokens), then again at higher thresholds (ORCH_LONG_REPEAT),
 // or, without usage data, when the transcript is large; also warns on delegation count.
 // Delegation count is incremental: the byte offset and count are cached in a .count file, and only new bytes are read.
-// Marker and .count files live in ORCH_STATE_DIR, or else in a private per-user dir under tmpdir (mode 0700, not a symlink, owned by the current user).
+// Marker, .count and .growth (usage scan state) files live in ORCH_STATE_DIR, or else in a private per-user dir under tmpdir (mode 0700, not a symlink, owned by the current user).
 // Fails open: on any error or unexpected input it prints nothing and exits 0.
-import { closeSync, existsSync, lstatSync, mkdirSync, openSync, readFileSync, readSync, rmSync, statSync, writeFileSync } from 'node:fs';
-import { tmpdir, userInfo } from 'node:os';
+import { closeSync, existsSync, openSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { join } from 'node:path';
+import { isMainAssistant, makeDbg, posInt, readBytes, readStdin, stateDir, writeAtomic } from './lib.mjs';
 
-const fmt = (e) => process.env.ORCH_DEBUG === '2' ? String(e?.stack ?? e) : `${e?.name ?? 'Error'}: ${String(e?.message ?? e).replace(/"[^"]*"/g, '"…"').slice(0, 200)}`;
-const dbg = (e) => { if (process.env.ORCH_DEBUG === '1' || process.env.ORCH_DEBUG === '2') process.stderr.write(`orchestrator long-session: ${fmt(e)}\n`); };
+const dbg = makeDbg('long-session');
 
-let raw = '';
-process.stdin.setEncoding('utf8');
-process.stdin.on('data', (d) => { raw += d; });
-process.stdin.on('end', () => {
+readStdin((raw) => {
   try {
     const out = run(JSON.parse(raw));
     if (out) process.stdout.write(out + '\n');
@@ -24,43 +20,71 @@ process.stdin.on('end', () => {
   }
 });
 
-const posInt = (v, d) => (/^[1-9]\d*$/.test(v ?? '') ? Number(v) : d);
+// Context tokens of one transcript line (main-session assistant usage), or null.
+function usageTokens(line) {
+  if (!line.includes('"usage"')) return null;
+  let entry;
+  try {
+    entry = JSON.parse(line);
+  } catch {
+    return null;
+  }
+  const u = entry?.message?.usage;
+  if (!isMainAssistant(entry) || !u || typeof u !== 'object') return null;
+  return (u.input_tokens || 0) + (u.cache_read_input_tokens || 0) + (u.cache_creation_input_tokens || 0);
+}
+
+const CHECK_BYTES = 64;
+const checkOf = (fd, offset) => readBytes(fd, offset - Math.min(offset, CHECK_BYTES), Math.min(offset, CHECK_BYTES)).toString('base64');
+
+// Cached scan state { offset, first, last, check } from a previous prompt; null unless the file still has the same bytes before the offset (a shrunk or rewritten file invalidates it).
+function loadGrowthCache(fd, cachePath, size) {
+  try {
+    const c = JSON.parse(readFileSync(cachePath, 'utf8'));
+    const ok = Number.isInteger(c?.offset) && c.offset > 0 && c.offset <= size && Number.isInteger(c.first) && Number.isInteger(c.last) && typeof c.check === 'string';
+    return ok && checkOf(fd, c.offset) === c.check ? c : null;
+  } catch (e) {
+    dbg(e);
+    return null;
+  }
+}
 
 // Context growth from assistant message.usage: { first, last } tokens, or null when no usage entries are found.
-function contextGrowth(path, size) {
+// Incremental: the scanned byte offset, the first usage and the latest usage are cached, so a later prompt reads only the bytes appended since.
+// Without a valid cache (first prompt, shrunk or rewritten file) it reads a bounded head window and tail window (1 MB each).
+function contextGrowth(path, size, cachePath) {
   const WINDOW = 1024 * 1024;
-  const usageTokens = (line) => {
-    if (!line.includes('"usage"')) return null;
-    let entry;
+  const save = (fd, offset, first, last) => {
     try {
-      entry = JSON.parse(line);
-    } catch {
-      return null;
+      writeAtomic(cachePath, JSON.stringify({ offset, first, last, check: checkOf(fd, offset) }));
+    } catch (e) {
+      dbg(e);
+      // ignore cache write errors
     }
-    const u = entry?.message?.usage;
-    if (entry?.type !== 'assistant' || entry.isSidechain || !u || typeof u !== 'object') return null;
-    return (u.input_tokens || 0) + (u.cache_read_input_tokens || 0) + (u.cache_creation_input_tokens || 0);
-  };
-  const readRange = (fd, start, len) => {
-    const buf = Buffer.alloc(len);
-    let got = 0;
-    while (got < len) {
-      const n = readSync(fd, buf, got, len - got, start + got);
-      if (n <= 0) break;
-      got += n;
-    }
-    return buf.toString('utf8', 0, got);
   };
   try {
     const fd = openSync(path, 'r');
     try {
+      const c = loadGrowthCache(fd, cachePath, size);
+      if (c) {
+        const buf = readBytes(fd, c.offset, size - c.offset);
+        const lastNL = buf.lastIndexOf(0x0a);
+        if (lastNL === -1) return { first: c.first, last: c.last };
+        let last = c.last;
+        for (const line of buf.toString('utf8', 0, lastNL).split('\n')) {
+          const t = usageTokens(line);
+          if (t !== null) last = t;
+        }
+        save(fd, c.offset + lastNL + 1, c.first, last);
+        return { first: c.first, last };
+      }
       const len = Math.min(size, WINDOW);
-      let head = readRange(fd, 0, len);
+      let head = readBytes(fd, 0, len).toString('utf8');
       if (size > len) {
         const nl = head.lastIndexOf('\n');
         head = nl === -1 ? '' : head.slice(0, nl);
       }
-      let tail = readRange(fd, size - len, len);
+      let tail = readBytes(fd, size - len, len).toString('utf8');
       if (size > len) {
         const nl = tail.indexOf('\n');
         tail = nl === -1 ? '' : tail.slice(nl + 1);
@@ -79,6 +103,8 @@ function contextGrowth(path, size) {
         if (t !== null) last = t;
       }
       if (first === null || last === null) return null;
+      const lastNL = tail.lastIndexOf('\n');
+      if (lastNL !== -1) save(fd, size - Buffer.byteLength(tail.slice(lastNL + 1)), first, last);
       return { first, last };
     } finally {
       closeSync(fd);
@@ -102,20 +128,14 @@ function countDelegations(path, size, cachePath) {
   }
   let next;
   try {
-    const len = size - cache.offset;
-    const buf = Buffer.alloc(len);
     const fd = openSync(path, 'r');
-    let got = 0;
+    let buf;
     try {
-      while (got < len) {
-        const n = readSync(fd, buf, got, len - got, cache.offset + got);
-        if (n <= 0) break;
-        got += n;
-      }
+      buf = readBytes(fd, cache.offset, size - cache.offset);
     } finally {
       closeSync(fd);
     }
-    const lastNL = buf.subarray(0, got).lastIndexOf(0x0a);
+    const lastNL = buf.lastIndexOf(0x0a);
     if (lastNL === -1) return cache.count;
     let count = cache.count;
     for (const line of buf.toString('utf8', 0, lastNL).split('\n')) {
@@ -126,7 +146,7 @@ function countDelegations(path, size, cachePath) {
       } catch {
         continue;
       }
-      if (entry?.type !== 'assistant' || entry.isSidechain) continue;
+      if (!isMainAssistant(entry)) continue;
       const content = entry.message?.content;
       if (!Array.isArray(content)) continue;
       count += content.filter((p) => p?.type === 'tool_use' && (p.name === 'Agent' || p.name === 'Task')).length;
@@ -137,7 +157,7 @@ function countDelegations(path, size, cachePath) {
     return cache.count;
   }
   try {
-    writeFileSync(cachePath, JSON.stringify(next));
+    writeAtomic(cachePath, JSON.stringify(next));
   } catch (e) {
     dbg(e);
     // ignore cache write errors
@@ -157,28 +177,6 @@ function readLevel(marker) {
   try { const s = readFileSync(marker, 'utf8').trim(); return /^[1-9]\d*$/.test(s) ? Number(s) : 1; } catch (e) { dbg(e); return 1; }
 }
 
-// State dir for markers: ORCH_STATE_DIR when set, else a per-user dir under tmpdir. Returns null (fail open) when the dir cannot be used.
-// The ownership/symlink safety check applies to the default per-user dir only; an explicit ORCH_STATE_DIR is trusted as the user's choice.
-function stateDir() {
-  const explicit = process.env.ORCH_STATE_DIR;
-  const tag = String(process.getuid?.() ?? userInfo().username).replace(/[^A-Za-z0-9_-]/g, '');
-  const dir = explicit || join(tmpdir(), `orchestrator-${tag}`);
-  try {
-    mkdirSync(dir, { recursive: true, mode: 0o700 });
-    if (!explicit && process.platform !== 'win32') {
-      const st = lstatSync(dir);
-      if (!st.isDirectory() || st.isSymbolicLink() || (process.getuid && st.uid !== process.getuid())) {
-        dbg(new Error('unsafe state dir ' + dir));
-        return null;
-      }
-    }
-  } catch (e) {
-    dbg(e);
-    return null;
-  }
-  return dir;
-}
-
 function run(input) {
   if (process.env.ORCH_LONG === 'off') return '';
 
@@ -196,13 +194,13 @@ function run(input) {
   const warned = existsSync(marker) ? readLevel(marker) : 0;
   if (warned >= levels.length) return '';
   const size = statSync(path).size;
-  const g = contextGrowth(path, size);
+  const g = contextGrowth(path, size, `${marker}.growth`);
   const growth = g ? g.last - g.first : 0;
   const level = levels.filter((t) => growth >= t).length;
   const say = (line) => JSON.stringify({ systemMessage: line, hookSpecificOutput: { hookEventName: 'UserPromptSubmit', additionalContext: `${line} Tell the user in their language.` } });
   if (warned > 0) {
     if (!g || level <= warned) return '';
-    writeFileSync(marker, String(level));
+    writeAtomic(marker, String(level));
     return say(`orchestrator: this session is very long (+${Math.round(growth / 1000)}k context tokens; reminder ${level - 1} of ${levels.length - 1}). Every turn re-reads the whole context. If a multi-step task is in progress, write a checkpoint per orchestrator:resume now (one haiku-coder delegation, bundled with any due housekeeping) and hand off per orchestrator:resume (summary plus a new-session card running /orchestrator:resume <slug>); otherwise suggest a new session or /compact in one line.`);
   }
 
@@ -214,7 +212,7 @@ function run(input) {
   const isLong = tokensLong || delegations >= delegLimit || (!g && size >= bytesLimit);
   if (!isLong) return '';
 
-  writeFileSync(marker, String(g ? Math.max(1, level) : levels.length));
+  writeAtomic(marker, String(g ? Math.max(1, level) : levels.length));
   try {
     rmSync(countPath, { force: true });
   } catch (e) {

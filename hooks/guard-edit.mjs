@@ -6,14 +6,11 @@ import fs from 'fs';
 import os from 'os';
 import { execFileSync } from 'child_process';
 import path from 'path';
+import { makeDbg, readBytes, readStdin } from './lib.mjs';
 
-const fmt = (e) => process.env.ORCH_DEBUG === '2' ? String(e?.stack ?? e) : `${e?.name ?? 'Error'}: ${String(e?.message ?? e).replace(/"[^"]*"/g, '"…"').slice(0, 200)}`;
-const dbg = (e) => { if (process.env.ORCH_DEBUG === '1' || process.env.ORCH_DEBUG === '2') process.stderr.write(`orchestrator guard-edit: ${fmt(e)}\n`); };
+const dbg = makeDbg('guard-edit');
 
-let raw = '';
-process.stdin.setEncoding('utf8');
-process.stdin.on('data', (d) => { raw += d; });
-process.stdin.on('end', () => {
+readStdin((raw) => {
   try {
     const input = JSON.parse(raw);
     if (shouldDeny(input)) {
@@ -124,20 +121,15 @@ function orchestrationOff(transcriptPath) {
   const WINDOW = 512 * 1024;
   let text;
   let size = 0;
+  let len = 0;
+  let skip = 0;
   let partial = false;
   try {
     const fd = fs.openSync(transcriptPath, 'r');
     try {
       size = fs.fstatSync(fd).size;
-      const len = Math.min(size, WINDOW);
-      const buf = Buffer.alloc(len);
-      let got = 0;
-      while (got < len) {
-        const n = fs.readSync(fd, buf, got, len - got, size - len + got);
-        if (n <= 0) break;
-        got += n;
-      }
-      text = buf.toString('utf8', 0, got);
+      len = Math.min(size, WINDOW);
+      text = readBytes(fd, size - len, len).toString('utf8');
       partial = size > len;
     } finally {
       fs.closeSync(fd);
@@ -148,19 +140,52 @@ function orchestrationOff(transcriptPath) {
   }
   if (partial) {
     const nl = text.indexOf('\n');
+    skip = nl === -1 ? len : nl + 1;
     text = nl === -1 ? '' : text.slice(nl + 1);
   }
   let mode = lastMode(text);
-  if (mode === null && partial) {
-    if (size > 16 * 1024 * 1024) return false;
-    try {
-      mode = lastMode(fs.readFileSync(transcriptPath, 'utf8'));
-    } catch (e) {
-      dbg(e);
-      return false;
+  if (mode === null && partial && skip > 0) mode = scanOlder(transcriptPath, size - len + skip);
+  return mode === 'off';
+}
+
+// Scan [0, end) backwards in fixed chunks (bounded memory and time) for the latest mode marker.
+function scanOlder(transcriptPath, end) {
+  const CHUNK = 1024 * 1024;
+  const MAX_CARRY = 32 * 1024 * 1024;
+  const deadline = Date.now() + 2000;
+  let fd;
+  try {
+    fd = fs.openSync(transcriptPath, 'r');
+    let pos = end;
+    let carry = Buffer.alloc(0);
+    while (pos > 0 && Date.now() < deadline) {
+      const start = Math.max(0, pos - CHUNK);
+      const data = Buffer.concat([readBytes(fd, start, pos - start), carry]);
+      let body = data;
+      if (start > 0) {
+        const i = data.indexOf(10);
+        if (i === -1) {
+          carry = data.length > MAX_CARRY ? Buffer.alloc(0) : data;
+          pos = start;
+          continue;
+        }
+        carry = data.subarray(0, i);
+        body = data.subarray(i + 1);
+      } else {
+        carry = Buffer.alloc(0);
+      }
+      const mode = lastMode(body.toString('utf8'));
+      if (mode) return mode;
+      pos = start;
+    }
+  } catch (e) {
+    dbg(e);
+  } finally {
+    if (fd !== undefined) {
+      try { fs.closeSync(fd); } catch { /* ignore */ }
     }
   }
-  return mode === 'off';
+  return null;
 }
 
 function lastMode(text) {

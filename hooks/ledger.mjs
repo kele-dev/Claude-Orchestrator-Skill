@@ -1,38 +1,18 @@
 #!/usr/bin/env node
 // SubagentStop hook: appends one line per orchestrator delegation ({ts, tier, status, agent_id}) to <store>/delegations.jsonl, capped at 1000 lines once over 256 KB.
 // Stats mode: `node ledger.mjs --stats <store>` prints one LEDGER line with the pass rate per tier.
-// Store computation duplicates hooks/session-info.mjs (lines 47-60); keep the two in sync. Fails open: any error prints nothing and exits 0; never blocks.
-import { execFileSync } from 'node:child_process';
+// Store computation: lib.storeFor (shared with session-info and trim-output). Fails open: any error prints nothing and exits 0; never blocks.
 import { appendFileSync, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
-import { homedir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { join } from 'node:path';
+import { makeDbg, readStdin, storeFor } from './lib.mjs';
 
-const fmt = (e) => process.env.ORCH_DEBUG === '2' ? String(e?.stack ?? e) : `${e?.name ?? 'Error'}: ${String(e?.message ?? e).replace(/"[^"]*"/g, '"…"').slice(0, 200)}`;
-const dbg = (e) => { if (process.env.ORCH_DEBUG === '1' || process.env.ORCH_DEBUG === '2') process.stderr.write(`orchestrator ledger: ${fmt(e)}\n`); };
+const dbg = makeDbg('ledger');
 
 const TIERS = ['haiku-coder', 'sonnet-dev', 'opus-planner', 'opus-reviewer'];
 const CAP_BYTES = 256 * 1024;
 const CAP_LINES = 1000;
 const NONE = 'LEDGER: no delegations';
 
-const fwd = (p) => p.replace(/\\/g, '/');
-
-// Same rule as hooks/session-info.mjs: git common dir of cwd (else cwd), lowercased, non [a-z0-9] runs -> '-', last 80 chars.
-function storeFor(cwd) {
-  let main = cwd;
-  try {
-    const common = execFileSync('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'], {
-      cwd, timeout: 3000, stdio: ['ignore', 'pipe', 'ignore'], encoding: 'utf8',
-    }).trim();
-    if (common) main = dirname(common);
-  } catch (e) {
-    dbg(e);
-    main = cwd;
-  }
-  main = fwd(main);
-  const key = main.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(-80);
-  return fwd(homedir()) + '/.claude/orchestrator/' + key;
-}
 
 // Text of the last assistant entry in a JSONL transcript; '' when none.
 function lastAssistantText(path) {
@@ -126,10 +106,7 @@ if (process.argv[2] === '--stats') {
     process.stdout.write(NONE + '\n');
   }
 } else {
-  let raw = '';
-  process.stdin.setEncoding('utf8');
-  process.stdin.on('data', (d) => { raw += d; });
-  process.stdin.on('end', () => {
+  readStdin((raw) => {
     try {
       record(JSON.parse(raw));
     } catch (e) {

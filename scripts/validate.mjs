@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 // Validates the orchestrator plugin layout, manifests, skills, agents, hooks and cross-references.
+import crypto from 'crypto';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { fileURLToPath } from 'url';
+import { fileURLToPath, pathToFileURL } from 'url';
 import { spawnSync } from 'child_process';
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
@@ -192,7 +193,7 @@ if (!exists(path.join(root, 'README.md'))) {
 }
 
 // 7. Required files, headings, frontmatter flags, README version note
-for (const f of ['skills/on/modes.md', 'skills/on/reference.md', 'skills/learn/legacy.md', 'skills/status/caps.md', 'skills/learn/reference.md', 'skills/on/non-opus.md']) {
+for (const f of ['skills/on/modes.md', 'skills/on/reference.md', 'skills/learn/legacy.md', 'skills/status/caps.md', 'skills/learn/reference.md', 'skills/on/non-opus.md', 'CHANGELOG.md']) {
   if (!exists(path.join(root, f))) err(f, 'required file missing');
 }
 const headingChecks = [
@@ -238,14 +239,20 @@ if (exists(path.join(root, 'skills/status/caps.md'))) {
     if (!s || !c || s[1] !== c[1] || s[2] !== c[2]) err('skills/status/caps.md', `caps differ from ${name} ## Budget: ${capRe.source}`);
   }
 }
-for (const s of ['off', 'team', 'autopilot', 'status']) {
+for (const s of ['off', 'team', 'autopilot', 'status', 'help']) {
   const f = `skills/${s}/SKILL.md`;
   if (!exists(path.join(root, f))) continue;
   const fm = frontmatter(f);
   if (fm && fm['disable-model-invocation'] !== 'true') err(f, 'frontmatter must set disable-model-invocation: true');
 }
-if (exists(path.join(root, 'README.md')) && plugin && !readText(path.join(root, 'README.md')).includes(`Baru di ${plugin.version}`)) {
+// Exact version token: "Baru di 1.13.0" must not match "Baru di 1.13.01" or "Baru di 1.13.0-rc" (a trailing sentence period is fine).
+const readmeHasVersion = (text, v) => new RegExp(`Baru di ${v.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![0-9A-Za-z+-]|\\.[0-9A-Za-z])`).test(text);
+if (exists(path.join(root, 'README.md')) && plugin && !readmeHasVersion(readText(path.join(root, 'README.md')), String(plugin.version))) {
   err('README.md', `missing "Baru di ${plugin.version}"`);
+}
+// pure in-memory checks of the matcher
+for (const [text, v, want] of [['- Baru di 1.13.0: x', '1.13.0', true], ['Baru di 1.13.0.', '1.13.0', true], ['Baru di 1.13.01', '1.13.0', false], ['Baru di 1.13.0.1', '1.13.0', false], ['Baru di 11.13.0', '1.13.0', false], ['Baru di 1.13.0-rc.1', '1.13.0', false]]) {
+  if (readmeHasVersion(text, v) !== want) err('scripts/validate.mjs', `README version matcher: "${text}" vs ${v} expected ${want}`);
 }
 
 // 7b. Stop names in skills/on/modes.md must be listed in autopilot's STOP section and resume's "When to write" section
@@ -295,15 +302,16 @@ if (exists(path.join(root, modesFile))) {
   }
 }
 
-// 7c. README "Baru di" lines must be in strictly ascending version order (numeric: 1.10 > 1.9); "Juga di" lines are ignored
-if (exists(path.join(root, 'README.md'))) {
+// 7c. "Baru di" lines in README.md and CHANGELOG.md must be in strictly ascending version order (numeric: 1.10 > 1.9); "Juga di" lines are ignored
+for (const rel of ['README.md', 'CHANGELOG.md']) {
+  if (!exists(path.join(root, rel))) continue;
   let prev = null;
-  readText(path.join(root, 'README.md')).split(/\r?\n/).forEach((line, i) => {
+  readText(path.join(root, rel)).split(/\r?\n/).forEach((line, i) => {
     const m = /^- Baru di (\d+(?:\.\d+){1,2})\b/.exec(line);
     if (!m) return;
     const cur = [...m[1].split('.').map(Number), 0].slice(0, 3);
     if (prev && (cur[0] - prev.n[0] || cur[1] - prev.n[1] || cur[2] - prev.n[2]) <= 0) {
-      err('README.md', `"Baru di ${m[1]}" must come after "Baru di ${prev.v}" (ascending order)`, i + 1);
+      err(rel, `"Baru di ${m[1]}" must come after "Baru di ${prev.v}" (ascending order)`, i + 1);
     }
     prev = { v: m[1], n: cur };
   });
@@ -323,6 +331,14 @@ function runHook(name, payload, extraEnv = {}) {
     env: { ...process.env, ORCH_GUARD: '', ORCH_NO_TRIM: '', CLAUDE_PROJECT_DIR: root, ORCH_STATE_DIR: os.tmpdir(), ...extraEnv },
   });
 }
+// Best-effort cleanup: never let a failed removal mask the real result.
+const rmQuiet = (p, opts = {}) => {
+  try {
+    fs.rmSync(p, { force: true, ...opts });
+  } catch {
+    // ignore
+  }
+};
 // Shared trim-output payload: 150 lines, one 50-char error line at index 69.
 const BIG_STDOUT = Array.from({ length: 150 }, (_, i) => (i === 69 ? 'Error: boom'.padEnd(50, '.') : 'x'.repeat(50))).join('\n');
 const trimPayload = (command) => ({
@@ -355,6 +371,39 @@ function sessionInfo(cwd, env = {}, raw = false) {
     }
     if (out !== null && !(out.includes('[orchestrator: trimmed') && out.includes('Error: boom'))) {
       err('hooks/trim-output.mjs', 'smoke "trim npm test": output not trimmed or lost the error line');
+    }
+  }
+  {
+    // failed command: keyword-less failure lines near the start survive in the trimmed middle
+    const failBody = (tailLine) => Array.from({ length: 150 }, (_, i) => (i === 6 ? 'fatal: not a git repository'.padEnd(50, '.') : i === 149 ? tailLine.padEnd(50, '.') : 'x'.repeat(50))).join('\n');
+    const failOut = (stdout, extra = {}) => {
+      const res = runHook('trim-output.mjs', { ...trimPayload('git status'), tool_response: { stdout, stderr: '', interrupted: false, ...extra } });
+      if (!res || res.stdout.trim() === '') return '';
+      return JSON.parse(res.stdout).hookSpecificOutput.updatedToolOutput.stdout;
+    };
+    if (!failOut(failBody('x'), { exit_code: 1 }).includes('fatal: not a git repository')) err('hooks/trim-output.mjs', 'smoke "trim failed exit code": expected keyword-less line 6 kept when the exit code is non-zero');
+    if (!failOut(failBody('Error: boom')).includes('fatal: not a git repository')) err('hooks/trim-output.mjs', 'smoke "trim failed keyword": expected keyword-less line 6 kept when an error line exists');
+    if (failOut(failBody('x')).includes('fatal: not a git repository')) err('hooks/trim-output.mjs', 'smoke "trim success": line 6 must still be trimmed when the command did not fail');
+  }
+  {
+    // IC-073: a trim appends one record to <store>/trim-stats-<session>.jsonl; --stats sums it; ORCH_NO_TRIM writes nothing
+    const home = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'orch-trimstat-home-')));
+    const tcwd = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'orch-trimstat-cwd-')));
+    const homeEnv = { HOME: home, USERPROFILE: home };
+    const store = path.join(home, '.claude', 'orchestrator', tcwd.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(-80));
+    const statsFile = path.join(store, 'trim-stats-smoke1.jsonl');
+    try {
+      const payload = { ...trimPayload('npm test'), cwd: tcwd, session_id: 'smoke1' };
+      runHook('trim-output.mjs', payload, { ORCH_NO_TRIM: '1', ...homeEnv });
+      if (fs.existsSync(statsFile)) err('hooks/trim-output.mjs', 'smoke "trim stats ORCH_NO_TRIM": expected no stats file');
+      runHook('trim-output.mjs', payload, homeEnv);
+      const recs = fs.existsSync(statsFile) ? fs.readFileSync(statsFile, 'utf8').split('\n').filter(Boolean) : [];
+      if (recs.length !== 1 || !(JSON.parse(recs[0]).saved > 0)) err('hooks/trim-output.mjs', 'smoke "trim stats record": expected one record with saved > 0');
+      const st = spawnSync(process.execPath, [path.join(root, 'hooks', 'trim-output.mjs'), '--stats', store], { encoding: 'utf8', cwd: root, env: { ...process.env, ...homeEnv } });
+      if (!/^TRIM: 1 trims, [1-9]\d* bytes saved$/.test(st.stdout.trim())) err('hooks/trim-output.mjs', `smoke "trim stats --stats": unexpected output "${st.stdout.trim()}"`);
+    } finally {
+      fs.rmSync(home, { recursive: true, force: true });
+      fs.rmSync(tcwd, { recursive: true, force: true });
     }
   }
   r = runHook('trim-output.mjs', trimPayload('git diff'));
@@ -450,6 +499,16 @@ function sessionInfo(cwd, env = {}, raw = false) {
   if (r && (r.status !== 0 || !r.stdout.includes('Orchestrator store:'))) {
     err('hooks/session-info.mjs', `smoke "session-info": exit ${r.status}, expected "Orchestrator store:" in stdout`);
   }
+  {
+    // rules injection must not depend on cat: rules.mjs prints rules.md, hooks.json falls back with a visible node warning
+    const rr = runHook('rules.mjs', {});
+    const rulesMd = readText(path.join(root, 'hooks/rules.md'));
+    if (rr && rr.stdout !== rulesMd) err('hooks/rules.mjs', 'smoke "rules": stdout differs from hooks/rules.md');
+    const rulesCmd = String(hooksJson?.hooks?.SessionStart?.[0]?.hooks?.[0]?.command ?? '');
+    if (!/^node "\$\{CLAUDE_PLUGIN_ROOT\}\/hooks\/rules\.mjs" \|\| /.test(rulesCmd) || !rulesCmd.includes('the rules hook failed')) {
+      err('hooks/hooks.json', 'SessionStart rules hook must run rules.mjs first and warn visibly when node is missing');
+    }
+  }
   if (r && !r.stdout.includes('Guards: active')) err('hooks/session-info.mjs', 'smoke "session-info": expected "Guards: active" in stdout');
   r = sessionInfo(root, { ORCH_GUARD: 'off' });
   if (r && !r.stdout.includes('Guards: off (ORCH_GUARD=off)')) err('hooks/session-info.mjs', 'smoke "session-info ORCH_GUARD=off": expected "Guards: off (ORCH_GUARD=off)" in stdout');
@@ -514,13 +573,73 @@ function sessionInfo(cwd, env = {}, raw = false) {
 
   // invalid JSON stdin: fail open silently; with ORCH_DEBUG=1 the error goes to stderr
   const rawHook = (name, env) => spawnSync(process.execPath, [path.join(root, 'hooks', name)], { input: '{bad' + 'x'.repeat(3100), encoding: 'utf8', cwd: root, env: { ...process.env, ORCH_DEBUG: '', ...env } });
-  for (const [name, prefix] of [['trim-output.mjs', 'orchestrator trim-output:'], ['guard-edit.mjs', 'orchestrator guard-edit:']]) {
+  for (const [name, prefix] of [['trim-output.mjs', 'orchestrator trim-output:'], ['guard-edit.mjs', 'orchestrator guard-edit:'], ['guard-review.mjs', 'orchestrator guard-review:'], ['guard-read.mjs', 'orchestrator guard-read:'], ['long-session.mjs', 'orchestrator long-session:'], ['session-info.mjs', 'orchestrator session-info:'], ['ledger.mjs', 'orchestrator ledger:']]) {
     const quiet = rawHook(name, {});
     if (quiet.status !== 0 || quiet.stdout.trim() !== '' || quiet.stderr.trim() !== '') {
       err(`hooks/${name}`, `smoke "invalid stdin": expected exit 0 with empty stdout and stderr (exit ${quiet.status})`);
     }
     const loud = rawHook(name, { ORCH_DEBUG: '1' });
+    if (loud.stdout.trim() !== '') err(`hooks/${name}`, 'smoke "invalid stdin ORCH_DEBUG=1": expected empty stdout on the error path');
     if (!(loud.stderr ?? '').startsWith(prefix)) err(`hooks/${name}`, `smoke "invalid stdin ORCH_DEBUG=1": expected stderr starting with "${prefix}"`);
+  }
+
+  {
+    // IC-050: ORCH_DEBUG=1 also appends a redacted line to <tmpdir>/orchestrator-debug.log (hook prefix, no stdin content)
+    const dtmp = fs.mkdtempSync(path.join(os.tmpdir(), 'orch-dbglog-'));
+    const dl = rawHook('long-session.mjs', { ORCH_DEBUG: '1', TMPDIR: dtmp, TMP: dtmp, TEMP: dtmp });
+    let logText = null;
+    try { logText = fs.readFileSync(path.join(dtmp, 'orchestrator-debug.log'), 'utf8'); } catch { /* reported below */ }
+    if (dl.status !== 0 || logText === null) err('hooks/lib.mjs', 'smoke "debug log": expected exit 0 and <tmpdir>/orchestrator-debug.log');
+    else if (!logText.startsWith('orchestrator long-session:') || logText.includes('xxxxxxxx')) err('hooks/lib.mjs', 'smoke "debug log": expected the hook prefix and no stdin content');
+    fs.rmSync(dtmp, { recursive: true, force: true });
+  }
+
+  {
+    // IC-072: read guard denies a whole-file main-session Read of a large file once per session; repeat, small file, subagent, ranged read and kill switch pass
+    const rdir = fs.mkdtempSync(path.join(os.tmpdir(), 'orch-readguard-'));
+    const sid = `smoke-read-${process.pid}-${Date.now()}`;
+    const big = path.join(rdir, 'big.txt');
+    const small = path.join(rdir, 'small.txt');
+    fs.writeFileSync(big, Array.from({ length: 2500 }, () => 'yyyyyyyyy').join('\n'));
+    fs.writeFileSync(small, 'hello\n');
+    const rstate = path.join(rdir, 'state');
+    const rd = (file, extra = {}, env = {}, tool = {}) => runHook('guard-read.mjs', { hook_event_name: 'PreToolUse', tool_name: 'Read', tool_input: { file_path: file, ...tool }, session_id: sid, cwd: root, ...extra }, { ORCH_STATE_DIR: rstate, ...env });
+    const denies = (g) => g && g.stdout.includes('"permissionDecision":"deny"');
+    try {
+      if (!denies(rd(big))) err('hooks/guard-read.mjs', 'smoke "read big first": expected deny');
+      const again = rd(big);
+      if (again && again.stdout.trim() !== '') err('hooks/guard-read.mjs', 'smoke "read big repeat": expected empty stdout');
+      if (denies(rd(small))) err('hooks/guard-read.mjs', 'smoke "read small": expected allow');
+      const sid2 = sid + '-b';
+      if (denies(rd(big, { session_id: sid2, agent_id: 'a1' }))) err('hooks/guard-read.mjs', 'smoke "read subagent": expected allow');
+      if (denies(rd(big, { session_id: sid2 }, {}, { limit: 50 }))) err('hooks/guard-read.mjs', 'smoke "read with limit": expected allow');
+      if (denies(rd(big, { session_id: sid2 }, { ORCH_READ_GUARD: 'off' }))) err('hooks/guard-read.mjs', 'smoke "read ORCH_READ_GUARD=off": expected allow');
+      if (!denies(rd(big, { session_id: sid2 }))) err('hooks/guard-read.mjs', 'smoke "read big other session": expected deny');
+      const bigPdf = path.join(rdir, 'big.PDF');
+      const bigPng = path.join(rdir, 'big.png');
+      fs.copyFileSync(big, bigPdf);
+      fs.copyFileSync(big, bigPng);
+      if (denies(rd(bigPdf, { session_id: sid + '-c' }, {}, { pages: '1-5' }))) err('hooks/guard-read.mjs', 'smoke "read large pdf with pages": expected allow');
+      if (denies(rd(bigPng, { session_id: sid + '-c' }))) err('hooks/guard-read.mjs', 'smoke "read large png": expected allow');
+      if (denies(rd(bigPdf, { session_id: sid + '-c' }))) err('hooks/guard-read.mjs', 'smoke "read large pdf": expected allow');
+      // marker is written in the state dir and a symlink planted at the marker path is never followed
+      const sid4 = sid + '-d';
+      const mk = (f, s) => path.join(rstate, `orchestrator-read-${s}-${crypto.createHash('sha1').update(f).digest('hex').slice(0, 16)}`);
+      if (!fs.existsSync(mk(big, sid))) err('hooks/guard-read.mjs', 'smoke "read marker": expected a marker in the state dir');
+      const victim = path.join(rdir, 'victim.txt');
+      fs.writeFileSync(victim, 'keep');
+      let linked = true;
+      try { fs.symlinkSync(victim, mk(big, sid4)); } catch { linked = false; }
+      if (linked) {
+        if (denies(rd(big, { session_id: sid4 }))) err('hooks/guard-read.mjs', 'smoke "read marker symlink": expected allow');
+        if (fs.readFileSync(victim, 'utf8') !== 'keep') err('hooks/guard-read.mjs', 'smoke "read marker symlink": symlink target was overwritten');
+      }
+    } finally {
+      for (const s of [sid, sid + '-b', sid + '-c']) {
+        for (const f of fs.readdirSync(os.tmpdir())) if (f.startsWith(`orchestrator-read-${s}-`)) rmQuiet(path.join(os.tmpdir(), f));
+      }
+      rmQuiet(rdir, { recursive: true });
+    }
   }
 
   // delegation ledger (SubagentStop): temp HOME and non-git cwd; store key = cwd path, same rule as session-info.mjs
@@ -579,7 +698,9 @@ function sessionInfo(cwd, env = {}, raw = false) {
   if (spawnSync('git', ['--version']).status === 0) {
     const gtmp = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'orch-root-')));
     try {
-      spawnSync('git', ['init', '-q'], { cwd: gtmp });
+      const cleanEnv = Object.fromEntries(Object.entries(process.env).filter(([k]) => !k.toUpperCase().startsWith('GIT_')));
+      const gi = spawnSync('git', ['init', '-q'], { cwd: gtmp, env: cleanEnv, encoding: 'utf8' });
+      if (gi.status !== 0) err('hooks/guard-edit.mjs', `smoke "guard root fallback": git init exited ${gi.status}: ${(gi.stderr ?? '').trim().slice(0, 200)}`);
       const tp = path.join(gtmp, 'transcript.jsonl');
       fs.writeFileSync(tp, JSON.stringify({ type: 'user', message: { content: 'hello' } }) + '\n');
       const payload = { hook_event_name: 'PreToolUse', tool_name: 'Edit', tool_input: { file_path: path.join(gtmp, 'a.txt') }, transcript_path: tp, cwd: gtmp };
@@ -636,6 +757,47 @@ function sessionInfo(cwd, env = {}, raw = false) {
     });
     if (g && g.stdout.trim() !== '') err('hooks/guard-edit.mjs', 'smoke "guard large transcript off": expected empty stdout');
 
+    // guard-edit: >16 MB transcript with the off line at the very start must still be seen (chunked backward scan)
+    const hugeTranscript = path.join(tmp, 'huge-off.jsonl');
+    const bigFiller = filler + '\n';
+    fs.writeFileSync(hugeTranscript, offLine + '\n' + bigFiller.repeat(Math.ceil((17 * 1024 * 1024) / bigFiller.length)));
+    const gh = runHook('guard-edit.mjs', {
+      hook_event_name: 'PreToolUse',
+      tool_name: 'Edit',
+      tool_input: { file_path: path.join(root, 'agents', 'x.md') },
+      transcript_path: hugeTranscript,
+      cwd: root,
+    });
+    if (gh && gh.stdout.trim() !== '') err('hooks/guard-edit.mjs', 'smoke "guard >16 MB transcript off at start": expected empty stdout');
+    try { fs.rmSync(hugeTranscript, { force: true }); } catch { /* ignore */ }
+
+    // guard-edit: >512 KB transcript with no mode marker in the window must not throw; no marker at all means not off, so deny
+    const midTranscript = path.join(tmp, 'mid-none.jsonl');
+    fs.writeFileSync(midTranscript, Array.from({ length: 1000 }, () => filler + '\n').join(''));
+    const gm = runHook('guard-edit.mjs', {
+      hook_event_name: 'PreToolUse',
+      tool_name: 'Edit',
+      tool_input: { file_path: path.join(root, 'agents', 'x.md') },
+      transcript_path: midTranscript,
+      cwd: root,
+    });
+    if (gm && !gm.stdout.includes('"permissionDecision":"deny"')) err('hooks/guard-edit.mjs', 'smoke "guard 1 MB transcript no marker": expected deny');
+    try { fs.rmSync(midTranscript, { force: true }); } catch { /* ignore */ }
+
+    // guard-edit: >512 KB transcript whose only marker is orchestrator:on at the start must deny (chunked scan finds on, not off)
+    const onLine = JSON.stringify({ type: 'user', message: { content: '<command-message>orchestrator:on</command-message>\n<command-name>/orchestrator:on</command-name>' } });
+    const onTranscript = path.join(tmp, 'mid-on.jsonl');
+    fs.writeFileSync(onTranscript, onLine + '\n' + Array.from({ length: 1000 }, () => filler + '\n').join(''));
+    const go = runHook('guard-edit.mjs', {
+      hook_event_name: 'PreToolUse',
+      tool_name: 'Edit',
+      tool_input: { file_path: path.join(root, 'agents', 'x.md') },
+      transcript_path: onTranscript,
+      cwd: root,
+    });
+    if (go && !go.stdout.includes('"permissionDecision":"deny"')) err('hooks/guard-edit.mjs', 'smoke "guard 1 MB transcript on at start": expected deny');
+    try { fs.rmSync(onTranscript, { force: true }); } catch { /* ignore */ }
+
     // long-session: over 1 MB, usage at head and tail only, filler in the middle forces head/tail windows
     const usage = (cacheRead) => JSON.stringify({ type: 'assistant', message: { usage: { input_tokens: 10, cache_read_input_tokens: cacheRead } } });
     const longPath = path.join(tmp, 'long-large.jsonl');
@@ -643,10 +805,9 @@ function sessionInfo(cwd, env = {}, raw = false) {
     const rl = runHook('long-session.mjs', { hook_event_name: 'UserPromptSubmit', session_id: sid, transcript_path: longPath, cwd: root }, { ORCH_LONG: '', ORCH_LONG_DELEGATIONS: '', ORCH_LONG_BYTES: '999999999', ORCH_LONG_TOKENS: '', ORCH_LONG_REPEAT: '' });
     if (rl && (!rl.stdout.includes('systemMessage') || !rl.stdout.includes('+130k'))) err('hooks/long-session.mjs', 'smoke "long large head/tail": expected systemMessage with "+130k" in stdout');
   } finally {
-    fs.rmSync(tmp, { recursive: true, force: true });
-    for (const f of fs.readdirSync(os.tmpdir())) {
-      if (f.startsWith(`orchestrator-long-${sid}`)) fs.rmSync(path.join(os.tmpdir(), f), { force: true });
-    }
+    rmQuiet(tmp, { recursive: true });
+    rmQuiet(path.join(os.tmpdir(), `orchestrator-long-${sid}`));
+    rmQuiet(path.join(os.tmpdir(), `orchestrator-long-${sid}.count`));
   }
 }
 
@@ -657,11 +818,11 @@ function sessionInfo(cwd, env = {}, raw = false) {
   if (refText === null) {
     err(refPath, 'missing, cannot check store key');
   } else {
-    for (const pattern of ['tr A-Z a-z', "sed 's/[^a-z0-9][^a-z0-9]*/-/g'", 'tail -c 80', 'ToLower()', "-replace '[^a-z0-9]+','-'", 'Substring($k.Length - 80)']) {
+    for (const pattern of ['tr A-Z a-z', "sed 's/[^a-z0-9][^a-z0-9]*/-/g'", 'tail -c 80', 'ToLower()', "-replace '[^a-z0-9]+','-'", 'Substring($k.Length - 80)', 'remote.origin.url']) {
       if (!refText.includes(pattern)) err(refPath, `store key pattern missing: ${pattern}`);
     }
   }
-  const siPath = 'hooks/session-info.mjs';
+  const siPath = 'hooks/lib.mjs'; // storeInfo (shared by session-info, ledger, trim-output)
   if (exists(path.join(root, siPath))) {
     if (!readText(path.join(root, siPath)).includes(".toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(-80)")) {
       err(siPath, 'store key pattern missing: .toLowerCase().replace(/[^a-z0-9]+/g, \'-\').slice(-80)');
@@ -688,8 +849,8 @@ function sessionInfo(cwd, env = {}, raw = false) {
         err('skills/learn/reference.md', `store key smoke: bash "${bashOut}" vs session-info "${store ?? ''}"`);
       }
     } finally {
-      fs.rmSync(sdir, { recursive: true, force: true });
-      fs.rmSync(shome, { recursive: true, force: true });
+      rmQuiet(sdir, { recursive: true });
+      rmQuiet(shome, { recursive: true });
     }
   }
 
@@ -719,10 +880,68 @@ function sessionInfo(cwd, env = {}, raw = false) {
           }
         }
       } finally {
-        fs.rmSync(sdir, { recursive: true, force: true });
-        fs.rmSync(shome, { recursive: true, force: true });
+        rmQuiet(sdir, { recursive: true });
+        rmQuiet(shome, { recursive: true });
       }
     }
+  }
+}
+
+// 8a4. Store key from repo identity (IC-035): remote URL key shared by clones, credentials never in the key, old path key kept when it exists
+if (spawnSync('git', ['--version']).status === 0) {
+  const refPath = 'skills/learn/reference.md';
+  const refText = exists(path.join(root, refPath)) ? readText(path.join(root, refPath)) : '';
+  const block = (lang) => {
+    const fence = refText.indexOf('```' + lang, refText.indexOf('## Store command'));
+    if (fence === -1) return null;
+    const bodyStart = refText.indexOf('\n', fence) + 1;
+    return refText.slice(bodyStart, refText.indexOf('```', bodyStart)).split('\n').map((l) => l.trim()).filter(Boolean).join('\n');
+  };
+  const psCheck = (sh) => spawnSync(sh, ['-NoProfile', '-Command', 'exit 0']).status === 0;
+  const psShell = process.platform === 'win32' ? (psCheck('pwsh') ? 'pwsh' : psCheck('powershell') ? 'powershell' : null) : null;
+  const bashOk = process.platform !== 'win32' && spawnSync('bash', ['--version']).status === 0;
+  const fwdSlash = (p) => p.split(path.sep).join('/');
+  const shome = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'orch-rkey-home-')));
+  const dirs = [];
+  const mkRepo = (remote) => {
+    const d = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'orch-rkey-repo-')));
+    dirs.push(d);
+    spawnSync('git', ['init', '-q'], { cwd: d });
+    if (remote) spawnSync('git', ['remote', 'add', 'origin', remote], { cwd: d });
+    return d;
+  };
+  const base = fwdSlash(shome) + '/.claude/orchestrator/';
+  const norm = (s) => s.trim().split(path.sep).join('/').toLowerCase();
+  const check = (name, dir, want) => {
+    const hook = sessionInfo(dir, { HOME: shome, USERPROFILE: shome, ORCH_STALE_DAYS: '' }, true);
+    const out = hook.stdout ?? '';
+    const store = /Orchestrator store: (.*)/.exec(out)?.[1]?.trim();
+    if (!store || norm(store) !== norm(want)) err('hooks/session-info.mjs', `store key smoke "${name}": got "${store ?? ''}", expected "${want}"`);
+    if (/secret|user:/i.test(out)) err('hooks/session-info.mjs', `store key smoke "${name}": credentials leaked into output`);
+    const env = { ...process.env, HOME: shome, USERPROFILE: shome };
+    if (bashOk && block('bash')) {
+      const b = spawnSync('bash', ['-c', block('bash')], { encoding: 'utf8', cwd: dir, env });
+      if (norm(b.stdout ?? '') !== norm(want)) err(refPath, `store key smoke "${name}": bash "${(b.stdout ?? '').trim()}" vs "${want}"`);
+    }
+    if (psShell && block('powershell')) {
+      const p = spawnSync(psShell, ['-NoProfile', '-Command', block('powershell')], { encoding: 'utf8', cwd: dir, env });
+      if (norm(p.stdout ?? '') !== norm(want)) err(refPath, `store key smoke "${name}": powershell "${(p.stdout ?? '').trim()}" vs "${want}"`);
+    }
+  };
+  try {
+    check('https with credentials', mkRepo('https://user:secret@GitHub.com/Foo/Bar.git'), base + 'github-com-foo-bar');
+    check('scp style, second clone', mkRepo('git@github.com:foo/bar.git'), base + 'github-com-foo-bar');
+    check('ssh url with port and trailing slash', mkRepo('ssh://git@GitHub.com:22/Foo/Bar/'), base + 'github-com-22-foo-bar');
+    const legacy = mkRepo('https://example.com/legacy/proj.git');
+    const oldKey = fwdSlash(legacy).toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(-80);
+    fs.mkdirSync(path.join(shome, '.claude', 'orchestrator', oldKey), { recursive: true });
+    check('old path dir kept', legacy, base + oldKey);
+    fs.mkdirSync(path.join(shome, '.claude', 'orchestrator', 'example-com-legacy-proj'), { recursive: true });
+    check('path dir wins when remote dir also exists', legacy, base + oldKey);
+    check('no remote uses path key', mkRepo(null), base + fwdSlash(dirs[dirs.length - 1]).toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(-80));
+  } finally {
+    for (const d of dirs) rmQuiet(d, { recursive: true });
+    rmQuiet(shome, { recursive: true });
   }
 }
 
@@ -734,7 +953,7 @@ function sessionInfo(cwd, env = {}, raw = false) {
   const sidC = `${sidA}-c`;
   const sidD = `${sidA}-d`;
   const sidE = `${sidA}-e`;
-  const markers = [sidA, sidB, sidC, sidD, sidE, `${sidA}-f`].flatMap((s) => [path.join(os.tmpdir(), `orchestrator-long-${s}`), path.join(os.tmpdir(), `orchestrator-long-${s}.count`)]);
+  const markers = [sidA, sidB, sidC, sidD, sidE, `${sidA}-f`, `${sidA}-m`, `${sidA}-n`].flatMap((s) => [path.join(os.tmpdir(), `orchestrator-long-${s}`), path.join(os.tmpdir(), `orchestrator-long-${s}.count`), path.join(os.tmpdir(), `orchestrator-long-${s}.growth`)]);
   markers.push(...['g', 'h', 'i', 'j', 'k'].flatMap((s) => [path.join(os.tmpdir(), `orchestrator-long-${sidA}-${s}`), path.join(os.tmpdir(), `orchestrator-long-${sidA}-${s}.count`)]));
   try {
     const digestPath = path.join(root, 'scripts', 'digest.mjs');
@@ -824,6 +1043,59 @@ function sessionInfo(cwd, env = {}, raw = false) {
     const r5 = runHook('long-session.mjs', { hook_event_name: 'UserPromptSubmit', session_id: sidD, transcript_path: flatPath, cwd: root }, { ORCH_LONG: '', ORCH_LONG_DELEGATIONS: '', ORCH_LONG_BYTES: '5', ORCH_LONG_TOKENS: '' });
     if (r5 && r5.stdout.trim() !== '') err('hooks/long-session.mjs', 'smoke "long usage flat": expected empty stdout (usage present overrides bytes)');
 
+    {
+      // usage growth is incremental: the scanned offset and first/last usage are cached; only appended bytes are read on the next prompt
+      const usageLine = (cacheRead) => JSON.stringify({ type: 'assistant', message: { usage: { input_tokens: 10, cache_read_input_tokens: cacheRead } } }) + '\n';
+      const incGrowth = path.join(tmp, 'inc-growth.jsonl');
+      const growthCache = path.join(os.tmpdir(), `orchestrator-long-${sidA}-m.growth`);
+      const growthEnv = { ORCH_LONG: '', ORCH_LONG_DELEGATIONS: '', ORCH_LONG_BYTES: '999999999', ORCH_LONG_TOKENS: '' };
+      const growthRun = (sid) => runHook('long-session.mjs', { hook_event_name: 'UserPromptSubmit', session_id: sid, transcript_path: incGrowth, cwd: root }, growthEnv);
+      fs.writeFileSync(incGrowth, [10000, 10100, 10200].map(usageLine).join(''));
+      const g1 = growthRun(`${sidA}-m`);
+      if (g1 && g1.stdout.trim() !== '') err('hooks/long-session.mjs', 'smoke "long growth incremental 1": expected empty stdout');
+      let cached = null;
+      try {
+        cached = JSON.parse(fs.readFileSync(growthCache, 'utf8'));
+      } catch {
+        err('hooks/long-session.mjs', 'smoke "long growth incremental 1": expected .growth cache file');
+      }
+      if (cached && cached.offset !== fs.statSync(incGrowth).size) err('hooks/long-session.mjs', 'smoke "long growth incremental 1": expected cached offset at end of file');
+      // same-length edit of the first line, before the cached offset: a full re-read would see a different first usage
+      fs.writeFileSync(incGrowth, [99999, 10100, 10200].map(usageLine).join(''));
+      fs.appendFileSync(incGrowth, usageLine(141000));
+      const g2 = growthRun(`${sidA}-m`);
+      if (g2 && !g2.stdout.includes('+131k')) err('hooks/long-session.mjs', 'smoke "long growth incremental 2": expected "+131k" from the cached first usage plus appended bytes');
+      // shrunk file: cache is ignored and the bounded read gives the right answer
+      fs.writeFileSync(path.join(os.tmpdir(), `orchestrator-long-${sidA}-n.growth`), JSON.stringify({ offset: 9999, first: 1, last: 2, check: '' }));
+      fs.writeFileSync(incGrowth, [10000, 141000].map(usageLine).join(''));
+      const g3 = growthRun(`${sidA}-n`);
+      if (g3 && !g3.stdout.includes('+131k')) err('hooks/long-session.mjs', 'smoke "long growth shrunk file": expected "+131k" via the bounded read');
+    }
+
+    {
+      // writeAtomic: replaces content, leaves no temp file, never follows a symlink at the target, fails silently on a stale temp file
+      const { writeAtomic } = await import(pathToFileURL(path.join(root, 'hooks', 'lib.mjs')).href);
+      const wa = path.join(tmp, 'atomic.txt');
+      fs.writeFileSync(wa, 'old');
+      writeAtomic(wa, 'new');
+      if (fs.readFileSync(wa, 'utf8') !== 'new') err('hooks/lib.mjs', 'writeAtomic: expected the target replaced with new content');
+      if (fs.readdirSync(tmp).some((f) => f.startsWith('atomic.txt.') && f.endsWith('.tmp'))) err('hooks/lib.mjs', 'writeAtomic: expected no leftover temp file');
+      const victim = path.join(tmp, 'atomic-victim.txt');
+      const link = path.join(tmp, 'atomic-link.txt');
+      fs.writeFileSync(victim, 'keep');
+      let linked = false;
+      try { fs.symlinkSync(victim, link); linked = true; } catch { /* no symlink permission: skip */ }
+      if (linked) {
+        writeAtomic(link, 'new');
+        if (fs.readFileSync(victim, 'utf8') !== 'keep') err('hooks/lib.mjs', 'writeAtomic: expected a symlink target to stay untouched');
+      }
+      const stale = path.join(tmp, 'atomic-stale.txt');
+      fs.writeFileSync(stale, 'old');
+      fs.writeFileSync(`${stale}.${process.pid}.tmp`, 'x');
+      writeAtomic(stale, 'new');
+      if (fs.readFileSync(stale, 'utf8') !== 'old') err('hooks/lib.mjs', 'writeAtomic: expected a silent no-op when the temp file already exists');
+    }
+
     // long repeat smoke: [suffix, ORCH_LONG_REPEAT, write marker first, [growth, expect ('' = empty stdout), noReminder]]
     const repeatSteps = [
       ['g', '', false, [[130000, '+130k', true], [130000, '', false], [260000, 'reminder 1 of 2', false], [260000, '', false], [400000, 'reminder 2 of 2', false], [900000, '', false]]],
@@ -849,6 +1121,10 @@ function sessionInfo(cwd, env = {}, raw = false) {
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
     for (const m of markers) fs.rmSync(m, { force: true });
+    // repeat-smoke sessions (sidA-g ... sidA-k) leave markers and .growth caches too
+    for (const f of fs.readdirSync(os.tmpdir())) {
+      if (f.startsWith(`orchestrator-long-${sidA}`)) rmQuiet(path.join(os.tmpdir(), f));
+    }
   }
 }
 
@@ -938,6 +1214,10 @@ function sessionInfo(cwd, env = {}, raw = false) {
         return (r.stdout ?? '').trim();
       };
       chk('auto newest', auto(autoCfg), 'BUDGET: spent 12k (1 agent)');
+      const autoQuiet = spawnSync(process.execPath, [budgetPath, 'auto'], { encoding: 'utf8', cwd: autoCwd, env: { ...process.env, ORCH_DEBUG: '', CLAUDE_CONFIG_DIR: autoCfg } });
+      chk('auto stderr silent by default', (autoQuiet.stderr ?? '').trim(), '');
+      const autoLoud = spawnSync(process.execPath, [budgetPath, 'auto', '--verbose'], { encoding: 'utf8', cwd: autoCwd, env: { ...process.env, ORCH_DEBUG: '', CLAUDE_CONFIG_DIR: autoCfg } });
+      chk('auto --verbose prints path', String((autoLoud.stderr ?? '').startsWith('budget: auto -> ')), 'true');
       const emptyCfg = path.join(tmp, 'empty-cfg');
       fs.mkdirSync(emptyCfg, { recursive: true });
       chk('auto empty', auto(emptyCfg), 'BUDGET: spent ? (transcript unreadable)');
@@ -955,6 +1235,26 @@ function sessionInfo(cwd, env = {}, raw = false) {
       const autoSub = path.join(autoCwd, 'sub');
       fs.mkdirSync(autoSub, { recursive: true });
       chk('auto from subfolder', auto(autoCfg, [], autoSub), 'BUDGET: spent 12k (1 agent)');
+      // session launched above the repo: the transcript lives under the parent dir slug, cwd is inside a git repo below it
+      if (spawnSync('git', ['--version']).status === 0) {
+        const above = fs.realpathSync(fs.mkdtempSync(path.join(tmp, 'above-')));
+        const repoDir = path.join(above, 'repo');
+        fs.mkdirSync(repoDir, { recursive: true });
+        if (spawnSync('git', ['init', '-q'], { cwd: repoDir }).status === 0) {
+          const aboveCfg = path.join(tmp, 'above-cfg');
+          const slug = (d) => d.replace(/[^A-Za-z0-9]/g, '-');
+          const parentProj = path.join(aboveCfg, 'projects', slug(above));
+          fs.mkdirSync(parentProj, { recursive: true });
+          fs.writeFileSync(path.join(parentProj, 'parent.jsonl'), one(7000));
+          chk('auto parent of git top level', auto(aboveCfg, [], repoDir), 'BUDGET: spent 7k (1 agent)');
+          // the closest match still wins over the parent one
+          const repoProj = path.join(aboveCfg, 'projects', slug(repoDir));
+          fs.mkdirSync(repoProj, { recursive: true });
+          fs.writeFileSync(path.join(repoProj, 'repo.jsonl'), one(3000));
+          fs.utimesSync(path.join(repoProj, 'repo.jsonl'), new Date(Date.now() - 60000), new Date(Date.now() - 60000));
+          chk('auto closest match preferred', auto(aboveCfg, [], repoDir), 'BUDGET: spent 3k (1 agent)');
+        }
+      }
     }
 
     // guard-review smoke
@@ -988,6 +1288,15 @@ function sessionInfo(cwd, env = {}, raw = false) {
       const denied = g.stdout.includes('"permissionDecision":"deny"');
       if (deny && !denied) err('hooks/guard-review.mjs', `smoke "${name}": expected deny`);
       if (!deny && g.stdout.trim() !== '') err('hooks/guard-review.mjs', `smoke "${name}": expected empty stdout`);
+    }
+    // timing guard: the PRD_PATH regex must stay linear on long path-like prompts (measured ~3 ms at 100k chars)
+    for (const [name, frag] of [['a/ runs', 'a/'], ['docs/prd fragments', 'docs/prd/']]) {
+      const t0 = Date.now();
+      const g = review('orchestrator:opus-reviewer', frag.repeat(Math.ceil(400000 / frag.length)));
+      if (!g) continue;
+      const ms = Date.now() - t0;
+      if (g.stdout.trim() !== '') err('hooks/guard-review.mjs', `timing "${name}": expected empty stdout`);
+      if (ms > 3000) err('hooks/guard-review.mjs', `timing "${name}": 400k-char prompt took ${ms} ms (limit 3000), PRD_PATH may be superlinear`);
     }
     const hp = path.join(root, 'hooks', 'guard-review.mjs');
     if (exists(hp)) {
@@ -1287,6 +1596,19 @@ function sessionInfo(cwd, env = {}, raw = false) {
   }
 }
 
+// 8z. Eval fixture scripts must be tracked as executable (mode 100755)
+{
+  const ls = spawnSync('git', ['ls-files', '-s', '--', 'evals/*/fixture.sh'], { cwd: root, encoding: 'utf8' });
+  if (ls.error || ls.status !== 0) {
+    console.log('note: git unavailable or not a repository, skipping fixture.sh mode check');
+  } else {
+    for (const line of ls.stdout.split(/\r?\n/).filter(Boolean)) {
+      const m = line.match(/^(\d+) \S+ \d\t(.+)$/);
+      if (m && m[1] !== '100755') err(m[2], `tracked mode ${m[1]}, expected 100755 (git update-index --chmod=+x)`);
+    }
+  }
+}
+
 // 9. Eval cases: case.yaml name matches folder, prompt.md and scaffold script exist, graders use a known type with required keys
 // evals/touches.json: keys match the case folders and every prefix is an existing path
 {
@@ -1310,6 +1632,63 @@ function sessionInfo(cwd, env = {}, raw = false) {
 }
 const GRADER_TYPES = new Set(['regex', 'tool_order', 'tool_used', 'file_exists', 'llm', 'baseline']);
 const REQUIRED = { regex: ['pattern'], tool_order: ['before', 'after'], tool_used: ['tool'], file_exists: ['path'], llm: [], baseline: ['baseline_file'] };
+// Grader frontmatter as a tree: top-level "key: value" plus indented "key: value" children (nested keys such as target.source).
+function graderTree(text) {
+  const lines = text.split(/\r?\n/);
+  const end = lines[0] === '---' ? lines.indexOf('---', 1) : -1;
+  const tree = {};
+  let parent = null;
+  for (const line of end === -1 ? [] : lines.slice(1, end)) {
+    const m = /^(\s*)([A-Za-z_][\w-]*):\s*(.*)$/.exec(line);
+    if (!m) continue;
+    const raw = m[3].trim();
+    const quoted = raw.length >= 2 && ((raw[0] === '"' && raw.at(-1) === '"') || (raw[0] === "'" && raw.at(-1) === "'"));
+    const val = quoted ? raw.slice(1, -1) : raw;
+    if (m[1] === '') {
+      tree[m[2]] = val === '' ? {} : val;
+      parent = val === '' ? tree[m[2]] : null;
+    } else if (parent) parent[m[2]] = val;
+  }
+  return tree;
+}
+const GRADER_ENUMS = { match: ['contains', 'not_contains'], source: ['file'] };
+const GRADER_TARGETS = new Set(['trace']);
+// Pure check of a parsed grader tree: recurses into nested keys, checks enums, flags, target, and min/max bounds.
+function graderProblems(node, where = '') {
+  const out = [];
+  for (const [k, v] of Object.entries(node)) {
+    const at = where ? `${where}.${k}` : k;
+    if (v && typeof v === 'object') {
+      if (k === 'target' && v.source === 'file' && !v.path) out.push(`${at} needs "path" when source is file`);
+      out.push(...graderProblems(v, at));
+      continue;
+    }
+    if (GRADER_ENUMS[k] && !GRADER_ENUMS[k].includes(v)) out.push(`${at} "${v}" must be one of ${GRADER_ENUMS[k].join(', ')}`);
+    if (k === 'target' && !GRADER_TARGETS.has(v)) out.push(`${at} "${v}" must be "trace" or a nested source block`);
+    if (k === 'flags' && !/^[dgimsuvy]*$/.test(v)) out.push(`${at} "${v}" has invalid RegExp flags`);
+    if ((k === 'min' || k === 'max') && !/^\d+$/.test(v)) out.push(`${at} "${v}" must be a non-negative integer`);
+  }
+  if (!where && /^\d+$/.test(node.min ?? '') && /^\d+$/.test(node.max ?? '') && Number(node.min) > Number(node.max)) out.push(`min ${node.min} exceeds max ${node.max}`);
+  return out;
+}
+{
+  // Negative tests: pure in-memory mutations of a valid grader tree; each must be flagged.
+  const base = { type: 'tool_used', tool: 'Agent', min: '1', max: '2', match: 'contains', flags: 'i', target: { source: 'file', path: 'a.txt' } };
+  if (graderProblems(base).length) err('scripts/validate.mjs', `grader self-test: valid tree flagged (${graderProblems(base).join('; ')})`);
+  const cases = [
+    ['bad match enum', { ...base, match: 'sometimes' }, 'match'],
+    ['bad flags', { ...base, flags: 'iz' }, 'flags'],
+    ['bad target scalar', { ...base, target: 'output' }, 'target'],
+    ['bad nested source enum', { ...base, target: { source: 'network', path: 'a' } }, 'target.source'],
+    ['nested file target without path', { ...base, target: { source: 'file' } }, 'path'],
+    ['non-numeric min', { ...base, min: 'x' }, 'min'],
+    ['negative max', { ...base, max: '-1' }, 'max'],
+    ['min above max', { ...base, min: '3', max: '2' }, 'exceeds'],
+  ];
+  for (const [label, tree, needle] of cases) {
+    if (!graderProblems(tree).some((p) => p.includes(needle))) err('scripts/validate.mjs', `grader self-test "${label}": expected a problem mentioning "${needle}"`);
+  }
+}
 for (const c of listDirs('evals').filter((d) => d !== 'results')) {
   const dir = `evals/${c}`, caseFile = `${dir}/case.yaml`;
   if (!exists(path.join(root, caseFile))) { err(caseFile, 'missing'); continue; }
@@ -1326,6 +1705,7 @@ for (const c of listDirs('evals').filter((d) => d !== 'results')) {
     if (!fm) continue;
     if (!GRADER_TYPES.has(fm.type)) { err(gf, `type "${fm.type ?? ''}" must be one of ${[...GRADER_TYPES].join(', ')}`); continue; }
     for (const k of REQUIRED[fm.type]) if (!fm[k]) err(gf, `${fm.type} grader needs "${k}"`);
+    for (const p of graderProblems(graderTree(readText(path.join(root, gf))))) err(gf, p);
     for (const [k, fl] of [['pattern', fm.flags ?? ''], ['input_match', '']]) {
       if (fm[k] && fm[k] !== '(block)') { try { new RegExp(fm[k], fl); } catch (e) { err(gf, `${k} is not a valid RegExp (${e.message})`); } }
     }

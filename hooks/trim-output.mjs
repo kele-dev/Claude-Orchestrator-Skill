@@ -1,11 +1,16 @@
 #!/usr/bin/env node
 // PostToolUse hook for Bash/PowerShell: trims long command output, keeping error lines and the tail.
 // Fails open: on any error or unexpected input it prints nothing and exits 0.
-const fmt = (e) => process.env.ORCH_DEBUG === '2' ? String(e?.stack ?? e) : `${e?.name ?? 'Error'}: ${String(e?.message ?? e).replace(/"[^"]*"/g, '"…"').slice(0, 200)}`;
-let raw = '';
-process.stdin.setEncoding('utf8');
-process.stdin.on('data', (d) => { raw += d; });
-process.stdin.on('end', () => {
+import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync } from 'node:fs';
+import { join } from 'node:path';
+import { makeDbg, posInt, readStdin, storeFor } from './lib.mjs';
+
+const dbg = makeDbg('trim-output');
+
+// Stats mode: `node trim-output.mjs --stats <store>` prints one TRIM line for the newest session file.
+if (process.argv[2] === '--stats') {
+  try { process.stdout.write(statsLine(process.argv[3]) + '\n'); } catch (e) { dbg(e); process.stdout.write('TRIM: none\n'); }
+} else readStdin((raw) => {
   try {
     if (raw.length < 3000) return;
     const input = JSON.parse(raw);
@@ -21,8 +26,10 @@ process.stdin.on('end', () => {
     const noLines = (typeof command === 'string' && /(^|[|;&(]\s*)(git\s+(diff|show|log\b[^|]*-p)|cat|jq|Get-Content|type)\b/.test(command))
       || /^(\{|\[\s*($|[{"\]]))/.test((text.split('\n').find((l) => l.trim() !== '') ?? '').trimStart());
     const readCmd = typeof command === 'string' && /(^|[;&]\s*)(ls|find|git\s+ls-files|grep|rg|head|tail|sed\s+-n|wc|Get-ChildItem|Select-String)\b/.test(command.trimStart());
-    const stdout = trim(text, noLines, readCmd);
+    const code = response.exit_code ?? response.exitCode;
+    const stdout = trim(text, noLines, readCmd, Number.isInteger(code) && code !== 0);
     if (stdout === null) return;
+    record(input, text, stdout);
 
     process.stdout.write(JSON.stringify({
       hookSpecificOutput: {
@@ -32,13 +39,13 @@ process.stdin.on('end', () => {
     }));
   } catch (e) {
     // fail open
-    if (process.env.ORCH_DEBUG === '1' || process.env.ORCH_DEBUG === '2') process.stderr.write(`orchestrator trim-output: ${fmt(e)}\n`);
+    dbg(e);
   }
 });
 
 // Returns the trimmed text, or null when no rule applied.
-function trim(text, noLines, readCmd) {
-  const out = noLines ? null : trimLines(text, readCmd ? 300 : 80);
+function trim(text, noLines, readCmd, exitFailed) {
+  const out = noLines ? null : trimLines(text, readCmd ? 300 : 80, exitFailed);
   const result = out ?? text;
   if (result.length > 30000) {
     const cut = result.length - 26000;
@@ -47,19 +54,25 @@ function trim(text, noLines, readCmd) {
   return out;
 }
 
-function trimLines(text, maxLines) {
+const ERROR_LINE = /error|fail|exception|panic|traceback|assert|not ok|✗|✖|×|^E\s|warning:/i;
+const HEAD_FAILED = 10;
+
+// When the command failed (non-zero exit code, or an error line anywhere), keep the first HEAD_FAILED lines instead of 3:
+// failure lines without a keyword (e.g. "fatal: ...") usually come first.
+function trimLines(text, maxLines, exitFailed = false) {
   const lines = text.split('\n');
   if (lines.length <= maxLines || text.length <= 4000) return null;
 
-  const posInt = (v, d) => (/^[1-9]\d*$/.test(v ?? '') ? Number(v) : d);
   const tailN = posInt(process.env.ORCH_TRIM_TAIL, 30);
   const errN = posInt(process.env.ORCH_TRIM_ERRORS, 10);
-  const head = lines.slice(0, 3);
+  const failed = exitFailed || lines.some((l) => ERROR_LINE.test(l));
+  const headN = failed ? HEAD_FAILED : 3;
+  const head = lines.slice(0, headN);
   const matched = lines
-    .slice(3, Math.max(3, lines.length - tailN))
-    .filter((l) => /error|fail|exception|panic|traceback|assert|not ok|✗|✖|×|^E\s|warning:/i.test(l))
+    .slice(headN, Math.max(headN, lines.length - tailN))
+    .filter((l) => ERROR_LINE.test(l))
     .slice(0, errN);
-  const tail = lines.slice(Math.max(3, lines.length - tailN));
+  const tail = lines.slice(Math.max(headN, lines.length - tailN));
   const dropped = lines.length - head.length - matched.length - tail.length;
 
   const body = matched.length ? [...matched, '...'] : ['...'];
@@ -69,4 +82,35 @@ function trimLines(text, maxLines) {
     ...body,
     ...tail,
   ].join('\n');
+}
+
+const NO_STATS = 'TRIM: none';
+
+// Appends one tiny {ts, before, after, saved} record to <store>/trim-stats-<session>.jsonl; never throws.
+function record(input, before, after) {
+  try {
+    const sid = String(input?.session_id ?? '').replace(/[^A-Za-z0-9_-]/g, '').slice(0, 64);
+    const cwd = typeof input?.cwd === 'string' && input.cwd !== '' ? input.cwd : process.cwd();
+    if (sid === '') return;
+    const store = storeFor(cwd);
+    const file = join(store, `trim-stats-${sid}.jsonl`);
+    if (!existsSync(store)) mkdirSync(store, { recursive: true });
+    if (existsSync(file) && statSync(file).size > 65536) return;
+    const saved = Buffer.byteLength(before) - Buffer.byteLength(after);
+    appendFileSync(file, JSON.stringify({ ts: Date.now(), before: before.split('\n').length, after: after.split('\n').length, saved }) + '\n');
+  } catch (e) {
+    dbg(e);
+  }
+}
+
+function statsLine(store) {
+  if (typeof store !== 'string' || store === '') return NO_STATS;
+  const files = readdirSync(store).filter((f) => /^trim-stats-.*\.jsonl$/.test(f))
+    .map((f) => ({ f, t: statSync(join(store, f)).mtimeMs })).sort((a, b) => b.t - a.t);
+  if (!files.length) return NO_STATS;
+  let n = 0, saved = 0;
+  for (const l of readFileSync(join(store, files[0].f), 'utf8').split('\n')) {
+    try { const r = JSON.parse(l); n++; saved += Number(r.saved) || 0; } catch { /* skip */ }
+  }
+  return n ? `TRIM: ${n} trims, ${saved} bytes saved` : NO_STATS;
 }

@@ -50,6 +50,7 @@ Results under `evals/results/` are git-ignored.
 ## Grader notes
 
 - `tool_used`/`tool_order` scope as confirmed by R1: count tool calls of the main session and of subagents (CLI 2.1.317); for main-session-only checks use `regex` with `target: trace` and `"parent_tool_use_id":null` (examples: `team-parallel/graders/no-main-edit.md`, `on-sonnet-prd-save/graders/prd-write-main.md`).
+- The Claude Code version pinned in `.github/workflows/eval.yml` and the version the trace fields were measured on (2.1.317) must move together.
 - `no-main-edit` graders in `on-small-edit` and `on-sonnet-guardrails` were converted to trace-based (`regex`, `target: trace`) in 1.11.0; they previously failed on correct delegation (see R1, main 0 Edit, subagent 2). Verified live: R1b `on-small-edit` PASS (all 4 graders); before the fix, R1 failed with "Edit called 2x" (main 0, subagent 2).
 - `target: trace` pilot: R9 `prd-write-main` grader true, local regex true; R4 `no-main-edit` grader true, local regex true. They agree on positive and negative-absent cases only; a negative-hit case was not seen.
 - Writes to `<store>` (checkpoints, lessons) land outside the run directory; the local sandbox denies them, so `checkpoint-written` and `save-written` FAIL there by design. R10 (extra grant for store writes) was not run, so the grant is untested and no `--allow-tools` flags are recorded.
@@ -103,7 +104,7 @@ Create a baseline: download `ci-result.json` from a CI eval run together with it
 
     node scripts/eval-compare.mjs ci-result.json --write evals/baseline.json
 
-and commit `evals/baseline.json`. It exits 2 and writes nothing when no trace was readable. If a `tracePath` in the result file no longer exists, the script also tries the same file name inside the result file's own folder.
+and commit `evals/baseline.json`. Exact steps: (1) trigger the `eval` workflow (Actions, Run workflow) with the repository secret `ANTHROPIC_API_KEY` set; (2) download the `eval-results` artifact and keep `ci-result.json` and the trace files in one folder; (3) run the command above from the repo root; (4) `git add evals/baseline.json`, commit and push. Until then the CI gate is skipped and the run prints a `::warning::` annotation. It exits 2 and writes nothing when no trace was readable. If a `tracePath` in the result file no longer exists, the script also tries the same file name inside the result file's own folder.
 
 Compare: `node scripts/eval-compare.mjs <current.json> [baseline.json] [--threshold 15]`. A pair is OVER when now is strictly greater than base * (1 + threshold/100). NEW (not in baseline) and SKIP (no readable trace) never fail. If both files name a model and the models differ, the compare is skipped. The summary counts measured and not-compared pairs; EMPTY (nothing measured) warns but does not fail. Baseline pairs missing from the current run print MISSING. With `--strict` (used in CI), EMPTY and a model mismatch exit 2 and MISSING pairs fail.
 

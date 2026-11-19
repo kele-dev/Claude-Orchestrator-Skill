@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 // Sum sub-agent token usage from a Claude Code transcript (JSONL), or main-session usage with --main. Always exits 0.
-// Usage: node scripts/budget.mjs <transcript.jsonl|auto> [--mark] [--main] [--from <bytes>] [--limit <N>k]
+// Usage: node scripts/budget.mjs <transcript.jsonl|auto> [--mark] [--main] [--from <bytes>] [--limit <N>k] [--verbose]
 // Exit: 0 ok, 2 invalid --limit (a number above 0).
-import { statSync, readdirSync, realpathSync } from 'node:fs';
+import { existsSync, statSync, readdirSync, realpathSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import os from 'node:os';
 import path from 'node:path';
@@ -23,25 +23,53 @@ function newestJsonl(dir) {
   return best;
 }
 
+// Git top level of cwd (resolved), or undefined. Cached per cwd for the process; git is not spawned when no .git exists up the tree.
+const topCache = new Map();
+function gitTop(cwd) {
+  if (topCache.has(cwd)) return topCache.get(cwd);
+  let inRepo = false;
+  for (let d = cwd; ; d = path.dirname(d)) {
+    if (existsSync(path.join(d, '.git'))) { inRepo = true; break; }
+    if (path.dirname(d) === d) break;
+  }
+  let top;
+  if (inRepo) {
+    try {
+      top = path.resolve(execFileSync('git', ['rev-parse', '--show-toplevel'], { stdio: ['ignore', 'pipe', 'ignore'], encoding: 'utf8', timeout: 3000 }).trim());
+    } catch { top = undefined; }
+  }
+  topCache.set(cwd, top);
+  return top;
+}
+
 // Newest *.jsonl of this project's transcript dir: cwd (and its realpath), then each parent up to the
-// git top level of cwd (stops after checking it; compared case-insensitively on win32/darwin), or up to
-// root when git fails. undefined if nothing found (treated as unreadable).
+// git top level of cwd (compared case-insensitively on win32/darwin), or up to root when git fails; when
+// nothing matched inside the repo, the parent dirs above the top level are tried (closest first).
+// undefined if nothing found (treated as unreadable).
 function newestTranscript() {
   const base = process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), '.claude');
-  let top;
-  try {
-    top = path.resolve(execFileSync('git', ['rev-parse', '--show-toplevel'], { stdio: ['ignore', 'pipe', 'ignore'], encoding: 'utf8', timeout: 3000 }).trim());
-  } catch { top = undefined; }
+  const top = gitTop(process.cwd());
   const fold = process.platform === 'win32' || process.platform === 'darwin';
   const same = (a, b) => (fold ? a.toLowerCase() === b.toLowerCase() : a === b);
   const starts = [process.cwd()];
   try { const real = realpathSync(process.cwd()); if (real !== starts[0]) starts.push(real); } catch { /* cwd only */ }
+  const above = []; // parent dirs above the git top level, searched only when nothing inside the repo matched (session launched above the repo)
   for (const start of starts) {
     for (let dir = start; ; dir = path.dirname(dir)) {
       const found = newestJsonl(path.join(base, 'projects', dir.replace(/[^A-Za-z0-9]/g, '-')));
       if (found) return found;
-      if (top !== undefined && same(path.resolve(dir), top)) break;
+      if (top !== undefined && same(path.resolve(dir), top)) {
+        for (let up = dir; path.dirname(up) !== up;) above.push(up = path.dirname(up));
+        break;
+      }
       if (path.dirname(dir) === dir) break;
+    }
+  }
+  for (const dir of above) {
+    const found = newestJsonl(path.join(base, 'projects', dir.replace(/[^A-Za-z0-9]/g, '-')));
+    if (found) {
+      if (process.env.ORCH_DEBUG || process.argv.includes('--verbose')) process.stderr.write('budget: auto found no transcript inside the git repo; using one from a parent dir\n');
+      return found;
     }
   }
   return undefined;
@@ -91,7 +119,11 @@ function main() {
   let file = args.find((a, i) => !a.startsWith('--') && args[i - 1] !== '--from' && args[i - 1] !== '--limit');
   if (file === 'auto') {
     file = newestTranscript();
-    if (file) process.stderr.write(`budget: auto -> ${file}\n`);
+    if (file && (process.env.ORCH_DEBUG || args.includes('--verbose'))) {
+      const home = os.homedir();
+      const shown = home && file.startsWith(home) ? `~${file.slice(home.length)}` : file;
+      process.stderr.write(`budget: auto -> ${shown}\n`);
+    }
   }
   if (args.includes('--mark')) {
     let size;

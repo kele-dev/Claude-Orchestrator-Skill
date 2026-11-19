@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "cat \"${CLAUDE_PLUGIN_ROOT}/hooks/rules.md\"",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/rules.mjs\" || { echo \"orchestrator WARNING: the rules hook failed (node missing from PATH or an error), so the guards (edit, review, trim, ledger) may NOT be active. Install Node.js 18+ and restart Claude Code. Tell the user this in one line.\"; cat \"${CLAUDE_PLUGIN_ROOT}/hooks/rules.md\"; }",
             "async": false
           },
           {
@@ -24,6 +24,16 @@
           {
             "type": "command",
             "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-edit.mjs\"",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "matcher": "Read",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-read.mjs\"",
             "timeout": 10
           }
         ]
