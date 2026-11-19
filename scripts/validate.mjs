@@ -192,7 +192,7 @@ if (!exists(path.join(root, 'README.md'))) {
 }
 
 // 7. Required files, headings, frontmatter flags, README version note
-for (const f of ['skills/on/modes.md', 'skills/on/reference.md', 'skills/learn/legacy.md', 'skills/status/caps.md', 'skills/learn/reference.md', 'skills/on/non-opus.md']) {
+for (const f of ['skills/on/modes.md', 'skills/on/reference.md', 'skills/learn/legacy.md', 'skills/status/caps.md', 'skills/learn/reference.md', 'skills/on/non-opus.md', 'CHANGELOG.md']) {
   if (!exists(path.join(root, f))) err(f, 'required file missing');
 }
 const headingChecks = [
@@ -238,7 +238,7 @@ if (exists(path.join(root, 'skills/status/caps.md'))) {
     if (!s || !c || s[1] !== c[1] || s[2] !== c[2]) err('skills/status/caps.md', `caps differ from ${name} ## Budget: ${capRe.source}`);
   }
 }
-for (const s of ['off', 'team', 'autopilot', 'status']) {
+for (const s of ['off', 'team', 'autopilot', 'status', 'help']) {
   const f = `skills/${s}/SKILL.md`;
   if (!exists(path.join(root, f))) continue;
   const fm = frontmatter(f);
@@ -301,15 +301,16 @@ if (exists(path.join(root, modesFile))) {
   }
 }
 
-// 7c. README "Baru di" lines must be in strictly ascending version order (numeric: 1.10 > 1.9); "Juga di" lines are ignored
-if (exists(path.join(root, 'README.md'))) {
+// 7c. "Baru di" lines in README.md and CHANGELOG.md must be in strictly ascending version order (numeric: 1.10 > 1.9); "Juga di" lines are ignored
+for (const rel of ['README.md', 'CHANGELOG.md']) {
+  if (!exists(path.join(root, rel))) continue;
   let prev = null;
-  readText(path.join(root, 'README.md')).split(/\r?\n/).forEach((line, i) => {
+  readText(path.join(root, rel)).split(/\r?\n/).forEach((line, i) => {
     const m = /^- Baru di (\d+(?:\.\d+){1,2})\b/.exec(line);
     if (!m) return;
     const cur = [...m[1].split('.').map(Number), 0].slice(0, 3);
     if (prev && (cur[0] - prev.n[0] || cur[1] - prev.n[1] || cur[2] - prev.n[2]) <= 0) {
-      err('README.md', `"Baru di ${m[1]}" must come after "Baru di ${prev.v}" (ascending order)`, i + 1);
+      err(rel, `"Baru di ${m[1]}" must come after "Baru di ${prev.v}" (ascending order)`, i + 1);
     }
     prev = { v: m[1], n: cur };
   });
