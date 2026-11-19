@@ -505,7 +505,7 @@ function sessionInfo(cwd, env = {}, raw = false) {
     const rulesMd = readText(path.join(root, 'hooks/rules.md'));
     if (rr && rr.stdout !== rulesMd) err('hooks/rules.mjs', 'smoke "rules": stdout differs from hooks/rules.md');
     const rulesCmd = String(hooksJson?.hooks?.SessionStart?.[0]?.hooks?.[0]?.command ?? '');
-    if (!/^node "\$\{CLAUDE_PLUGIN_ROOT\}\/hooks\/rules\.mjs" \|\| /.test(rulesCmd) || !rulesCmd.includes('node was not found')) {
+    if (!/^node "\$\{CLAUDE_PLUGIN_ROOT\}\/hooks\/rules\.mjs" \|\| /.test(rulesCmd) || !rulesCmd.includes('the rules hook failed')) {
       err('hooks/hooks.json', 'SessionStart rules hook must run rules.mjs first and warn visibly when node is missing');
     }
   }
