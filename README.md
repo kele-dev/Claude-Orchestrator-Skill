@@ -82,6 +82,7 @@ Orchestration mode is active automatically in every session. Manual commands:
 - The edit guard and output trim need Node 18+ on PATH. Without Node they do nothing (fail open). macOS desktop app: Node from nvm or Homebrew may be missing from the app's PATH; check that `/orchestrator:status` shows `Guards: active` (the session-start `Guards:` line comes only from the hooks), or install Node system-wide.
 - Hook messages are in English; the model is told to relay them in the user's language.
 - Review guard (`guard-review`): a PreToolUse hook on Agent/Task that denies `orchestrator:opus-reviewer` when its prompt names a `docs/prd/*.md` file that does not exist. It fails open when Node is missing or the check cannot run. Turn it off with env `ORCH_GUARD=off`.
+- Read guard (`guard-read`): a PreToolUse hook on Read. A main-session Read without `offset`/`limit` of a file over 2000 lines or 100 KB is denied once per file per session, with a hint to use `offset`/`limit`, Grep or the Explore agent; repeating the same Read is allowed. Subagents are not affected. Fails open. Turn it off with env `ORCH_READ_GUARD=off`.
 
 ## What's new (1.9.0 and later)
 
@@ -144,7 +145,7 @@ Orchestration mode is active automatically in every session. Manual commands:
 - Skill `learn`: project lessons saved and maintained automatically as local files in the project store; one report line tells you what changed, and the manual commands are optional.
 - Skills `init`, `resume`, and `status`: one-pass project map, checkpoints to continue in a new session, and a read-only state summary.
 - Agents `haiku-coder` (executor), `sonnet-dev` (escalation), `opus-reviewer` (review, read-only; now runs on Opus), `opus-planner` (hard-design PRD and diagnosis when the main session is not Opus-class, read-only).
-- Hooks: SessionStart rules (loads the orchestration rules into every session), SessionStart session info (store path, lesson index, open checkpoints), edit guard (PreToolUse), review guard (PreToolUse, Agent/Task), output trim (PostToolUse), long-session reminder (UserPromptSubmit).
+- Hooks: SessionStart rules (loads the orchestration rules into every session), SessionStart session info (store path, lesson index, open checkpoints), edit guard (PreToolUse), review guard (PreToolUse, Agent/Task), read guard (PreToolUse, Read), output trim (PostToolUse), long-session reminder (UserPromptSubmit).
 
 ## Optional: reduce permission prompts
 
@@ -175,6 +176,7 @@ If you previously installed via `install.ps1`, delete `haiku-coder.md`, `sonnet-
 - `budget=<N>k` - batas token untuk semua delegasi
 - cek `Guards: active` di `/orchestrator:status` (tanpa Node guard mati diam-diam)
 - `ORCH_DEBUG=1` menulis error hook ke stderr
+- Read guard (`guard-read`): Read sesi utama tanpa `offset`/`limit` untuk file di atas 2000 baris atau 100 KB ditolak sekali per file per sesi (gunakan `offset`/`limit`, Grep, atau agent Explore); Read yang sama diulang diizinkan; subagent tidak terpengaruh; matikan dengan `ORCH_READ_GUARD=off`
 - Claude akan menyarankan team/autopilot kalau tugasnya cocok, tapi default tetap `on`. Batas iterasi naik otomatis (maks 4 putaran fix) hanya selama perbaikannya ada kemajuan.
 - Belajar: di akhir tugas Claude sendiri yang memutuskan pelajaran mana yang disimpan (maks 3, hanya yang sudah terbukti), serta memperbaiki atau menghapus yang usang, sebagai file lokal di store project (`~/.claude/orchestrator/<project-key>/lessons/`). Satu baris di laporan memberi tahu apa yang berubah. `/orchestrator:learn list` untuk melihat, `prune` untuk merapikan.
 - Hemat token: jawaban ringkas, output test dipotong, Opus tidak mendikte file panjang, self-review sebelum lapor, `learned-map` untuk peta project, saran sesi baru saat ganti topik, dan satu baris laporan token di akhir.

@@ -571,7 +571,7 @@ function sessionInfo(cwd, env = {}, raw = false) {
 
   // invalid JSON stdin: fail open silently; with ORCH_DEBUG=1 the error goes to stderr
   const rawHook = (name, env) => spawnSync(process.execPath, [path.join(root, 'hooks', name)], { input: '{bad' + 'x'.repeat(3100), encoding: 'utf8', cwd: root, env: { ...process.env, ORCH_DEBUG: '', ...env } });
-  for (const [name, prefix] of [['trim-output.mjs', 'orchestrator trim-output:'], ['guard-edit.mjs', 'orchestrator guard-edit:'], ['guard-review.mjs', 'orchestrator guard-review:'], ['long-session.mjs', 'orchestrator long-session:'], ['session-info.mjs', 'orchestrator session-info:'], ['ledger.mjs', 'orchestrator ledger:']]) {
+  for (const [name, prefix] of [['trim-output.mjs', 'orchestrator trim-output:'], ['guard-edit.mjs', 'orchestrator guard-edit:'], ['guard-review.mjs', 'orchestrator guard-review:'], ['guard-read.mjs', 'orchestrator guard-read:'], ['long-session.mjs', 'orchestrator long-session:'], ['session-info.mjs', 'orchestrator session-info:'], ['ledger.mjs', 'orchestrator ledger:']]) {
     const quiet = rawHook(name, {});
     if (quiet.status !== 0 || quiet.stdout.trim() !== '' || quiet.stderr.trim() !== '') {
       err(`hooks/${name}`, `smoke "invalid stdin": expected exit 0 with empty stdout and stderr (exit ${quiet.status})`);
@@ -579,6 +579,34 @@ function sessionInfo(cwd, env = {}, raw = false) {
     const loud = rawHook(name, { ORCH_DEBUG: '1' });
     if (loud.stdout.trim() !== '') err(`hooks/${name}`, 'smoke "invalid stdin ORCH_DEBUG=1": expected empty stdout on the error path');
     if (!(loud.stderr ?? '').startsWith(prefix)) err(`hooks/${name}`, `smoke "invalid stdin ORCH_DEBUG=1": expected stderr starting with "${prefix}"`);
+  }
+
+  {
+    // IC-072: read guard denies a whole-file main-session Read of a large file once per session; repeat, small file, subagent, ranged read and kill switch pass
+    const rdir = fs.mkdtempSync(path.join(os.tmpdir(), 'orch-readguard-'));
+    const sid = `smoke-read-${process.pid}-${Date.now()}`;
+    const big = path.join(rdir, 'big.txt');
+    const small = path.join(rdir, 'small.txt');
+    fs.writeFileSync(big, Array.from({ length: 2500 }, () => 'yyyyyyyyy').join('\n'));
+    fs.writeFileSync(small, 'hello\n');
+    const rd = (file, extra = {}, env = {}, tool = {}) => runHook('guard-read.mjs', { hook_event_name: 'PreToolUse', tool_name: 'Read', tool_input: { file_path: file, ...tool }, session_id: sid, cwd: root, ...extra }, env);
+    const denies = (g) => g && g.stdout.includes('"permissionDecision":"deny"');
+    try {
+      if (!denies(rd(big))) err('hooks/guard-read.mjs', 'smoke "read big first": expected deny');
+      const again = rd(big);
+      if (again && again.stdout.trim() !== '') err('hooks/guard-read.mjs', 'smoke "read big repeat": expected empty stdout');
+      if (denies(rd(small))) err('hooks/guard-read.mjs', 'smoke "read small": expected allow');
+      const sid2 = sid + '-b';
+      if (denies(rd(big, { session_id: sid2, agent_id: 'a1' }))) err('hooks/guard-read.mjs', 'smoke "read subagent": expected allow');
+      if (denies(rd(big, { session_id: sid2 }, {}, { limit: 50 }))) err('hooks/guard-read.mjs', 'smoke "read with limit": expected allow');
+      if (denies(rd(big, { session_id: sid2 }, { ORCH_READ_GUARD: 'off' }))) err('hooks/guard-read.mjs', 'smoke "read ORCH_READ_GUARD=off": expected allow');
+      if (!denies(rd(big, { session_id: sid2 }))) err('hooks/guard-read.mjs', 'smoke "read big other session": expected deny');
+    } finally {
+      for (const s of [sid, sid + '-b']) {
+        for (const f of fs.readdirSync(os.tmpdir())) if (f.startsWith(`orchestrator-read-${s}-`)) rmQuiet(path.join(os.tmpdir(), f));
+      }
+      rmQuiet(rdir, { recursive: true });
+    }
   }
 
   // delegation ledger (SubagentStop): temp HOME and non-git cwd; store key = cwd path, same rule as session-info.mjs
