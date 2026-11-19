@@ -1,12 +1,10 @@
 #!/usr/bin/env node
 // SessionStart hook: prints the per-project orchestrator store path, lesson index, checkpoints and digest command.
-// Store computation mirrors skills/learn/reference.md "## Store command". Fails open: any error prints nothing.
-import { execFileSync } from 'node:child_process';
+// Store computation (lib.storeInfo) mirrors skills/learn/reference.md "## Store command". Fails open: any error prints nothing.
 import { readdirSync, readFileSync, statSync } from 'node:fs';
-import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { makeDbg, readStdin } from './lib.mjs';
+import { makeDbg, readStdin, storeInfo } from './lib.mjs';
 
 const dbg = makeDbg('session-info');
 const clean = (s) => String(s).replace(/[\u0000-\u001f\u007f`]/g, ' ').replace(/\s+/g, ' ').trim();
@@ -41,20 +39,7 @@ function run(input) {
   const cwd = input?.cwd;
   if (typeof cwd !== 'string' || cwd === '') return '';
 
-  let main = cwd;
-  try {
-    const common = execFileSync('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'], {
-      cwd, timeout: 3000, stdio: ['ignore', 'pipe', 'ignore'], encoding: 'utf8',
-    }).trim();
-    if (common) main = dirname(common);
-  } catch (e) {
-    dbg(e);
-    main = cwd;
-  }
-  main = fwd(main);
-
-  const key = main.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(-80);
-  const store = fwd(homedir()) + '/.claude/orchestrator/' + key;
+  const { main, store } = storeInfo(cwd);
   const lines = [`Orchestrator store: ${store}`];
   lines.push(process.env.ORCH_GUARD === 'off' ? 'Guards: off (ORCH_GUARD=off)' : `Guards: active (hooks run on Node ${process.version})`);
 

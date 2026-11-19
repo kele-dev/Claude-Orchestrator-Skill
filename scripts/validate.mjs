@@ -772,11 +772,11 @@ function sessionInfo(cwd, env = {}, raw = false) {
   if (refText === null) {
     err(refPath, 'missing, cannot check store key');
   } else {
-    for (const pattern of ['tr A-Z a-z', "sed 's/[^a-z0-9][^a-z0-9]*/-/g'", 'tail -c 80', 'ToLower()', "-replace '[^a-z0-9]+','-'", 'Substring($k.Length - 80)']) {
+    for (const pattern of ['tr A-Z a-z', "sed 's/[^a-z0-9][^a-z0-9]*/-/g'", 'tail -c 80', 'ToLower()', "-replace '[^a-z0-9]+','-'", 'Substring($k.Length - 80)', 'remote.origin.url']) {
       if (!refText.includes(pattern)) err(refPath, `store key pattern missing: ${pattern}`);
     }
   }
-  const siPath = 'hooks/session-info.mjs';
+  const siPath = 'hooks/lib.mjs'; // storeInfo (shared by session-info, ledger, trim-output)
   if (exists(path.join(root, siPath))) {
     if (!readText(path.join(root, siPath)).includes(".toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(-80)")) {
       err(siPath, 'store key pattern missing: .toLowerCase().replace(/[^a-z0-9]+/g, \'-\').slice(-80)');
@@ -838,6 +838,62 @@ function sessionInfo(cwd, env = {}, raw = false) {
         rmQuiet(shome, { recursive: true });
       }
     }
+  }
+}
+
+// 8a4. Store key from repo identity (IC-035): remote URL key shared by clones, credentials never in the key, old path key kept when it exists
+if (spawnSync('git', ['--version']).status === 0) {
+  const refPath = 'skills/learn/reference.md';
+  const refText = exists(path.join(root, refPath)) ? readText(path.join(root, refPath)) : '';
+  const block = (lang) => {
+    const fence = refText.indexOf('```' + lang, refText.indexOf('## Store command'));
+    if (fence === -1) return null;
+    const bodyStart = refText.indexOf('\n', fence) + 1;
+    return refText.slice(bodyStart, refText.indexOf('```', bodyStart)).split('\n').map((l) => l.trim()).filter(Boolean).join('\n');
+  };
+  const psCheck = (sh) => spawnSync(sh, ['-NoProfile', '-Command', 'exit 0']).status === 0;
+  const psShell = process.platform === 'win32' ? (psCheck('pwsh') ? 'pwsh' : psCheck('powershell') ? 'powershell' : null) : null;
+  const bashOk = process.platform !== 'win32' && spawnSync('bash', ['--version']).status === 0;
+  const fwdSlash = (p) => p.split(path.sep).join('/');
+  const shome = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'orch-rkey-home-')));
+  const dirs = [];
+  const mkRepo = (remote) => {
+    const d = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'orch-rkey-repo-')));
+    dirs.push(d);
+    spawnSync('git', ['init', '-q'], { cwd: d });
+    if (remote) spawnSync('git', ['remote', 'add', 'origin', remote], { cwd: d });
+    return d;
+  };
+  const base = fwdSlash(shome) + '/.claude/orchestrator/';
+  const norm = (s) => s.trim().split(path.sep).join('/').toLowerCase();
+  const check = (name, dir, want) => {
+    const hook = sessionInfo(dir, { HOME: shome, USERPROFILE: shome, ORCH_STALE_DAYS: '' }, true);
+    const out = hook.stdout ?? '';
+    const store = /Orchestrator store: (.*)/.exec(out)?.[1]?.trim();
+    if (!store || norm(store) !== norm(want)) err('hooks/session-info.mjs', `store key smoke "${name}": got "${store ?? ''}", expected "${want}"`);
+    if (/secret|user:/i.test(out)) err('hooks/session-info.mjs', `store key smoke "${name}": credentials leaked into output`);
+    const env = { ...process.env, HOME: shome, USERPROFILE: shome };
+    if (bashOk && block('bash')) {
+      const b = spawnSync('bash', ['-c', block('bash')], { encoding: 'utf8', cwd: dir, env });
+      if (norm(b.stdout ?? '') !== norm(want)) err(refPath, `store key smoke "${name}": bash "${(b.stdout ?? '').trim()}" vs "${want}"`);
+    }
+    if (psShell && block('powershell')) {
+      const p = spawnSync(psShell, ['-NoProfile', '-Command', block('powershell')], { encoding: 'utf8', cwd: dir, env });
+      if (norm(p.stdout ?? '') !== norm(want)) err(refPath, `store key smoke "${name}": powershell "${(p.stdout ?? '').trim()}" vs "${want}"`);
+    }
+  };
+  try {
+    check('https with credentials', mkRepo('https://user:secret@GitHub.com/Foo/Bar.git'), base + 'github-com-foo-bar');
+    check('scp style, second clone', mkRepo('git@github.com:foo/bar.git'), base + 'github-com-foo-bar');
+    check('ssh url with port and trailing slash', mkRepo('ssh://git@GitHub.com:22/Foo/Bar/'), base + 'github-com-22-foo-bar');
+    const legacy = mkRepo('https://example.com/legacy/proj.git');
+    const oldKey = fwdSlash(legacy).toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(-80);
+    fs.mkdirSync(path.join(shome, '.claude', 'orchestrator', oldKey), { recursive: true });
+    check('old path dir kept', legacy, base + oldKey);
+    check('no remote uses path key', mkRepo(null), base + fwdSlash(dirs[dirs.length - 1]).toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(-80));
+  } finally {
+    for (const d of dirs) rmQuiet(d, { recursive: true });
+    rmQuiet(shome, { recursive: true });
   }
 }
 

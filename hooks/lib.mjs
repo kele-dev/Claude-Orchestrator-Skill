@@ -1,6 +1,6 @@
 // Shared helpers for the orchestrator hooks (stdin read, debug output, env ints, bounded file reads, transcript entry filter).
 import { execFileSync } from 'node:child_process';
-import { readSync } from 'node:fs';
+import { existsSync, readSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname } from 'node:path';
 
@@ -36,17 +36,38 @@ export function readBytes(fd, start, len) {
 // True for a main-session (non-sidechain) assistant transcript entry.
 export const isMainAssistant = (entry) => entry?.type === 'assistant' && !entry.isSidechain;
 
-// Per-project store dir (same rule as hooks/session-info.mjs): git common dir of cwd (else cwd), slugified, last 80 chars.
-export function storeFor(cwd) {
+// Normalizes a git remote URL for the store key: no scheme, no credentials, lowercase, no trailing slash or .git.
+// "https://user:pw@GitHub.com/Foo/Bar.git" and "git@github.com:foo/bar.git" both give "github.com/foo/bar" (or ":" form), then slugified.
+export function remoteKey(url) {
+  const u = String(url ?? '').split('\n')[0].trim().toLowerCase()
+    .replace(/^[a-z][a-z0-9+.-]*:\/\//, '').replace(/^[^/]*@/, '')
+    .replace(/\/+$/, '').replace(/\.git$/, '').replace(/\/+$/, '');
+  return u.replace(/[^a-z0-9]+/g, '-').slice(-80);
+}
+
+// Per-project store: key from the git remote origin URL (so clones and worktrees of one repo share a store), else the path slug.
+// Backward compatible: when the remote-key dir does not exist but the old path-slug dir does, the old dir is kept.
+// Mirrors skills/learn/reference.md "## Store command". Returns { main, store }; main = main checkout path with forward slashes.
+export function storeInfo(cwd) {
+  const git = (args) => execFileSync('git', args, { cwd, timeout: 3000, stdio: ['ignore', 'pipe', 'ignore'], encoding: 'utf8' }).trim();
   let main = cwd;
   try {
-    const common = execFileSync('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'], {
-      cwd, timeout: 3000, stdio: ['ignore', 'pipe', 'ignore'], encoding: 'utf8',
-    }).trim();
+    const common = git(['rev-parse', '--path-format=absolute', '--git-common-dir']);
     if (common) main = dirname(common);
   } catch {
     main = cwd;
   }
-  const key = main.replace(/\\/g, '/').toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(-80);
-  return homedir().replace(/\\/g, '/') +'/.claude/orchestrator/' + key;
+  main = main.replace(/\\/g, '/');
+  let remote = '';
+  try {
+    remote = remoteKey(git(['config', '--get', 'remote.origin.url']));
+  } catch {
+    remote = '';
+  }
+  const base = homedir().replace(/\\/g, '/') + '/.claude/orchestrator/';
+  const pathKey = main.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(-80);
+  const useRemote = remote !== '' && (existsSync(base + remote) || !existsSync(base + pathKey));
+  return { main, store: base + (useRemote ? remote : pathKey) };
 }
+
+export const storeFor = (cwd) => storeInfo(cwd).store;
