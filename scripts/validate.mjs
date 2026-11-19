@@ -1283,6 +1283,19 @@ function sessionInfo(cwd, env = {}, raw = false) {
   }
 }
 
+// 8z. Eval fixture scripts must be tracked as executable (mode 100755)
+{
+  const ls = spawnSync('git', ['ls-files', '-s', '--', 'evals/*/fixture.sh'], { cwd: root, encoding: 'utf8' });
+  if (ls.error || ls.status !== 0) {
+    console.log('note: git unavailable or not a repository, skipping fixture.sh mode check');
+  } else {
+    for (const line of ls.stdout.split(/\r?\n/).filter(Boolean)) {
+      const m = line.match(/^(\d+) \S+ \d\t(.+)$/);
+      if (m && m[1] !== '100755') err(m[2], `tracked mode ${m[1]}, expected 100755 (git update-index --chmod=+x)`);
+    }
+  }
+}
+
 // 9. Eval cases: case.yaml name matches folder, prompt.md and scaffold script exist, graders use a known type with required keys
 // evals/touches.json: keys match the case folders and every prefix is an existing path
 {
