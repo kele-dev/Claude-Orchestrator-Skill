@@ -323,6 +323,14 @@ function runHook(name, payload, extraEnv = {}) {
     env: { ...process.env, ORCH_GUARD: '', ORCH_NO_TRIM: '', CLAUDE_PROJECT_DIR: root, ORCH_STATE_DIR: os.tmpdir(), ...extraEnv },
   });
 }
+// Best-effort cleanup: never let a failed removal mask the real result.
+const rmQuiet = (p, opts = {}) => {
+  try {
+    fs.rmSync(p, { force: true, ...opts });
+  } catch {
+    // ignore
+  }
+};
 // Shared trim-output payload: 150 lines, one 50-char error line at index 69.
 const BIG_STDOUT = Array.from({ length: 150 }, (_, i) => (i === 69 ? 'Error: boom'.padEnd(50, '.') : 'x'.repeat(50))).join('\n');
 const trimPayload = (command) => ({
@@ -632,10 +640,9 @@ function sessionInfo(cwd, env = {}, raw = false) {
     const rl = runHook('long-session.mjs', { hook_event_name: 'UserPromptSubmit', session_id: sid, transcript_path: longPath, cwd: root }, { ORCH_LONG: '', ORCH_LONG_DELEGATIONS: '', ORCH_LONG_BYTES: '999999999', ORCH_LONG_TOKENS: '', ORCH_LONG_REPEAT: '' });
     if (rl && (!rl.stdout.includes('systemMessage') || !rl.stdout.includes('+130k'))) err('hooks/long-session.mjs', 'smoke "long large head/tail": expected systemMessage with "+130k" in stdout');
   } finally {
-    fs.rmSync(tmp, { recursive: true, force: true });
-    for (const f of fs.readdirSync(os.tmpdir())) {
-      if (f.startsWith(`orchestrator-long-${sid}`)) fs.rmSync(path.join(os.tmpdir(), f), { force: true });
-    }
+    rmQuiet(tmp, { recursive: true });
+    rmQuiet(path.join(os.tmpdir(), `orchestrator-long-${sid}`));
+    rmQuiet(path.join(os.tmpdir(), `orchestrator-long-${sid}.count`));
   }
 }
 
@@ -677,8 +684,8 @@ function sessionInfo(cwd, env = {}, raw = false) {
         err('skills/learn/reference.md', `store key smoke: bash "${bashOut}" vs session-info "${store ?? ''}"`);
       }
     } finally {
-      fs.rmSync(sdir, { recursive: true, force: true });
-      fs.rmSync(shome, { recursive: true, force: true });
+      rmQuiet(sdir, { recursive: true });
+      rmQuiet(shome, { recursive: true });
     }
   }
 
@@ -708,8 +715,8 @@ function sessionInfo(cwd, env = {}, raw = false) {
           }
         }
       } finally {
-        fs.rmSync(sdir, { recursive: true, force: true });
-        fs.rmSync(shome, { recursive: true, force: true });
+        rmQuiet(sdir, { recursive: true });
+        rmQuiet(shome, { recursive: true });
       }
     }
   }
