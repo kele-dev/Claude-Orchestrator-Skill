@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Sum sub-agent token usage from a Claude Code transcript (JSONL), or main-session usage with --main. Always exits 0.
-// Usage: node scripts/budget.mjs <transcript.jsonl|auto> [--mark] [--main] [--from <bytes>] [--limit <N>k]
+// Usage: node scripts/budget.mjs <transcript.jsonl|auto> [--mark] [--main] [--from <bytes>] [--limit <N>k] [--verbose]
 // Exit: 0 ok, 2 invalid --limit (a number above 0).
 import { statSync, readdirSync, realpathSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
@@ -91,7 +91,11 @@ function main() {
   let file = args.find((a, i) => !a.startsWith('--') && args[i - 1] !== '--from' && args[i - 1] !== '--limit');
   if (file === 'auto') {
     file = newestTranscript();
-    if (file) process.stderr.write(`budget: auto -> ${file}\n`);
+    if (file && (process.env.ORCH_DEBUG || args.includes('--verbose'))) {
+      const home = os.homedir();
+      const shown = home && file.startsWith(home) ? `~${file.slice(home.length)}` : file;
+      process.stderr.write(`budget: auto -> ${shown}\n`);
+    }
   }
   if (args.includes('--mark')) {
     let size;

@@ -948,6 +948,10 @@ function sessionInfo(cwd, env = {}, raw = false) {
         return (r.stdout ?? '').trim();
       };
       chk('auto newest', auto(autoCfg), 'BUDGET: spent 12k (1 agent)');
+      const autoQuiet = spawnSync(process.execPath, [budgetPath, 'auto'], { encoding: 'utf8', cwd: autoCwd, env: { ...process.env, ORCH_DEBUG: '', CLAUDE_CONFIG_DIR: autoCfg } });
+      chk('auto stderr silent by default', (autoQuiet.stderr ?? '').trim(), '');
+      const autoLoud = spawnSync(process.execPath, [budgetPath, 'auto', '--verbose'], { encoding: 'utf8', cwd: autoCwd, env: { ...process.env, ORCH_DEBUG: '', CLAUDE_CONFIG_DIR: autoCfg } });
+      chk('auto --verbose prints path', String((autoLoud.stderr ?? '').startsWith('budget: auto -> ')), 'true');
       const emptyCfg = path.join(tmp, 'empty-cfg');
       fs.mkdirSync(emptyCfg, { recursive: true });
       chk('auto empty', auto(emptyCfg), 'BUDGET: spent ? (transcript unreadable)');
