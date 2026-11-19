@@ -476,6 +476,16 @@ function sessionInfo(cwd, env = {}, raw = false) {
   if (r && (r.status !== 0 || !r.stdout.includes('Orchestrator store:'))) {
     err('hooks/session-info.mjs', `smoke "session-info": exit ${r.status}, expected "Orchestrator store:" in stdout`);
   }
+  {
+    // rules injection must not depend on cat: rules.mjs prints rules.md, hooks.json falls back with a visible node warning
+    const rr = runHook('rules.mjs', {});
+    const rulesMd = readText(path.join(root, 'hooks/rules.md'));
+    if (rr && rr.stdout !== rulesMd) err('hooks/rules.mjs', 'smoke "rules": stdout differs from hooks/rules.md');
+    const rulesCmd = String(hooksJson?.hooks?.SessionStart?.[0]?.hooks?.[0]?.command ?? '');
+    if (!/^node "\$\{CLAUDE_PLUGIN_ROOT\}\/hooks\/rules\.mjs" \|\| /.test(rulesCmd) || !rulesCmd.includes('node was not found')) {
+      err('hooks/hooks.json', 'SessionStart rules hook must run rules.mjs first and warn visibly when node is missing');
+    }
+  }
   if (r && !r.stdout.includes('Guards: active')) err('hooks/session-info.mjs', 'smoke "session-info": expected "Guards: active" in stdout');
   r = sessionInfo(root, { ORCH_GUARD: 'off' });
   if (r && !r.stdout.includes('Guards: off (ORCH_GUARD=off)')) err('hooks/session-info.mjs', 'smoke "session-info ORCH_GUARD=off": expected "Guards: off (ORCH_GUARD=off)" in stdout');
