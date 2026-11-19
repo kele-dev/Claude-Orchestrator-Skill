@@ -565,7 +565,9 @@ function sessionInfo(cwd, env = {}, raw = false) {
   if (spawnSync('git', ['--version']).status === 0) {
     const gtmp = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'orch-root-')));
     try {
-      spawnSync('git', ['init', '-q'], { cwd: gtmp });
+      const cleanEnv = Object.fromEntries(Object.entries(process.env).filter(([k]) => !k.toUpperCase().startsWith('GIT_')));
+      const gi = spawnSync('git', ['init', '-q'], { cwd: gtmp, env: cleanEnv, encoding: 'utf8' });
+      if (gi.status !== 0) err('hooks/guard-edit.mjs', `smoke "guard root fallback": git init exited ${gi.status}: ${(gi.stderr ?? '').trim().slice(0, 200)}`);
       const tp = path.join(gtmp, 'transcript.jsonl');
       fs.writeFileSync(tp, JSON.stringify({ type: 'user', message: { content: 'hello' } }) + '\n');
       const payload = { hook_event_name: 'PreToolUse', tool_name: 'Edit', tool_input: { file_path: path.join(gtmp, 'a.txt') }, transcript_path: tp, cwd: gtmp };
