@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // PreToolUse hook for Read: denies ONCE per file per session a main-session whole-file Read (no offset/limit) of a large file
-// (over 2000 lines or 100 KB). A repeated identical Read is allowed (marker file in the temp dir). Subagents are untouched.
+// (over 2000 lines or 100 KB); page-ranged reads and pdf/image/notebook files are allowed. A repeated identical Read is allowed (marker file in the temp dir). Subagents are untouched.
 // Kill switch: ORCH_READ_GUARD=off. Fails open on malformed input, missing session id or any error (prints nothing, exits 0).
 import { createHash } from 'node:crypto';
 import { closeSync, openSync, statSync, writeFileSync, existsSync } from 'node:fs';
@@ -22,6 +22,8 @@ readStdin((raw) => {
     if (typeof file !== 'string' || file === '') return;
     if (ti.offset !== undefined && ti.offset !== null) return;
     if (ti.limit !== undefined && ti.limit !== null) return;
+    if (ti.pages !== undefined && ti.pages !== null && ti.pages !== '') return;
+    if (/\.(pdf|png|jpe?g|gif|webp|bmp|svg|ipynb)$/i.test(file)) return;
     const sid = String(input.session_id ?? '').replace(/[^A-Za-z0-9_-]/g, '').slice(0, 80);
     if (sid === '') return;
 

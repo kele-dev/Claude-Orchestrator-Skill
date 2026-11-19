@@ -613,8 +613,15 @@ function sessionInfo(cwd, env = {}, raw = false) {
       if (denies(rd(big, { session_id: sid2 }, {}, { limit: 50 }))) err('hooks/guard-read.mjs', 'smoke "read with limit": expected allow');
       if (denies(rd(big, { session_id: sid2 }, { ORCH_READ_GUARD: 'off' }))) err('hooks/guard-read.mjs', 'smoke "read ORCH_READ_GUARD=off": expected allow');
       if (!denies(rd(big, { session_id: sid2 }))) err('hooks/guard-read.mjs', 'smoke "read big other session": expected deny');
+      const bigPdf = path.join(rdir, 'big.PDF');
+      const bigPng = path.join(rdir, 'big.png');
+      fs.copyFileSync(big, bigPdf);
+      fs.copyFileSync(big, bigPng);
+      if (denies(rd(bigPdf, { session_id: sid + '-c' }, {}, { pages: '1-5' }))) err('hooks/guard-read.mjs', 'smoke "read large pdf with pages": expected allow');
+      if (denies(rd(bigPng, { session_id: sid + '-c' }))) err('hooks/guard-read.mjs', 'smoke "read large png": expected allow');
+      if (denies(rd(bigPdf, { session_id: sid + '-c' }))) err('hooks/guard-read.mjs', 'smoke "read large pdf": expected allow');
     } finally {
-      for (const s of [sid, sid + '-b']) {
+      for (const s of [sid, sid + '-b', sid + '-c']) {
         for (const f of fs.readdirSync(os.tmpdir())) if (f.startsWith(`orchestrator-read-${s}-`)) rmQuiet(path.join(os.tmpdir(), f));
       }
       rmQuiet(rdir, { recursive: true });
