@@ -1081,6 +1081,15 @@ function sessionInfo(cwd, env = {}, raw = false) {
       if (deny && !denied) err('hooks/guard-review.mjs', `smoke "${name}": expected deny`);
       if (!deny && g.stdout.trim() !== '') err('hooks/guard-review.mjs', `smoke "${name}": expected empty stdout`);
     }
+    // timing guard: the PRD_PATH regex must stay linear on long path-like prompts (measured ~3 ms at 100k chars)
+    for (const [name, frag] of [['a/ runs', 'a/'], ['docs/prd fragments', 'docs/prd/']]) {
+      const t0 = Date.now();
+      const g = review('orchestrator:opus-reviewer', frag.repeat(Math.ceil(400000 / frag.length)));
+      if (!g) continue;
+      const ms = Date.now() - t0;
+      if (g.stdout.trim() !== '') err('hooks/guard-review.mjs', `timing "${name}": expected empty stdout`);
+      if (ms > 3000) err('hooks/guard-review.mjs', `timing "${name}": 400k-char prompt took ${ms} ms (limit 3000), PRD_PATH may be superlinear`);
+    }
     const hp = path.join(root, 'hooks', 'guard-review.mjs');
     if (exists(hp)) {
       const bad = spawnSync(process.execPath, [hp], { input: 'not json', encoding: 'utf8', cwd: root, env: { ...process.env, ORCH_GUARD: '' } });
