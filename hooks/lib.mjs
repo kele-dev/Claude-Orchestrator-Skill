@@ -1,5 +1,8 @@
 // Shared helpers for the orchestrator hooks (stdin read, debug output, env ints, bounded file reads, transcript entry filter).
+import { execFileSync } from 'node:child_process';
 import { readSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { dirname } from 'node:path';
 
 // One-line error text; full stack when ORCH_DEBUG=2, quoted strings redacted otherwise.
 export const fmt = (e) => process.env.ORCH_DEBUG === '2' ? String(e?.stack ?? e) : `${e?.name ?? 'Error'}: ${String(e?.message ?? e).replace(/"[^"]*"/g, '"…"').slice(0, 200)}`;
@@ -32,3 +35,18 @@ export function readBytes(fd, start, len) {
 
 // True for a main-session (non-sidechain) assistant transcript entry.
 export const isMainAssistant = (entry) => entry?.type === 'assistant' && !entry.isSidechain;
+
+// Per-project store dir (same rule as hooks/session-info.mjs): git common dir of cwd (else cwd), slugified, last 80 chars.
+export function storeFor(cwd) {
+  let main = cwd;
+  try {
+    const common = execFileSync('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'], {
+      cwd, timeout: 3000, stdio: ['ignore', 'pipe', 'ignore'], encoding: 'utf8',
+    }).trim();
+    if (common) main = dirname(common);
+  } catch {
+    main = cwd;
+  }
+  const key = main.replace(/\\/g, '/').toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(-80);
+  return homedir().replace(/\\/g, '/') +'/.claude/orchestrator/' + key;
+}

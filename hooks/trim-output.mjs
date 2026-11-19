@@ -1,10 +1,16 @@
 #!/usr/bin/env node
 // PostToolUse hook for Bash/PowerShell: trims long command output, keeping error lines and the tail.
 // Fails open: on any error or unexpected input it prints nothing and exits 0.
-import { makeDbg, posInt, readStdin } from './lib.mjs';
+import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync } from 'node:fs';
+import { join } from 'node:path';
+import { makeDbg, posInt, readStdin, storeFor } from './lib.mjs';
 
 const dbg = makeDbg('trim-output');
-readStdin((raw) => {
+
+// Stats mode: `node trim-output.mjs --stats <store>` prints one TRIM line for the newest session file.
+if (process.argv[2] === '--stats') {
+  try { process.stdout.write(statsLine(process.argv[3]) + '\n'); } catch (e) { dbg(e); process.stdout.write('TRIM: none\n'); }
+} else readStdin((raw) => {
   try {
     if (raw.length < 3000) return;
     const input = JSON.parse(raw);
@@ -23,6 +29,7 @@ readStdin((raw) => {
     const code = response.exit_code ?? response.exitCode;
     const stdout = trim(text, noLines, readCmd, Number.isInteger(code) && code !== 0);
     if (stdout === null) return;
+    record(input, text, stdout);
 
     process.stdout.write(JSON.stringify({
       hookSpecificOutput: {
@@ -75,4 +82,35 @@ function trimLines(text, maxLines, exitFailed = false) {
     ...body,
     ...tail,
   ].join('\n');
+}
+
+const NO_STATS = 'TRIM: none';
+
+// Appends one tiny {ts, before, after, saved} record to <store>/trim-stats-<session>.jsonl; never throws.
+function record(input, before, after) {
+  try {
+    const sid = String(input?.session_id ?? '').replace(/[^A-Za-z0-9_-]/g, '').slice(0, 64);
+    const cwd = typeof input?.cwd === 'string' && input.cwd !== '' ? input.cwd : process.cwd();
+    if (sid === '') return;
+    const store = storeFor(cwd);
+    const file = join(store, `trim-stats-${sid}.jsonl`);
+    if (!existsSync(store)) mkdirSync(store, { recursive: true });
+    if (existsSync(file) && statSync(file).size > 65536) return;
+    const saved = Buffer.byteLength(before) - Buffer.byteLength(after);
+    appendFileSync(file, JSON.stringify({ ts: Date.now(), before: before.split('\n').length, after: after.split('\n').length, saved }) + '\n');
+  } catch (e) {
+    dbg(e);
+  }
+}
+
+function statsLine(store) {
+  if (typeof store !== 'string' || store === '') return NO_STATS;
+  const files = readdirSync(store).filter((f) => /^trim-stats-.*\.jsonl$/.test(f))
+    .map((f) => ({ f, t: statSync(join(store, f)).mtimeMs })).sort((a, b) => b.t - a.t);
+  if (!files.length) return NO_STATS;
+  let n = 0, saved = 0;
+  for (const l of readFileSync(join(store, files[0].f), 'utf8').split('\n')) {
+    try { const r = JSON.parse(l); n++; saved += Number(r.saved) || 0; } catch { /* skip */ }
+  }
+  return n ? `TRIM: ${n} trims, ${saved} bytes saved` : NO_STATS;
 }

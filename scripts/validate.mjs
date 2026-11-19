@@ -383,6 +383,27 @@ function sessionInfo(cwd, env = {}, raw = false) {
     if (!failOut(failBody('Error: boom')).includes('fatal: not a git repository')) err('hooks/trim-output.mjs', 'smoke "trim failed keyword": expected keyword-less line 6 kept when an error line exists');
     if (failOut(failBody('x')).includes('fatal: not a git repository')) err('hooks/trim-output.mjs', 'smoke "trim success": line 6 must still be trimmed when the command did not fail');
   }
+  {
+    // IC-073: a trim appends one record to <store>/trim-stats-<session>.jsonl; --stats sums it; ORCH_NO_TRIM writes nothing
+    const home = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'orch-trimstat-home-')));
+    const tcwd = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'orch-trimstat-cwd-')));
+    const homeEnv = { HOME: home, USERPROFILE: home };
+    const store = path.join(home, '.claude', 'orchestrator', tcwd.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(-80));
+    const statsFile = path.join(store, 'trim-stats-smoke1.jsonl');
+    try {
+      const payload = { ...trimPayload('npm test'), cwd: tcwd, session_id: 'smoke1' };
+      runHook('trim-output.mjs', payload, { ORCH_NO_TRIM: '1', ...homeEnv });
+      if (fs.existsSync(statsFile)) err('hooks/trim-output.mjs', 'smoke "trim stats ORCH_NO_TRIM": expected no stats file');
+      runHook('trim-output.mjs', payload, homeEnv);
+      const recs = fs.existsSync(statsFile) ? fs.readFileSync(statsFile, 'utf8').split('\n').filter(Boolean) : [];
+      if (recs.length !== 1 || !(JSON.parse(recs[0]).saved > 0)) err('hooks/trim-output.mjs', 'smoke "trim stats record": expected one record with saved > 0');
+      const st = spawnSync(process.execPath, [path.join(root, 'hooks', 'trim-output.mjs'), '--stats', store], { encoding: 'utf8', cwd: root, env: { ...process.env, ...homeEnv } });
+      if (!/^TRIM: 1 trims, [1-9]\d* bytes saved$/.test(st.stdout.trim())) err('hooks/trim-output.mjs', `smoke "trim stats --stats": unexpected output "${st.stdout.trim()}"`);
+    } finally {
+      fs.rmSync(home, { recursive: true, force: true });
+      fs.rmSync(tcwd, { recursive: true, force: true });
+    }
+  }
   r = runHook('trim-output.mjs', trimPayload('git diff'));
   if (r && r.stdout.trim() !== '') err('hooks/trim-output.mjs', 'smoke "git diff untouched": expected empty stdout');
   {
