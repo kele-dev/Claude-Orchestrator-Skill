@@ -514,12 +514,13 @@ function sessionInfo(cwd, env = {}, raw = false) {
 
   // invalid JSON stdin: fail open silently; with ORCH_DEBUG=1 the error goes to stderr
   const rawHook = (name, env) => spawnSync(process.execPath, [path.join(root, 'hooks', name)], { input: '{bad' + 'x'.repeat(3100), encoding: 'utf8', cwd: root, env: { ...process.env, ORCH_DEBUG: '', ...env } });
-  for (const [name, prefix] of [['trim-output.mjs', 'orchestrator trim-output:'], ['guard-edit.mjs', 'orchestrator guard-edit:']]) {
+  for (const [name, prefix] of [['trim-output.mjs', 'orchestrator trim-output:'], ['guard-edit.mjs', 'orchestrator guard-edit:'], ['guard-review.mjs', 'orchestrator guard-review:'], ['long-session.mjs', 'orchestrator long-session:'], ['session-info.mjs', 'orchestrator session-info:'], ['ledger.mjs', 'orchestrator ledger:']]) {
     const quiet = rawHook(name, {});
     if (quiet.status !== 0 || quiet.stdout.trim() !== '' || quiet.stderr.trim() !== '') {
       err(`hooks/${name}`, `smoke "invalid stdin": expected exit 0 with empty stdout and stderr (exit ${quiet.status})`);
     }
     const loud = rawHook(name, { ORCH_DEBUG: '1' });
+    if (loud.stdout.trim() !== '') err(`hooks/${name}`, 'smoke "invalid stdin ORCH_DEBUG=1": expected empty stdout on the error path');
     if (!(loud.stderr ?? '').startsWith(prefix)) err(`hooks/${name}`, `smoke "invalid stdin ORCH_DEBUG=1": expected stderr starting with "${prefix}"`);
   }
 
