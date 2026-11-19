@@ -1,6 +1,6 @@
 # orchestrator:learn legacy rules
 
-## Legacy (v1.6.0 and older; removal planned in v1.8.0)
+## Legacy (v1.6.0 and older; kept so old stores can still be read; no removal date)
 All legacy rules live here; other skills only point to this section.
 - `<main>` = parent of the absolute git-common-dir (outside git: the current folder).
 - Legacy lessons: `<main>/.claude/skills/learned-<topic>/SKILL.md`. Read per topic (frontmatter first, full text only when relevant) for topics not in the store.
