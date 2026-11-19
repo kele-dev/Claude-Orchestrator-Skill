@@ -6,14 +6,11 @@ import fs from 'fs';
 import os from 'os';
 import { execFileSync } from 'child_process';
 import path from 'path';
+import { makeDbg, readBytes, readStdin } from './lib.mjs';
 
-const fmt = (e) => process.env.ORCH_DEBUG === '2' ? String(e?.stack ?? e) : `${e?.name ?? 'Error'}: ${String(e?.message ?? e).replace(/"[^"]*"/g, '"…"').slice(0, 200)}`;
-const dbg = (e) => { if (process.env.ORCH_DEBUG === '1' || process.env.ORCH_DEBUG === '2') process.stderr.write(`orchestrator guard-edit: ${fmt(e)}\n`); };
+const dbg = makeDbg('guard-edit');
 
-let raw = '';
-process.stdin.setEncoding('utf8');
-process.stdin.on('data', (d) => { raw += d; });
-process.stdin.on('end', () => {
+readStdin((raw) => {
   try {
     const input = JSON.parse(raw);
     if (shouldDeny(input)) {
@@ -130,14 +127,7 @@ function orchestrationOff(transcriptPath) {
     try {
       size = fs.fstatSync(fd).size;
       const len = Math.min(size, WINDOW);
-      const buf = Buffer.alloc(len);
-      let got = 0;
-      while (got < len) {
-        const n = fs.readSync(fd, buf, got, len - got, size - len + got);
-        if (n <= 0) break;
-        got += n;
-      }
-      text = buf.toString('utf8', 0, got);
+      text = readBytes(fd, size - len, len).toString('utf8');
       partial = size > len;
     } finally {
       fs.closeSync(fd);
@@ -167,14 +157,7 @@ function scanOlder(transcriptPath, end) {
     let carry = Buffer.alloc(0);
     while (pos > 0 && Date.now() < deadline) {
       const start = Math.max(0, pos - CHUNK);
-      const chunk = Buffer.alloc(pos - start);
-      let got = 0;
-      while (got < chunk.length) {
-        const n = fs.readSync(fd, chunk, got, chunk.length - got, start + got);
-        if (n <= 0) break;
-        got += n;
-      }
-      const data = Buffer.concat([chunk.subarray(0, got), carry]);
+      const data = Buffer.concat([readBytes(fd, start, pos - start), carry]);
       let body = data;
       if (start > 0) {
         const i = data.indexOf(10);

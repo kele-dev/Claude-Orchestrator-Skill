@@ -3,14 +3,12 @@
 // Fails open on any error or unknown input (prints nothing, exits 0).
 import fs from 'fs';
 import path from 'path';
+import { makeDbg, readStdin } from './lib.mjs';
 
 const PRD_PATH = /(?<![A-Za-z0-9_.\/\\:-])(?:[A-Za-z]:[\/\\]|\/|\.{1,2}\/)?(?:[A-Za-z0-9_.-]+[\/\\])*docs[\/\\]prd[\/\\][A-Za-z0-9_.-]+\.md(?!\.?[A-Za-z0-9_\/-])/g;
-const fmt = (e) => process.env.ORCH_DEBUG === '2' ? String(e?.stack ?? e) : `${e?.name ?? 'Error'}: ${String(e?.message ?? e).replace(/"[^"]*"/g, '"…"').slice(0, 200)}`;
+const dbg = makeDbg('guard-review');
 
-let raw = '';
-process.stdin.setEncoding('utf8');
-process.stdin.on('data', (d) => { raw += d; });
-process.stdin.on('end', () => {
+readStdin((raw) => {
   try {
     const input = JSON.parse(raw);
     const missing = findMissing(input);
@@ -25,7 +23,7 @@ process.stdin.on('end', () => {
     }
   } catch (e) {
     // fail open
-    if (process.env.ORCH_DEBUG === '1' || process.env.ORCH_DEBUG === '2') process.stderr.write(`orchestrator guard-review: ${fmt(e)}\n`);
+    dbg(e);
   }
 });
 

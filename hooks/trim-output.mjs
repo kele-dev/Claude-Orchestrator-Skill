@@ -1,11 +1,10 @@
 #!/usr/bin/env node
 // PostToolUse hook for Bash/PowerShell: trims long command output, keeping error lines and the tail.
 // Fails open: on any error or unexpected input it prints nothing and exits 0.
-const fmt = (e) => process.env.ORCH_DEBUG === '2' ? String(e?.stack ?? e) : `${e?.name ?? 'Error'}: ${String(e?.message ?? e).replace(/"[^"]*"/g, '"…"').slice(0, 200)}`;
-let raw = '';
-process.stdin.setEncoding('utf8');
-process.stdin.on('data', (d) => { raw += d; });
-process.stdin.on('end', () => {
+import { makeDbg, posInt, readStdin } from './lib.mjs';
+
+const dbg = makeDbg('trim-output');
+readStdin((raw) => {
   try {
     if (raw.length < 3000) return;
     const input = JSON.parse(raw);
@@ -32,7 +31,7 @@ process.stdin.on('end', () => {
     }));
   } catch (e) {
     // fail open
-    if (process.env.ORCH_DEBUG === '1' || process.env.ORCH_DEBUG === '2') process.stderr.write(`orchestrator trim-output: ${fmt(e)}\n`);
+    dbg(e);
   }
 });
 
@@ -51,7 +50,6 @@ function trimLines(text, maxLines) {
   const lines = text.split('\n');
   if (lines.length <= maxLines || text.length <= 4000) return null;
 
-  const posInt = (v, d) => (/^[1-9]\d*$/.test(v ?? '') ? Number(v) : d);
   const tailN = posInt(process.env.ORCH_TRIM_TAIL, 30);
   const errN = posInt(process.env.ORCH_TRIM_ERRORS, 10);
   const head = lines.slice(0, 3);

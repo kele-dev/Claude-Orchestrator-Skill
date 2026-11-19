@@ -6,9 +6,9 @@ import { execFileSync } from 'node:child_process';
 import { appendFileSync, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
+import { makeDbg, readStdin } from './lib.mjs';
 
-const fmt = (e) => process.env.ORCH_DEBUG === '2' ? String(e?.stack ?? e) : `${e?.name ?? 'Error'}: ${String(e?.message ?? e).replace(/"[^"]*"/g, '"…"').slice(0, 200)}`;
-const dbg = (e) => { if (process.env.ORCH_DEBUG === '1' || process.env.ORCH_DEBUG === '2') process.stderr.write(`orchestrator ledger: ${fmt(e)}\n`); };
+const dbg = makeDbg('ledger');
 
 const TIERS = ['haiku-coder', 'sonnet-dev', 'opus-planner', 'opus-reviewer'];
 const CAP_BYTES = 256 * 1024;
@@ -119,10 +119,7 @@ if (process.argv[2] === '--stats') {
     process.stdout.write(NONE + '\n');
   }
 } else {
-  let raw = '';
-  process.stdin.setEncoding('utf8');
-  process.stdin.on('data', (d) => { raw += d; });
-  process.stdin.on('end', () => {
+  readStdin((raw) => {
     try {
       record(JSON.parse(raw));
     } catch (e) {

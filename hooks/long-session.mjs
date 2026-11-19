@@ -4,17 +4,14 @@
 // Delegation count is incremental: the byte offset and count are cached in a .count file, and only new bytes are read.
 // Marker and .count files live in ORCH_STATE_DIR, or else in a private per-user dir under tmpdir (mode 0700, not a symlink, owned by the current user).
 // Fails open: on any error or unexpected input it prints nothing and exits 0.
-import { closeSync, existsSync, lstatSync, mkdirSync, openSync, readFileSync, readSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { closeSync, existsSync, lstatSync, mkdirSync, openSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir, userInfo } from 'node:os';
 import { join } from 'node:path';
+import { isMainAssistant, makeDbg, posInt, readBytes, readStdin } from './lib.mjs';
 
-const fmt = (e) => process.env.ORCH_DEBUG === '2' ? String(e?.stack ?? e) : `${e?.name ?? 'Error'}: ${String(e?.message ?? e).replace(/"[^"]*"/g, '"…"').slice(0, 200)}`;
-const dbg = (e) => { if (process.env.ORCH_DEBUG === '1' || process.env.ORCH_DEBUG === '2') process.stderr.write(`orchestrator long-session: ${fmt(e)}\n`); };
+const dbg = makeDbg('long-session');
 
-let raw = '';
-process.stdin.setEncoding('utf8');
-process.stdin.on('data', (d) => { raw += d; });
-process.stdin.on('end', () => {
+readStdin((raw) => {
   try {
     const out = run(JSON.parse(raw));
     if (out) process.stdout.write(out + '\n');
@@ -23,8 +20,6 @@ process.stdin.on('end', () => {
     dbg(e);
   }
 });
-
-const posInt = (v, d) => (/^[1-9]\d*$/.test(v ?? '') ? Number(v) : d);
 
 // Context growth from assistant message.usage: { first, last } tokens, or null when no usage entries are found.
 function contextGrowth(path, size) {
@@ -38,19 +33,10 @@ function contextGrowth(path, size) {
       return null;
     }
     const u = entry?.message?.usage;
-    if (entry?.type !== 'assistant' || entry.isSidechain || !u || typeof u !== 'object') return null;
+    if (!isMainAssistant(entry) || !u || typeof u !== 'object') return null;
     return (u.input_tokens || 0) + (u.cache_read_input_tokens || 0) + (u.cache_creation_input_tokens || 0);
   };
-  const readRange = (fd, start, len) => {
-    const buf = Buffer.alloc(len);
-    let got = 0;
-    while (got < len) {
-      const n = readSync(fd, buf, got, len - got, start + got);
-      if (n <= 0) break;
-      got += n;
-    }
-    return buf.toString('utf8', 0, got);
-  };
+  const readRange = (fd, start, len) => readBytes(fd, start, len).toString('utf8');
   try {
     const fd = openSync(path, 'r');
     try {
@@ -102,20 +88,14 @@ function countDelegations(path, size, cachePath) {
   }
   let next;
   try {
-    const len = size - cache.offset;
-    const buf = Buffer.alloc(len);
     const fd = openSync(path, 'r');
-    let got = 0;
+    let buf;
     try {
-      while (got < len) {
-        const n = readSync(fd, buf, got, len - got, cache.offset + got);
-        if (n <= 0) break;
-        got += n;
-      }
+      buf = readBytes(fd, cache.offset, size - cache.offset);
     } finally {
       closeSync(fd);
     }
-    const lastNL = buf.subarray(0, got).lastIndexOf(0x0a);
+    const lastNL = buf.lastIndexOf(0x0a);
     if (lastNL === -1) return cache.count;
     let count = cache.count;
     for (const line of buf.toString('utf8', 0, lastNL).split('\n')) {
@@ -126,7 +106,7 @@ function countDelegations(path, size, cachePath) {
       } catch {
         continue;
       }
-      if (entry?.type !== 'assistant' || entry.isSidechain) continue;
+      if (!isMainAssistant(entry)) continue;
       const content = entry.message?.content;
       if (!Array.isArray(content)) continue;
       count += content.filter((p) => p?.type === 'tool_use' && (p.name === 'Agent' || p.name === 'Task')).length;

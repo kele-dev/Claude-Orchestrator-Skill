@@ -6,9 +6,9 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { makeDbg, readStdin } from './lib.mjs';
 
-const fmt = (e) => process.env.ORCH_DEBUG === '2' ? String(e?.stack ?? e) : `${e?.name ?? 'Error'}: ${String(e?.message ?? e).replace(/"[^"]*"/g, '"…"').slice(0, 200)}`;
-const dbg = (e) => { if (process.env.ORCH_DEBUG === '1' || process.env.ORCH_DEBUG === '2') process.stderr.write(`orchestrator session-info: ${fmt(e)}\n`); };
+const dbg = makeDbg('session-info');
 const clean = (s) => String(s).replace(/[\u0000-\u001f\u007f`]/g, ' ').replace(/\s+/g, ' ').trim();
 
 const STALE_DAYS_DEFAULT = 14;
@@ -16,10 +16,7 @@ const STALE_DAYS = /^\d+$/.test((process.env.ORCH_STALE_DAYS ?? '').trim()) && N
   ? Number(process.env.ORCH_STALE_DAYS)
   : STALE_DAYS_DEFAULT;
 
-let raw = '';
-process.stdin.setEncoding('utf8');
-process.stdin.on('data', (d) => { raw += d; });
-process.stdin.on('end', () => {
+readStdin((raw) => {
   try {
     const out = run(JSON.parse(raw));
     if (out) process.stdout.write(out + '\n');
