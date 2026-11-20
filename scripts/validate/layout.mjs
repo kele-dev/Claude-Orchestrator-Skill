@@ -193,9 +193,17 @@ const readmeHasVersion = (text, v) => new RegExp(`Baru di ${v.replace(/[.*+?^${}
 if (exists(path.join(root, 'README.md')) && plugin && !readmeHasVersion(readText(path.join(root, 'README.md')), String(plugin.version))) {
   err('README.md', `missing "Baru di ${plugin.version}"`);
 }
+// A line that is exactly "### <version>" (trailing whitespace allowed) must exist in CHANGELOG.md.
+const changelogHasVersion = (text, v) => new RegExp(`^### ${v.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*$`, 'm').test(text);
+if (exists(path.join(root, 'CHANGELOG.md')) && plugin && !changelogHasVersion(readText(path.join(root, 'CHANGELOG.md')), String(plugin.version))) {
+  err('CHANGELOG.md', `missing "### ${plugin.version}" entry`);
+}
 // pure in-memory checks of the matcher
 for (const [text, v, want] of [['- Baru di 1.13.0: x', '1.13.0', true], ['Baru di 1.13.0.', '1.13.0', true], ['Baru di 1.13.01', '1.13.0', false], ['Baru di 1.13.0.1', '1.13.0', false], ['Baru di 11.13.0', '1.13.0', false], ['Baru di 1.13.0-rc.1', '1.13.0', false]]) {
   if (readmeHasVersion(text, v) !== want) err('scripts/validate.mjs', `README version matcher: "${text}" vs ${v} expected ${want}`);
+}
+for (const [text, v, want] of [['### 1.14.0', '1.14.0', true], ['### 1.14.0\n', '1.14.0', true], ['### 1.14.01', '1.14.0', false], ['### 1.14', '1.14.0', false], ['#### 1.14.0', '1.14.0', false]]) {
+  if (changelogHasVersion(text, v) !== want) err('scripts/validate.mjs', `CHANGELOG version matcher: "${text}" vs ${v} expected ${want}`);
 }
 
 // 7b. Stop names in skills/on/modes.md must be listed in autopilot's STOP section and resume's "When to write" section
