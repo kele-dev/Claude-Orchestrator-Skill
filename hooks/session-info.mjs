@@ -41,7 +41,10 @@ function run(input) {
 
   const { main, store } = storeInfo(cwd);
   const lines = [`Orchestrator store: ${store}`];
-  lines.push(process.env.ORCH_GUARD === 'off' ? 'Guards: off (ORCH_GUARD=off)' : `Guards: active (hooks run on Node ${process.version})`);
+  const editOff = process.env.ORCH_GUARD === 'off';
+  const readOff = process.env.ORCH_READ_GUARD === 'off';
+  if (editOff) lines.push(readOff ? 'Guards: off (ORCH_GUARD=off, ORCH_READ_GUARD=off)' : 'Guards: off (ORCH_GUARD=off), read guard active');
+  else lines.push(`Guards: active${readOff ? ', read guard off (ORCH_READ_GUARD=off)' : ''} (hooks run on Node ${process.version})`);
 
   const allLessons = listMd(join(store, 'lessons'), 'learned-');
   const lessons = allLessons.slice(0, 20).map((f) => {

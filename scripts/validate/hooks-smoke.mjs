@@ -162,6 +162,17 @@ const { root, err, exists, readText, runHook, rmQuiet, trimPayload, sessionInfo,
   r = sessionInfo(root, { ORCH_GUARD: 'off' });
   if (r && !r.stdout.includes('Guards: off (ORCH_GUARD=off)')) err('hooks/session-info.mjs', 'smoke "session-info ORCH_GUARD=off": expected "Guards: off (ORCH_GUARD=off)" in stdout');
 
+  for (const [env, want] of [
+    [{ ORCH_READ_GUARD: 'off' }, 'Guards: active, read guard off (ORCH_READ_GUARD=off) (hooks run on Node '],
+    [{ ORCH_GUARD: 'off' }, 'Guards: off (ORCH_GUARD=off), read guard active'],
+    [{ ORCH_GUARD: 'off', ORCH_READ_GUARD: 'off' }, 'Guards: off (ORCH_GUARD=off, ORCH_READ_GUARD=off)'],
+  ]) {
+    const v = sessionInfo(root, env);
+    if (v && !v.stdout.includes(want)) err('hooks/session-info.mjs', `smoke "session-info guards ${Object.keys(env).join('+')}": expected "${want}" in stdout`);
+  }
+  r = sessionInfo(root, { ORCH_READ_GUARD: 'on' });
+  if (r && (!r.stdout.includes('Guards: active (hooks run on Node ') || r.stdout.includes('read guard off'))) err('hooks/session-info.mjs', 'smoke "session-info both guards on": expected the unchanged "Guards: active (hooks run on Node" line');
+
   // session-info stale checkpoints (fake HOME and cwd in temp dirs)
   const sh = fs.mkdtempSync(path.join(os.tmpdir(), 'orch-st-'));
   const scwd = fs.mkdtempSync(path.join(os.tmpdir(), 'orch-cwd-'));
