@@ -5,6 +5,9 @@ import os from 'os';
 import path from 'path';
 import { spawnSync } from 'child_process';
 
+// Independent copy of the path store-key rule in hooks/lib.mjs (storeInfo); the test keeps its own oracle on purpose.
+const pathKey = (p) => p.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(-80);
+
 export function run(ctx) {
 const { root, err, exists, readText, runHook, rmQuiet, trimPayload, sessionInfo, hooksJson } = ctx;
 
@@ -39,7 +42,7 @@ const { root, err, exists, readText, runHook, rmQuiet, trimPayload, sessionInfo,
     const home = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'orch-trimstat-home-')));
     const tcwd = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'orch-trimstat-cwd-')));
     const homeEnv = { HOME: home, USERPROFILE: home };
-    const store = path.join(home, '.claude', 'orchestrator', tcwd.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(-80));
+    const store = path.join(home, '.claude', 'orchestrator', pathKey(tcwd));
     const statsFile = path.join(store, 'trim-stats-smoke1.jsonl');
     try {
       const payload = { ...trimPayload('npm test'), cwd: tcwd, session_id: 'smoke1' };
@@ -162,6 +165,17 @@ const { root, err, exists, readText, runHook, rmQuiet, trimPayload, sessionInfo,
   r = sessionInfo(root, { ORCH_GUARD: 'off' });
   if (r && !r.stdout.includes('Guards: off (ORCH_GUARD=off)')) err('hooks/session-info.mjs', 'smoke "session-info ORCH_GUARD=off": expected "Guards: off (ORCH_GUARD=off)" in stdout');
 
+  for (const [env, want] of [
+    [{ ORCH_READ_GUARD: 'off' }, 'Guards: active, read guard off (ORCH_READ_GUARD=off) (hooks run on Node '],
+    [{ ORCH_GUARD: 'off' }, 'Guards: off (ORCH_GUARD=off), read guard active'],
+    [{ ORCH_GUARD: 'off', ORCH_READ_GUARD: 'off' }, 'Guards: off (ORCH_GUARD=off, ORCH_READ_GUARD=off)'],
+  ]) {
+    const v = sessionInfo(root, env);
+    if (v && !v.stdout.includes(want)) err('hooks/session-info.mjs', `smoke "session-info guards ${Object.keys(env).join('+')}": expected "${want}" in stdout`);
+  }
+  r = sessionInfo(root, { ORCH_READ_GUARD: 'on' });
+  if (r && (!r.stdout.includes('Guards: active (hooks run on Node ') || r.stdout.includes('read guard off'))) err('hooks/session-info.mjs', 'smoke "session-info both guards on": expected the unchanged "Guards: active (hooks run on Node" line');
+
   // session-info stale checkpoints (fake HOME and cwd in temp dirs)
   const sh = fs.mkdtempSync(path.join(os.tmpdir(), 'orch-st-'));
   const scwd = fs.mkdtempSync(path.join(os.tmpdir(), 'orch-cwd-'));
@@ -264,6 +278,15 @@ const { root, err, exists, readText, runHook, rmQuiet, trimPayload, sessionInfo,
       if (denies(rd(big, { session_id: sid2 }, {}, { limit: 50 }))) err('hooks/guard-read.mjs', 'smoke "read with limit": expected allow');
       if (denies(rd(big, { session_id: sid2 }, { ORCH_READ_GUARD: 'off' }))) err('hooks/guard-read.mjs', 'smoke "read ORCH_READ_GUARD=off": expected allow');
       if (!denies(rd(big, { session_id: sid2 }))) err('hooks/guard-read.mjs', 'smoke "read big other session": expected deny');
+      // /orchestrator:off in the transcript turns the read guard off; the same transcript ending with on still denies
+      const cmdLine = (name) => JSON.stringify({ type: 'user', message: { content: `<command-message>orchestrator:${name}</command-message>\n<command-name>/orchestrator:${name}</command-name>` } });
+      const tOff = path.join(rdir, 't-off.jsonl');
+      const tOn = path.join(rdir, 't-on.jsonl');
+      fs.writeFileSync(tOff, [cmdLine('on'), cmdLine('off'), ''].join('\n'));
+      fs.writeFileSync(tOn, [cmdLine('off'), cmdLine('on'), ''].join('\n'));
+      const offRes = rd(big, { session_id: sid + '-o1', transcript_path: tOff });
+      if (!offRes || offRes.stdout.trim() !== '') err('hooks/guard-read.mjs', 'smoke "read after /orchestrator:off": expected empty stdout');
+      if (!denies(rd(big, { session_id: sid + '-o2', transcript_path: tOn }))) err('hooks/guard-read.mjs', 'smoke "read with orchestrator on": expected deny');
       const bigPdf = path.join(rdir, 'big.PDF');
       const bigPng = path.join(rdir, 'big.png');
       fs.copyFileSync(big, bigPdf);
@@ -296,7 +319,7 @@ const { root, err, exists, readText, runHook, rmQuiet, trimPayload, sessionInfo,
     const home = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'orch-ledger-home-')));
     const lcwd = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'orch-ledger-cwd-')));
     const homeEnv = { HOME: home, USERPROFILE: home };
-    const key = lcwd.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(-80);
+    const key = pathKey(lcwd);
     const store = path.join(home, '.claude', 'orchestrator', key);
     const file = path.join(store, 'delegations.jsonl');
     const ledgerLines = () => (fs.existsSync(file) ? fs.readFileSync(file, 'utf8').split('\n').filter(Boolean) : []);
@@ -330,6 +353,19 @@ const { root, err, exists, readText, runHook, rmQuiet, trimPayload, sessionInfo,
 
       const stats = spawnSync(process.execPath, [path.join(root, 'hooks', 'ledger.mjs'), '--stats', store], { encoding: 'utf8', cwd: root, env: { ...process.env, ...homeEnv } });
       if (stats.stdout.trim() !== 'LEDGER: haiku-coder 3/5 pass, 2 unknown, sonnet-dev 0/0 pass, 1 unknown') err('hooks/ledger.mjs', `smoke "stats": unexpected output "${stats.stdout.trim()}"`);
+      // lock: none left after runs; a stale lock is removed; capping rewrites atomically and keeps the new record
+      const lockFile = path.join(store, 'delegations.lock');
+      if (fs.existsSync(lockFile)) err('hooks/ledger.mjs', 'smoke "ledger lock": delegations.lock remains after a run');
+      const fillerLine = JSON.stringify({ ts: 'x', tier: 'haiku-coder', status: 'SUCCESS', agent_id: 'f'.repeat(200) }) + '\n';
+      fs.writeFileSync(file, fillerLine.repeat(1500));
+      fs.writeFileSync(lockFile, '1');
+      const old = new Date(Date.now() - 60000);
+      fs.utimesSync(lockFile, old, old);
+      runHook('ledger.mjs', payload({ agent_type: 'orchestrator:haiku-coder', agent_id: 'cap-last', last_assistant_message: 'STATUS: SUCCESS' }), homeEnv);
+      const capped = ledgerLines();
+      if (capped.length !== 1001 || JSON.parse(capped.at(-1)).agent_id !== 'cap-last') err('hooks/ledger.mjs', `smoke "ledger cap": expected 1001 lines ending with the new record, got ${capped.length}`);
+      if (fs.existsSync(lockFile)) err('hooks/ledger.mjs', 'smoke "ledger stale lock": expected the stale lock removed and no lock left');
+
       const emptyDir = fs.mkdtempSync(path.join(os.tmpdir(), 'orch-ledger-empty-'));
       const none = spawnSync(process.execPath, [path.join(root, 'hooks', 'ledger.mjs'), '--stats', emptyDir], { encoding: 'utf8', cwd: root, env: { ...process.env, ...homeEnv } });
       if (none.stdout.trim() !== 'LEDGER: no delegations') err('hooks/ledger.mjs', 'smoke "stats empty": expected "LEDGER: no delegations"');
@@ -555,8 +591,13 @@ if (spawnSync('git', ['--version']).status === 0) {
   const mkRepo = (remote) => {
     const d = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'orch-rkey-repo-')));
     dirs.push(d);
-    spawnSync('git', ['init', '-q'], { cwd: d });
-    if (remote) spawnSync('git', ['remote', 'add', 'origin', remote], { cwd: d });
+    const cleanEnv = Object.fromEntries(Object.entries(process.env).filter(([k]) => !k.toUpperCase().startsWith('GIT_')));
+    const gi = spawnSync('git', ['init', '-q'], { cwd: d, env: cleanEnv, encoding: 'utf8' });
+    if (gi.status !== 0) err('hooks/session-info.mjs', `store key smoke: git init exited ${gi.status}: ${(gi.stderr ?? '').trim().slice(0, 200)}`);
+    if (remote) {
+      const ra = spawnSync('git', ['remote', 'add', 'origin', remote], { cwd: d, env: cleanEnv, encoding: 'utf8' });
+      if (ra.status !== 0) err('hooks/session-info.mjs', `store key smoke: git remote add exited ${ra.status}: ${(ra.stderr ?? '').trim().slice(0, 200)}`);
+    }
     return d;
   };
   const base = fwdSlash(shome) + '/.claude/orchestrator/';
@@ -582,12 +623,12 @@ if (spawnSync('git', ['--version']).status === 0) {
     check('scp style, second clone', mkRepo('git@github.com:foo/bar.git'), base + 'github-com-foo-bar');
     check('ssh url with port and trailing slash', mkRepo('ssh://git@GitHub.com:22/Foo/Bar/'), base + 'github-com-22-foo-bar');
     const legacy = mkRepo('https://example.com/legacy/proj.git');
-    const oldKey = fwdSlash(legacy).toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(-80);
+    const oldKey = pathKey(fwdSlash(legacy));
     fs.mkdirSync(path.join(shome, '.claude', 'orchestrator', oldKey), { recursive: true });
     check('old path dir kept', legacy, base + oldKey);
     fs.mkdirSync(path.join(shome, '.claude', 'orchestrator', 'example-com-legacy-proj'), { recursive: true });
     check('path dir wins when remote dir also exists', legacy, base + oldKey);
-    check('no remote uses path key', mkRepo(null), base + fwdSlash(dirs[dirs.length - 1]).toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(-80));
+    check('no remote uses path key', mkRepo(null), base + pathKey(fwdSlash(dirs[dirs.length - 1])));
   } finally {
     for (const d of dirs) rmQuiet(d, { recursive: true });
     rmQuiet(shome, { recursive: true });

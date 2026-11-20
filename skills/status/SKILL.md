@@ -11,7 +11,7 @@ disable-model-invocation: true
 ## Collect
 - Mode: `on` unless the latest of `/orchestrator:on` / `/orchestrator:off` in this conversation is off; note whether `team` or `autopilot` is running.
 - Plugin version: `version` from `${CLAUDE_PLUGIN_ROOT}/.claude-plugin/plugin.json`; if that variable is not resolved, read `.claude-plugin/plugin.json` two folders above this skill's folder; if neither works, show `unknown`.
-- Guards: `active` when the session-start context has a `Guards: active` line (printed only by the Node hooks); `off` when it has `Guards: off`; otherwise `inactive: hooks did not run (Node 18+ not on PATH?)`. The store line does not prove this: the skills can compute the store without Node.
+- Guards: `active` when the session-start context has a `Guards: active` line (printed only by the Node hooks); `off` when it has `Guards: off`; also report the read guard as `off` when that line says `read guard off` or `ORCH_READ_GUARD=off`; otherwise `inactive: hooks did not run (Node 18+ not on PATH?)`. The store line does not prove this: the skills can compute the store without Node.
 - `<store>`: the path (outside git it uses the project root; say "not a git repo").
 - Lessons: each `<store>/lessons/*.md` -> file name + its frontmatter `description` (frontmatter only). Flag whether `learned-map` exists; if missing, suggest `/orchestrator:init`.
 - Checkpoints: each `<store>/checkpoints/*.md` -> name, its `Task:` line, its `Updated:` line. If any exist, suggest `/orchestrator:resume <name>`. Also list legacy `<main>/.claude/orchestrator/checkpoints/*.md`, marked "(legacy)" (`legacy.md` in the `orchestrator:learn` folder; only if legacy files exist).

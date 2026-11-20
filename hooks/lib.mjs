@@ -1,6 +1,6 @@
 // Shared helpers for the orchestrator hooks (stdin read, debug output, env ints, bounded file reads, transcript entry filter).
 import { execFileSync } from 'node:child_process';
-import { appendFileSync, existsSync, lstatSync, mkdirSync, readSync, renameSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
+import { appendFileSync, closeSync, existsSync, fstatSync, lstatSync, openSync, mkdirSync, readSync, renameSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
 import { homedir, tmpdir, userInfo } from 'node:os';
 import { dirname, join } from 'node:path';
 
@@ -57,6 +57,123 @@ export function writeAtomic(path, data) {
   } catch {
     try { unlinkSync(tmp); } catch { /* ignore */ }
   }
+}
+
+const dbg = makeDbg('guard-edit'); // same debug tag as before the move to lib
+
+// True only when the most recent real orchestrator command/Skill call in the transcript is off.
+export function orchestrationOff(transcriptPath) {
+  const WINDOW = 512 * 1024;
+  let text;
+  let size = 0;
+  let len = 0;
+  let skip = 0;
+  let partial = false;
+  try {
+    const fd = openSync(transcriptPath, 'r');
+    try {
+      size = fstatSync(fd).size;
+      len = Math.min(size, WINDOW);
+      text = readBytes(fd, size - len, len).toString('utf8');
+      partial = size > len;
+    } finally {
+      closeSync(fd);
+    }
+  } catch (e) {
+    dbg(e);
+    return false;
+  }
+  if (partial) {
+    const nl = text.indexOf('\n');
+    skip = nl === -1 ? len : nl + 1;
+    text = nl === -1 ? '' : text.slice(nl + 1);
+  }
+  let mode = lastMode(text);
+  if (mode === null && partial && skip > 0) mode = scanOlder(transcriptPath, size - len + skip);
+  return mode === 'off';
+}
+
+// Scan [0, end) backwards in fixed chunks (bounded memory and time) for the latest mode marker.
+function scanOlder(transcriptPath, end) {
+  const CHUNK = 1024 * 1024;
+  const MAX_CARRY = 32 * 1024 * 1024;
+  const deadline = Date.now() + 2000;
+  let fd;
+  try {
+    fd = openSync(transcriptPath, 'r');
+    let pos = end;
+    let carry = Buffer.alloc(0);
+    while (pos > 0 && Date.now() < deadline) {
+      const start = Math.max(0, pos - CHUNK);
+      const data = Buffer.concat([readBytes(fd, start, pos - start), carry]);
+      let body = data;
+      if (start > 0) {
+        const i = data.indexOf(10);
+        if (i === -1) {
+          carry = data.length > MAX_CARRY ? Buffer.alloc(0) : data;
+          pos = start;
+          continue;
+        }
+        carry = data.subarray(0, i);
+        body = data.subarray(i + 1);
+      } else {
+        carry = Buffer.alloc(0);
+      }
+      const mode = lastMode(body.toString('utf8'));
+      if (mode) return mode;
+      pos = start;
+    }
+  } catch (e) {
+    dbg(e);
+  } finally {
+    if (fd !== undefined) {
+      try { closeSync(fd); } catch { /* ignore */ }
+    }
+  }
+  return null;
+}
+
+function lastMode(text) {
+  const lines = text.split('\n');
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const l = lines[i];
+    if (!(l.includes('<command-name>/orchestrator:') || (l.includes('"Skill"') && l.includes('orchestrator:')))) continue;
+    let entry;
+    try {
+      entry = JSON.parse(lines[i]);
+    } catch {
+      continue;
+    }
+    const mode = modeOf(entry);
+    if (mode) return mode;
+  }
+  return null;
+}
+
+function modeOf(entry) {
+  const content = entry?.message?.content;
+  if (entry?.type === 'user') {
+    let s = null;
+    if (typeof content === 'string') s = content;
+    else if (Array.isArray(content)) {
+      const first = content.find((p) => p?.type === 'text');
+      if (typeof first?.text === 'string') s = first.text;
+    }
+    if (s === null) return null;
+    s = s.replace(/<system-reminder>[\s\S]*?<\/system-reminder>/g, '');
+    if (!s.trimStart().startsWith('<command-message>')) return null;
+    const m = /<command-name>\/orchestrator:(on|off|team|autopilot)<\/command-name>/.exec(s);
+    return m ? m[1] : null;
+  }
+  if (entry?.type === 'assistant' && Array.isArray(content)) {
+    for (const p of content) {
+      if (p?.type === 'tool_use' && p.name === 'Skill' && typeof p.input?.skill === 'string') {
+        const m = /^orchestrator:(on|off|team|autopilot)$/.exec(p.input.skill);
+        if (m) return m[1];
+      }
+    }
+  }
+  return null;
 }
 
 // Reads all of stdin as utf8 and passes it to cb.
