@@ -5,6 +5,9 @@ import os from 'os';
 import path from 'path';
 import { spawnSync } from 'child_process';
 
+// Independent copy of the path store-key rule in hooks/lib.mjs (storeInfo); the test keeps its own oracle on purpose.
+const pathKey = (p) => p.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(-80);
+
 export function run(ctx) {
 const { root, err, exists, readText, runHook, rmQuiet, trimPayload, sessionInfo, hooksJson } = ctx;
 
@@ -39,7 +42,7 @@ const { root, err, exists, readText, runHook, rmQuiet, trimPayload, sessionInfo,
     const home = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'orch-trimstat-home-')));
     const tcwd = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'orch-trimstat-cwd-')));
     const homeEnv = { HOME: home, USERPROFILE: home };
-    const store = path.join(home, '.claude', 'orchestrator', tcwd.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(-80));
+    const store = path.join(home, '.claude', 'orchestrator', pathKey(tcwd));
     const statsFile = path.join(store, 'trim-stats-smoke1.jsonl');
     try {
       const payload = { ...trimPayload('npm test'), cwd: tcwd, session_id: 'smoke1' };
@@ -316,7 +319,7 @@ const { root, err, exists, readText, runHook, rmQuiet, trimPayload, sessionInfo,
     const home = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'orch-ledger-home-')));
     const lcwd = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'orch-ledger-cwd-')));
     const homeEnv = { HOME: home, USERPROFILE: home };
-    const key = lcwd.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(-80);
+    const key = pathKey(lcwd);
     const store = path.join(home, '.claude', 'orchestrator', key);
     const file = path.join(store, 'delegations.jsonl');
     const ledgerLines = () => (fs.existsSync(file) ? fs.readFileSync(file, 'utf8').split('\n').filter(Boolean) : []);
@@ -620,12 +623,12 @@ if (spawnSync('git', ['--version']).status === 0) {
     check('scp style, second clone', mkRepo('git@github.com:foo/bar.git'), base + 'github-com-foo-bar');
     check('ssh url with port and trailing slash', mkRepo('ssh://git@GitHub.com:22/Foo/Bar/'), base + 'github-com-22-foo-bar');
     const legacy = mkRepo('https://example.com/legacy/proj.git');
-    const oldKey = fwdSlash(legacy).toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(-80);
+    const oldKey = pathKey(fwdSlash(legacy));
     fs.mkdirSync(path.join(shome, '.claude', 'orchestrator', oldKey), { recursive: true });
     check('old path dir kept', legacy, base + oldKey);
     fs.mkdirSync(path.join(shome, '.claude', 'orchestrator', 'example-com-legacy-proj'), { recursive: true });
     check('path dir wins when remote dir also exists', legacy, base + oldKey);
-    check('no remote uses path key', mkRepo(null), base + fwdSlash(dirs[dirs.length - 1]).toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(-80));
+    check('no remote uses path key', mkRepo(null), base + pathKey(fwdSlash(dirs[dirs.length - 1])));
   } finally {
     for (const d of dirs) rmQuiet(d, { recursive: true });
     rmQuiet(shome, { recursive: true });
