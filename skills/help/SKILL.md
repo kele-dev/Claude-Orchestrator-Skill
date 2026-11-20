@@ -15,10 +15,10 @@ Commands:
 - `/orchestrator:autopilot <task>` - batch after batch without asking (add `--dry-run`)
 - `/orchestrator:init [--refresh]` - map the project once
 - `/orchestrator:resume <slug>` - continue from a checkpoint
-- `/orchestrator:learn [list | add <lesson> | prune]` - project lessons
+- `/orchestrator:learn [list | add <lesson> | remove <lesson> | prune]` - project lessons
 - `/orchestrator:status` - read-only state summary
 - `/orchestrator:help` - this list
 
-Kill switches (env vars): `ORCH_GUARD=off` (edit and review guards), `ORCH_READ_GUARD=off` (large-read guard), `ORCH_NO_TRIM=1` (output trim; or add `# notrim` to one command), `ORCH_DEBUG=1` (hook errors to stderr).
+Kill switches (env vars): `ORCH_GUARD=off` (edit and review guards), `ORCH_READ_GUARD=off` (large-read guard), `ORCH_NO_TRIM=1` (output trim; or add `# notrim` to one command), `ORCH_LONG=off` (long-session warning), `ORCH_DEBUG=1` (hook errors to stderr and `<tmpdir>/orchestrator-debug.log`).
 
 Docs: `README.md` in the plugin folder (usage, hooks, data location), `CHANGELOG.md` (release notes per version), lessons and checkpoints in the store shown by `/orchestrator:status`.
