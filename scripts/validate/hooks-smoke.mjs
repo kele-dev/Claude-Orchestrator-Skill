@@ -588,8 +588,13 @@ if (spawnSync('git', ['--version']).status === 0) {
   const mkRepo = (remote) => {
     const d = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'orch-rkey-repo-')));
     dirs.push(d);
-    spawnSync('git', ['init', '-q'], { cwd: d });
-    if (remote) spawnSync('git', ['remote', 'add', 'origin', remote], { cwd: d });
+    const cleanEnv = Object.fromEntries(Object.entries(process.env).filter(([k]) => !k.toUpperCase().startsWith('GIT_')));
+    const gi = spawnSync('git', ['init', '-q'], { cwd: d, env: cleanEnv, encoding: 'utf8' });
+    if (gi.status !== 0) err('hooks/session-info.mjs', `store key smoke: git init exited ${gi.status}: ${(gi.stderr ?? '').trim().slice(0, 200)}`);
+    if (remote) {
+      const ra = spawnSync('git', ['remote', 'add', 'origin', remote], { cwd: d, env: cleanEnv, encoding: 'utf8' });
+      if (ra.status !== 0) err('hooks/session-info.mjs', `store key smoke: git remote add exited ${ra.status}: ${(ra.stderr ?? '').trim().slice(0, 200)}`);
+    }
     return d;
   };
   const base = fwdSlash(shome) + '/.claude/orchestrator/';
