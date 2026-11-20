@@ -38,7 +38,7 @@ Scoring: see the improvement-cycle skill `references/scoring.md`. Score = Impact
 | IC-029 | P2 | 3.0 | UX & accessibility | Legacy heading still says removal planned in v1.8.0 (plugin is 1.12.1) | skills/learn/legacy.md:3 | S | done | 010 |
 | IC-030 | P2 | 2.0 | Stability | guard-review PRD_PATH regex may go quadratic on long path-like prompts (needs investigation) | hooks/guard-review.mjs:158,189 | S | done | 010 |
 | IC-031 | P2 | 2.0 | Observability & ops | rules hook depends on cat and hooks on node PATH with no failure signal | hooks/hooks.json:8 | S | done | 010 |
-| IC-032 | P2 | 2.0 | Performance | Every Bash/Edit tool call spawns Node (~70-80 ms measured) | hooks/hooks.json:22-27,44-50; measured node -e 0 65-75 ms; re-assessed 2026-11-20: every tool call must reach trim/guards, so no matcher can narrow | M | blocked | 010 |
+| IC-032 | P2 | 2.0 | Performance | Every Bash/Edit tool call spawns Node (~70-80 ms measured) | hooks/hooks.json:22-27,44-50; measured node -e 0 65-75 ms; re-assessed 2026-11-20: every tool call must reach trim/guards, so no matcher can narrow | M | rejected | 010 |
 | IC-033 | P2 | 2.0 | UX & accessibility | Windows Git Bash instruction gives no default path or fallback | skills/on/SKILL.md:30; skills/init/SKILL.md:37; cycle 003 proposal: generate verify.ps1 when bash is missing (skills/init/SKILL.md:37) | M | done | 010 |
 | IC-034 | P2 | 2.0 | New features | Proposal: in-plugin help command and changelogs moved out of README | skills/ (no help); README.md:31-46,71-117,143-166 | M | done | 010 |
 | IC-035 | P2 | 2.0 | New features | Proposal: store key from repo identity instead of truncated path | hooks/session-info.mjs:52; skills/learn/reference.md:12; docs/ideas/token-saving.md:52 | M | done | 010 |
