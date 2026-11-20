@@ -350,6 +350,19 @@ const { root, err, exists, readText, runHook, rmQuiet, trimPayload, sessionInfo,
 
       const stats = spawnSync(process.execPath, [path.join(root, 'hooks', 'ledger.mjs'), '--stats', store], { encoding: 'utf8', cwd: root, env: { ...process.env, ...homeEnv } });
       if (stats.stdout.trim() !== 'LEDGER: haiku-coder 3/5 pass, 2 unknown, sonnet-dev 0/0 pass, 1 unknown') err('hooks/ledger.mjs', `smoke "stats": unexpected output "${stats.stdout.trim()}"`);
+      // lock: none left after runs; a stale lock is removed; capping rewrites atomically and keeps the new record
+      const lockFile = path.join(store, 'delegations.lock');
+      if (fs.existsSync(lockFile)) err('hooks/ledger.mjs', 'smoke "ledger lock": delegations.lock remains after a run');
+      const fillerLine = JSON.stringify({ ts: 'x', tier: 'haiku-coder', status: 'SUCCESS', agent_id: 'f'.repeat(200) }) + '\n';
+      fs.writeFileSync(file, fillerLine.repeat(1500));
+      fs.writeFileSync(lockFile, '1');
+      const old = new Date(Date.now() - 60000);
+      fs.utimesSync(lockFile, old, old);
+      runHook('ledger.mjs', payload({ agent_type: 'orchestrator:haiku-coder', agent_id: 'cap-last', last_assistant_message: 'STATUS: SUCCESS' }), homeEnv);
+      const capped = ledgerLines();
+      if (capped.length !== 1001 || JSON.parse(capped.at(-1)).agent_id !== 'cap-last') err('hooks/ledger.mjs', `smoke "ledger cap": expected 1001 lines ending with the new record, got ${capped.length}`);
+      if (fs.existsSync(lockFile)) err('hooks/ledger.mjs', 'smoke "ledger stale lock": expected the stale lock removed and no lock left');
+
       const emptyDir = fs.mkdtempSync(path.join(os.tmpdir(), 'orch-ledger-empty-'));
       const none = spawnSync(process.execPath, [path.join(root, 'hooks', 'ledger.mjs'), '--stats', emptyDir], { encoding: 'utf8', cwd: root, env: { ...process.env, ...homeEnv } });
       if (none.stdout.trim() !== 'LEDGER: no delegations') err('hooks/ledger.mjs', 'smoke "stats empty": expected "LEDGER: no delegations"');

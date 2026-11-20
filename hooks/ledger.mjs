@@ -2,9 +2,9 @@
 // SubagentStop hook: appends one line per orchestrator delegation ({ts, tier, status, agent_id}) to <store>/delegations.jsonl, capped at 1000 lines once over 256 KB.
 // Stats mode: `node ledger.mjs --stats <store>` prints one LEDGER line with the pass rate per tier.
 // Store computation: lib.storeFor (shared with session-info and trim-output). Fails open: any error prints nothing and exits 0; never blocks.
-import { appendFileSync, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { appendFileSync, existsSync, mkdirSync, readFileSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { makeDbg, readStdin, storeFor } from './lib.mjs';
+import { makeDbg, readStdin, storeFor, writeAtomic } from './lib.mjs';
 
 const dbg = makeDbg('ledger');
 
@@ -39,12 +39,39 @@ function lastAssistantText(path) {
   return '';
 }
 
+const LOCK_WAIT_MS = 500;
+const LOCK_STALE_MS = 5000;
+
+// Takes <store>/delegations.lock (flag 'wx'); retries for ~500 ms, removes a lock older than 5 s. Returns true when held.
+function takeLock(lock) {
+  const deadline = Date.now() + LOCK_WAIT_MS;
+  for (;;) {
+    try {
+      writeFileSync(lock, String(process.pid), { flag: 'wx' });
+      return true;
+    } catch (e) {
+      if (e?.code !== 'EEXIST') {
+        dbg(e);
+        return false;
+      }
+      try {
+        if (Date.now() - statSync(lock).mtimeMs > LOCK_STALE_MS) {
+          unlinkSync(lock);
+          continue;
+        }
+      } catch { /* lock vanished: retry */ }
+      if (Date.now() >= deadline) return false;
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 20);
+    }
+  }
+}
+
 // Keeps only the last CAP_LINES lines when the file is over CAP_BYTES.
 function capFile(file) {
   try {
     if (!existsSync(file) || statSync(file).size <= CAP_BYTES) return;
     const lines = readFileSync(file, 'utf8').split('\n').filter((l) => l !== '');
-    writeFileSync(file, lines.slice(-CAP_LINES).map((l) => l + '\n').join(''));
+    writeAtomic(file, lines.slice(-CAP_LINES).map((l) => l + '\n').join(''));
   } catch (e) {
     dbg(e);
   }
@@ -61,8 +88,18 @@ function record(input) {
   const store = storeFor(cwd);
   mkdirSync(store, { recursive: true });
   const file = join(store, 'delegations.jsonl');
-  capFile(file);
-  appendFileSync(file, JSON.stringify({ ts: new Date().toISOString(), tier, status, agent_id: String(input?.agent_id ?? '') }) + '\n');
+  const line = JSON.stringify({ ts: new Date().toISOString(), tier, status, agent_id: String(input?.agent_id ?? '') }) + '\n';
+  // Cap and append under a lock so parallel SubagentStop hooks cannot lose lines; without the lock, append only (never drop the record).
+  const lock = join(store, 'delegations.lock');
+  const held = takeLock(lock);
+  try {
+    if (held) capFile(file);
+    appendFileSync(file, line);
+  } finally {
+    if (held) {
+      try { unlinkSync(lock); } catch (e) { dbg(e); }
+    }
+  }
 }
 
 // Pass rate per tier from <store>/delegations.jsonl; bad lines and unknown tiers are skipped. "?" (no STATUS found) is unknown, not a failure.
