@@ -6,7 +6,7 @@ import fs from 'fs';
 import os from 'os';
 import { execFileSync } from 'child_process';
 import path from 'path';
-import { makeDbg, readBytes, readStdin } from './lib.mjs';
+import { makeDbg, orchestrationOff, readStdin } from './lib.mjs';
 
 const dbg = makeDbg('guard-edit');
 
@@ -114,119 +114,4 @@ function normalize(p) {
   let s = p.split(path.sep).join('/');
   if (process.platform === 'win32' || process.platform === 'darwin') s = s.toLowerCase();
   return s.replace(/\/+$/, '');
-}
-
-// True only when the most recent real orchestrator command/Skill call in the transcript is off.
-function orchestrationOff(transcriptPath) {
-  const WINDOW = 512 * 1024;
-  let text;
-  let size = 0;
-  let len = 0;
-  let skip = 0;
-  let partial = false;
-  try {
-    const fd = fs.openSync(transcriptPath, 'r');
-    try {
-      size = fs.fstatSync(fd).size;
-      len = Math.min(size, WINDOW);
-      text = readBytes(fd, size - len, len).toString('utf8');
-      partial = size > len;
-    } finally {
-      fs.closeSync(fd);
-    }
-  } catch (e) {
-    dbg(e);
-    return false;
-  }
-  if (partial) {
-    const nl = text.indexOf('\n');
-    skip = nl === -1 ? len : nl + 1;
-    text = nl === -1 ? '' : text.slice(nl + 1);
-  }
-  let mode = lastMode(text);
-  if (mode === null && partial && skip > 0) mode = scanOlder(transcriptPath, size - len + skip);
-  return mode === 'off';
-}
-
-// Scan [0, end) backwards in fixed chunks (bounded memory and time) for the latest mode marker.
-function scanOlder(transcriptPath, end) {
-  const CHUNK = 1024 * 1024;
-  const MAX_CARRY = 32 * 1024 * 1024;
-  const deadline = Date.now() + 2000;
-  let fd;
-  try {
-    fd = fs.openSync(transcriptPath, 'r');
-    let pos = end;
-    let carry = Buffer.alloc(0);
-    while (pos > 0 && Date.now() < deadline) {
-      const start = Math.max(0, pos - CHUNK);
-      const data = Buffer.concat([readBytes(fd, start, pos - start), carry]);
-      let body = data;
-      if (start > 0) {
-        const i = data.indexOf(10);
-        if (i === -1) {
-          carry = data.length > MAX_CARRY ? Buffer.alloc(0) : data;
-          pos = start;
-          continue;
-        }
-        carry = data.subarray(0, i);
-        body = data.subarray(i + 1);
-      } else {
-        carry = Buffer.alloc(0);
-      }
-      const mode = lastMode(body.toString('utf8'));
-      if (mode) return mode;
-      pos = start;
-    }
-  } catch (e) {
-    dbg(e);
-  } finally {
-    if (fd !== undefined) {
-      try { fs.closeSync(fd); } catch { /* ignore */ }
-    }
-  }
-  return null;
-}
-
-function lastMode(text) {
-  const lines = text.split('\n');
-  for (let i = lines.length - 1; i >= 0; i--) {
-    const l = lines[i];
-    if (!(l.includes('<command-name>/orchestrator:') || (l.includes('"Skill"') && l.includes('orchestrator:')))) continue;
-    let entry;
-    try {
-      entry = JSON.parse(lines[i]);
-    } catch {
-      continue;
-    }
-    const mode = modeOf(entry);
-    if (mode) return mode;
-  }
-  return null;
-}
-
-function modeOf(entry) {
-  const content = entry?.message?.content;
-  if (entry?.type === 'user') {
-    let s = null;
-    if (typeof content === 'string') s = content;
-    else if (Array.isArray(content)) {
-      const first = content.find((p) => p?.type === 'text');
-      if (typeof first?.text === 'string') s = first.text;
-    }
-    if (s === null) return null;
-    s = s.replace(/<system-reminder>[\s\S]*?<\/system-reminder>/g, '');
-    if (!s.trimStart().startsWith('<command-message>')) return null;
-    const m = /<command-name>\/orchestrator:(on|off|team|autopilot)<\/command-name>/.exec(s);
-    return m ? m[1] : null;
-  }
-  if (entry?.type === 'assistant' && Array.isArray(content)) {
-    for (const p of content) {
-      if (p?.type === 'tool_use' && p.name === 'Skill' && typeof p.input?.skill === 'string') {
-        const m = /^orchestrator:(on|off|team|autopilot)$/.exec(p.input.skill);
-        if (m) return m[1];
-      }
-    }
-  }
-  return null;
 }

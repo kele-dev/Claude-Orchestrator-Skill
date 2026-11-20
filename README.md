@@ -83,7 +83,7 @@ Orchestration mode is active automatically in every session. Manual commands:
 - The edit guard and output trim need Node 18+ on PATH. Without Node they do nothing (fail open). macOS desktop app: Node from nvm or Homebrew may be missing from the app's PATH; check that `/orchestrator:status` shows `Guards: active` (the session-start `Guards:` line comes only from the hooks), or install Node system-wide.
 - Hook messages are in English; the model is told to relay them in the user's language.
 - Review guard (`guard-review`): a PreToolUse hook on Agent/Task that denies `orchestrator:opus-reviewer` when its prompt names a `docs/prd/*.md` file that does not exist. It fails open when Node is missing or the check cannot run. Turn it off with env `ORCH_GUARD=off`.
-- Read guard (`guard-read`): a PreToolUse hook on Read. A main-session Read without `offset`/`limit` of a file over 2000 lines or 100 KB is denied once per file per session, with a hint to use `offset`/`limit`, Grep or the Explore agent; repeating the same Read is allowed. Subagents are not affected. Fails open. Turn it off with env `ORCH_READ_GUARD=off`.
+- Read guard (`guard-read`): a PreToolUse hook on Read. A main-session Read without `offset`/`limit` of a file over 2000 lines or 100 KB is denied once per file per session, with a hint to use `offset`/`limit`, Grep or the Explore agent; repeating the same Read is allowed. Subagents are not affected. Fails open. Inactive after `/orchestrator:off`. Turn it off with env `ORCH_READ_GUARD=off`.
 
 ## Plugin contents
 

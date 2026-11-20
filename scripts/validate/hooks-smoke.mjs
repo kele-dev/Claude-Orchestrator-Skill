@@ -264,6 +264,15 @@ const { root, err, exists, readText, runHook, rmQuiet, trimPayload, sessionInfo,
       if (denies(rd(big, { session_id: sid2 }, {}, { limit: 50 }))) err('hooks/guard-read.mjs', 'smoke "read with limit": expected allow');
       if (denies(rd(big, { session_id: sid2 }, { ORCH_READ_GUARD: 'off' }))) err('hooks/guard-read.mjs', 'smoke "read ORCH_READ_GUARD=off": expected allow');
       if (!denies(rd(big, { session_id: sid2 }))) err('hooks/guard-read.mjs', 'smoke "read big other session": expected deny');
+      // /orchestrator:off in the transcript turns the read guard off; the same transcript ending with on still denies
+      const cmdLine = (name) => JSON.stringify({ type: 'user', message: { content: `<command-message>orchestrator:${name}</command-message>\n<command-name>/orchestrator:${name}</command-name>` } });
+      const tOff = path.join(rdir, 't-off.jsonl');
+      const tOn = path.join(rdir, 't-on.jsonl');
+      fs.writeFileSync(tOff, [cmdLine('on'), cmdLine('off'), ''].join('\n'));
+      fs.writeFileSync(tOn, [cmdLine('off'), cmdLine('on'), ''].join('\n'));
+      const offRes = rd(big, { session_id: sid + '-o1', transcript_path: tOff });
+      if (!offRes || offRes.stdout.trim() !== '') err('hooks/guard-read.mjs', 'smoke "read after /orchestrator:off": expected empty stdout');
+      if (!denies(rd(big, { session_id: sid + '-o2', transcript_path: tOn }))) err('hooks/guard-read.mjs', 'smoke "read with orchestrator on": expected deny');
       const bigPdf = path.join(rdir, 'big.PDF');
       const bigPng = path.join(rdir, 'big.png');
       fs.copyFileSync(big, bigPdf);

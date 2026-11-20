@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 // PreToolUse hook for Read: denies ONCE per file per session a main-session whole-file Read (no offset/limit) of a large file
 // (over 2000 lines or 100 KB); page-ranged reads and pdf/image/notebook files are allowed. A repeated identical Read is allowed (marker file in the private per-user state dir, never followed if a symlink). Subagents are untouched.
-// Kill switch: ORCH_READ_GUARD=off. Fails open on malformed input, missing session id or any error (prints nothing, exits 0).
+// Kill switch: ORCH_READ_GUARD=off; also inactive after /orchestrator:off (same transcript check as guard-edit). Fails open on malformed input, missing session id or any error (prints nothing, exits 0).
 import { createHash } from 'node:crypto';
 import { closeSync, lstatSync, openSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { makeDbg, readBytes, readStdin, stateDir } from './lib.mjs';
+import { makeDbg, orchestrationOff, readBytes, readStdin, stateDir } from './lib.mjs';
 
 const dbg = makeDbg('guard-read');
 const MAX_BYTES = 100 * 1024;
@@ -30,6 +30,7 @@ readStdin((raw) => {
     if (!st.isFile()) return;
     const big = st.size > MAX_BYTES || (st.size > 20000 && countLines(file, st.size) > MAX_LINES);
     if (!big) return;
+    if (orchestrationOff(input.transcript_path)) return;
 
     const dir = stateDir();
     if (dir === null) return;
