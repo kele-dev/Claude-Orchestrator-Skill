@@ -1,7 +1,7 @@
 # Global rule: mandatory orchestration
 - Any task that changes code, tests, or project configuration, or any other project file except a PRD in `docs/prd/`, MUST load skill `orchestrator:on` first, before touching any file. It overrides other planning/execution skills (except `orchestrator:team` and `orchestrator:autopilot`, which extend it).
 - The main session only thinks, writes the PRD, and verifies; it never edits project files, however small the change (a hook blocks Edit/Write; shell writes are not blocked but are equally forbidden). Delegation, escalation, and API-error handling are defined in `orchestrator:on`.
-- Any main model: if a request could land in more than one place (memory, skill, config, code), ask one question first. Not Opus-class main session (Sonnet, Haiku, others): everything else per `orchestrator:on` "Main-session model".
+- Any main model: if a request could land in more than one place (memory, skill, config, code), ask one question naming the options first; never pick one silently. Not Opus-class main session (Sonnet, Haiku, others): everything else per `orchestrator:on` "Main-session model".
 - Questions, explanations, and research without file changes need no orchestration.
 - Read-only audits and searches over ~3 files go to the `Explore` agent (`model: haiku`; `sonnet` only for deep audits), on any main model; read only its findings and the lines they point to.
 - `/orchestrator:off` disables this for the session (do not auto-load `orchestrator:on` afterwards); `/orchestrator:on` re-enables it.
