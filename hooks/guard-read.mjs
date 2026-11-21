@@ -30,14 +30,14 @@ readStdin((raw) => {
     if (!st.isFile()) return;
     const big = st.size > MAX_BYTES || (st.size > 20000 && countLines(file, st.size) > MAX_LINES);
     if (!big) return;
-    if (orchestrationOff(input.transcript_path)) return;
-
     const dir = stateDir();
     if (dir === null) return;
     const marker = join(dir, `orchestrator-read-${sid}-${createHash('sha1').update(file).digest('hex').slice(0, 16)}`);
     let seen = null;
     try { seen = lstatSync(marker); } catch { /* no marker yet */ }
     if (seen !== null) return; // already warned (regular file) or unsafe (symlink etc.): allow, never follow or overwrite
+    if (orchestrationOff(input.transcript_path)) return;
+
     try { writeFileSync(marker, '1', { flag: 'wx' }); } catch { return; }
     const kb = Math.round(st.size / 1024);
     process.stdout.write(JSON.stringify({
