@@ -2,7 +2,7 @@
 // SubagentStop hook: appends one line per orchestrator delegation ({ts, tier, status, agent_id}) to <store>/delegations.jsonl, capped at 1000 lines once over 256 KB.
 // Stats mode: `node ledger.mjs --stats <store>` prints one LEDGER line with the pass rate per tier.
 // Store computation: lib.storeFor (shared with session-info and trim-output). Fails open: any error prints nothing and exits 0; never blocks.
-import { appendFileSync, existsSync, mkdirSync, readFileSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
+import { appendFileSync, closeSync, existsSync, fstatSync, mkdirSync, openSync, readFileSync, readSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { makeDbg, readStdin, storeFor, writeAtomic } from './lib.mjs';
 
@@ -14,11 +14,25 @@ const CAP_LINES = 1000;
 const NONE = 'LEDGER: no delegations';
 
 
-// Text of the last assistant entry in a JSONL transcript; '' when none.
+const TAIL_BYTES = 1048576;
+
+// Text of the last assistant entry in a JSONL transcript (reads at most the last TAIL_BYTES); '' when none.
 function lastAssistantText(path) {
   if (typeof path !== 'string' || path === '') return '';
+  let fd = null;
   try {
-    const lines = readFileSync(path, 'utf8').split('\n');
+    fd = openSync(path, 'r');
+    const size = fstatSync(fd).size;
+    const start = Math.max(0, size - TAIL_BYTES);
+    const buf = Buffer.alloc(size - start);
+    let got = 0;
+    while (got < buf.length) {
+      const n = readSync(fd, buf, got, buf.length - got, start + got);
+      if (n === 0) break;
+      got += n;
+    }
+    const lines = buf.subarray(0, got).toString('utf8').split('\n');
+    if (start > 0) lines.shift(); // partial first line
     for (let i = lines.length - 1; i >= 0; i--) {
       if (!lines[i].includes('"assistant"')) continue;
       let entry;
@@ -35,6 +49,8 @@ function lastAssistantText(path) {
     }
   } catch (e) {
     dbg(e);
+  } finally {
+    if (fd !== null) closeSync(fd);
   }
   return '';
 }
