@@ -22,13 +22,6 @@
 - Permanent (unknown model, 401/403/authentication, quota exhausted) -> stop immediately and report the exact error.
 - Agent reports are not trusted raw: check `git diff` and re-run the verification yourself.
 
-## Step 5: Review per batch
-After a group of related tasks is finished:
-- Up to 5 files: the main session reads `git diff --stat` and `git diff -U1` itself.
-- Above 5 files: `haiku-coder` `TYPE: SCAN`; brief = `git diff --stat` + a targeted checklist; the agent reads per-file `git diff -U1`. The main session then reads only the hunks the SCAN flags. Never SCAN and also re-read the whole diff.
-- Risky or large work (>5 tasks, or schema/auth/security): also call `opus-reviewer` with the PRD (the `docs/prd/<slug>.md` path if saved, otherwise paste the full PRD text into the brief) and the list of allowed files. (not Opus-class: the final diff always goes to `opus-reviewer`, never per batch)
-- Collect all findings first (SCAN, own diff review, verify output), then ONE fix delegation; small fully-specified fixes go together in one brief, never one delegation per finding. Fixes go through steps 3-4, then re-review until "PASS".
-
 ## Token rules (situational)
 - Housekeeping due at the same time (COMMIT, checkpoint write or delete, lessons save) goes in ONE `haiku-coder` brief as ordered typed steps (e.g. `1. TYPE: COMMIT ...` `2. TYPE: RUN rm "<checkpoint>"`); each step keeps its own rules. Never one delegation per step: each costs ~10k tokens of startup.
 - Reuse finished agents: a fix brief (fix round, or a small finding from review) for a unit whose agent finished in this session goes to that agent with `SendMessage` (it keeps its files and context, saving ~10k startup); a new agent only when moving up a tier, when `SendMessage` is unavailable, or when the agent was stopped. It still counts as one fix round.

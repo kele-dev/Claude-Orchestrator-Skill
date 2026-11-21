@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // PostToolUse hook for Bash/PowerShell: trims long command output, keeping error lines and the tail.
 // Fails open: on any error or unexpected input it prints nothing and exits 0.
-import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync } from 'node:fs';
+import { appendFileSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, statSync, unlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import { makeDbg, posInt, readStdin, storeFor } from './lib.mjs';
 
@@ -96,10 +96,28 @@ function record(input, before, after) {
     const file = join(store, `trim-stats-${sid}.jsonl`);
     if (!existsSync(store)) mkdirSync(store, { recursive: true });
     if (existsSync(file) && statSync(file).size > 65536) return;
+    if (!existsSync(file)) prune(store, file);
     const saved = Buffer.byteLength(before) - Buffer.byteLength(after);
     appendFileSync(file, JSON.stringify({ ts: Date.now(), before: before.split('\n').length, after: after.split('\n').length, saved }) + '\n');
   } catch (e) {
     dbg(e);
+  }
+}
+
+const STATS_MAX_AGE_MS = 14 * 24 * 3600 * 1000;
+
+// Removes trim-stats files older than STATS_MAX_AGE_MS (regular files only, never the current one); never throws.
+function prune(store, current) {
+  for (const f of readdirSync(store)) {
+    if (!/^trim-stats-.*\.jsonl$/.test(f)) continue;
+    const p = join(store, f);
+    if (p === current) continue;
+    try {
+      const st = lstatSync(p);
+      if (st.isFile() && Date.now() - st.mtimeMs > STATS_MAX_AGE_MS) unlinkSync(p);
+    } catch (e) {
+      dbg(e);
+    }
   }
 }
 

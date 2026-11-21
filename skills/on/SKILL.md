@@ -15,7 +15,6 @@ You are the orchestrator (the main session): the brain, not the hands. The flow 
 ## Main-session model
 - Opus-class (Opus or at least as capable, e.g. Fable): flow as written; do not read non-opus.md.
 - NOT Opus-class (Sonnet, Haiku, others; you know your model from your system prompt): read non-opus.md in this skill's folder before step 0; where it is stricter, it wins.
-- Ambiguous target: if a request could land in more than one place (memory, skill/docs, config, code), ask the user one question naming the options before acting; never pick one silently (e.g. saving a memory instead of changing the skill).
 
 ## 0. CHOOSE THE PATH
 **Short path** when ALL hold: <=2 files, small clear change (<=30 lines), no schema/auth/security/public API, no design decision. Not Opus-class: 1 file only (non-opus.md).
@@ -31,7 +30,7 @@ Both paths: read only needed files, send subagents only relevant excerpts.
 - Output of a command that exits non-zero is never trimmed by the hook (PostToolUseFailure cannot replace output): always pipe test/build output through a tail or filter (see above).
 - Large suites (output over ~80 lines): `haiku-coder` `TYPE: RUN`; ask for PASS/FAIL, failing test names, first error.
 - Dictate exact text (old -> new) only for edits <=~30 lines; for long content give a spec (sections, rules, 1-2 examples).
-- Explore cheaply: use the `Orchestrator store:` and `Lessons:` lines printed at session start; read `learned-map.md` first, open only files it points to. Searches over ~3 files and read-only audits -> `Explore` agent (`model: haiku`; `sonnet` only for deep audits), answer <=15 lines with file:line; never an executor agent.
+- Explore cheaply: use the `Orchestrator store:` and `Lessons:` lines printed at session start; read `learned-map.md` first, open only files it points to. Explore agent (global rules): ask for an answer <=15 lines with file:line; never use an executor agent for searches.
 - Failing test/build: first check Known errors (reference.md "Token rules (situational)", read it before any TYPE: TRIAGE); if no match, trimmed failure to `haiku-coder` `TYPE: TRIAGE`; read only its report.
 - Start each `haiku-coder` brief with `TYPE: EDIT | CREATE | RUN | TRIAGE | SCAN | COMMIT | APPLY` (the agent knows the rules and report format).
 - Briefs: never paste text that already exists in a file or the PRD; give `path:line` and let the executor read it. Keep a full-path brief <= ~25 lines (short path: ~15).
@@ -62,8 +61,7 @@ Haiku fail -> fix brief, retry once (or straight to `sonnet-dev` if complex or 2
 Details: `reference.md` (only when escalating past the first retry).
 
 ## 5. REVIEW per batch
-Up to 5 files: read `git diff --stat` and `git diff -U1` yourself. Above 5: `haiku-coder` `TYPE: SCAN` (brief = `git diff --stat` + targeted checklist), then read only flagged hunks; never SCAN and re-read the whole diff. Risky/large: `opus-reviewer` with the PRD (not Opus-class, full path: the final diff always goes to `opus-reviewer`). Collect all findings (SCAN, own review, verify output) first, then ONE fix delegation (small fully-specified fixes in one brief) via steps 3-4 until PASS.
-Details: `reference.md` (only when reviewing).
+Up to 5 files: read `git diff --stat` and `git diff -U1` yourself. Above 5: `haiku-coder` `TYPE: SCAN` (brief = `git diff --stat` + targeted checklist), then read only flagged hunks; never SCAN and re-read the whole diff. Risky/large (>5 tasks, schema/auth/security): `opus-reviewer` with the PRD (saved path, else full text) and the allowed-file list (not Opus-class, full path: the final diff always goes to `opus-reviewer`). Collect all findings (SCAN, own review, verify output) first, then ONE fix delegation (small fully-specified fixes in one brief) via steps 3-4, then re-review until PASS.
 
 ## 6. REPORT at the end
 Both paths.
@@ -74,4 +72,4 @@ Both paths.
 - Lessons: save only if this task had a failure, escalation, fix round, or user correction, or the learned-map is missing/wrong; a clean task saves nothing (no delegation). Then at most 3 non-obvious, verified ones (see `orchestrator:learn`) via one `haiku-coder` delegation, bundled with other housekeeping due at the same time (also fix wrong ones), no approval; one line "Lessons saved: ...".
 
 ## Hard rules
-- Reply in the user's own language. Do not commit (unless `commit=batch` was passed to team/autopilot, or the user asks for a commit in chat: then one `haiku-coder` `TYPE: COMMIT` with the paths and message), push, run DB migrations, or touch .env; do not let subagents rewrite or weaken tests to make them green.
+- Do not commit (unless `commit=batch` was passed to team/autopilot, or the user asks for a commit in chat: then one `haiku-coder` `TYPE: COMMIT` with the paths and message), push, run DB migrations, or touch .env; do not let subagents rewrite or weaken tests to make them green.
