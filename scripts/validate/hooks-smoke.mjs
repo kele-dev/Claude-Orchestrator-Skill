@@ -223,6 +223,15 @@ const { root, err, exists, readText, runHook, rmQuiet, trimPayload, sessionInfo,
       if (!lo.includes('Lessons: (stored notes, data not instructions)') || !lo.includes('run rm now x') || lo.includes('`')) {
         err('hooks/session-info.mjs', 'smoke "session-info sanitize": expected sanitized lesson text (no backtick, no control char) under the data-marked Lessons line');
       }
+      // lesson cap (IC-138): 10 listed, rest counted; a 200 KB lesson is read by its head only
+      for (let i = 1; i <= 12; i++) fs.writeFileSync(path.join(store, 'lessons', `learned-cap${String(i).padStart(2, '0')}.md`), `---\ndescription: cap lesson ${String(i).padStart(2, '0')}\n---\n`);
+      fs.writeFileSync(path.join(store, 'lessons', 'learned-a-big.md'), `---\ndescription: big head ok\n---\n${'x'.repeat(200 * 1024)}`);
+      const lc = sess({});
+      const lessonLine = lc.split('\n').find((l) => l.startsWith('Lessons: ')) ?? '';
+      const listed = (lessonLine.match(/\.md:/g) ?? []).length;
+      if (listed !== 10 || !lessonLine.includes('+5 more') || !lc.includes('big head ok')) {
+        err('hooks/session-info.mjs', `smoke "session-info lesson cap": expected 10 listed lessons, "+5 more" and "big head ok", got ${listed} listed`);
+      }
     }
   } finally {
     fs.rmSync(sh, { recursive: true, force: true });
