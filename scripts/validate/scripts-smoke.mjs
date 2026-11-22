@@ -554,7 +554,7 @@ const { root, err, exists, readText, runHook, rmQuiet } = ctx;
 {
   const sel = (args) => spawnSync(process.execPath, [path.join(root, 'scripts', 'eval-select.mjs'), ...args], { encoding: 'utf8', cwd: root });
   const lines = (r) => (r.stdout ?? '').split('\n').filter(Boolean);
-  for (const [f, want] of [['skills/status/SKILL.md', ['status-slash']], ['README.md', []], ['evals/chat-terse/prompt.md', ['chat-terse']]]) {
+  for (const [f, want] of [['skills/status/SKILL.md', ['status-slash']], ['skills/help/SKILL.md', []], ['README.md', []], ['evals/chat-terse/prompt.md', ['chat-terse']]]) {
     const r = sel(['--files', f]);
     if (r.status !== 0 || JSON.stringify(lines(r)) !== JSON.stringify(want)) err('scripts/eval-select.mjs', `smoke "select ${f}": expected [${want.join(', ')}] with exit 0, got exit ${r.status} [${lines(r).join(', ')}]`);
   }
@@ -568,6 +568,20 @@ const { root, err, exists, readText, runHook, rmQuiet } = ctx;
     const r = sel(args);
     if (r.status !== 2) err('scripts/eval-select.mjs', `smoke "select ${args.join(' ')}": expected exit 2, got ${r.status}`);
   }
+  const allCases = Object.keys(JSON.parse(fs.readFileSync(path.join(root, 'evals', 'touches.json'), 'utf8'))).sort().join(',');
+  for (const [f, want] of [
+    ['README.md', ['selected=', 'case=*', 'skip=true', 'partial=false']],
+    ['skills/status/SKILL.md', ['selected=status-slash', 'case=status-slash', 'skip=false', 'partial=true']],
+    ['skills/learn/SKILL.md', ['selected=on-learned-errors,on-learned-errors-write', 'case={on-learned-errors,on-learned-errors-write}', 'skip=false', 'partial=true']],
+    ['hooks/x.mjs', [`selected=${allCases}`, 'case=*', 'skip=false', 'partial=false']],
+  ]) {
+    const r = sel(['--files', f, '--plan']);
+    if (r.status !== 0 || JSON.stringify(lines(r)) !== JSON.stringify(want)) err('scripts/eval-select.mjs', `smoke "plan ${f}": expected [${want.join(' | ')}] with exit 0, got exit ${r.status} [${lines(r).join(' | ')}]`);
+  }
+  const headNone = sel(['--base', 'HEAD']);
+  if (headNone.status !== 0 || (headNone.stdout ?? '') !== '') err('scripts/eval-select.mjs', `smoke "select --base HEAD": expected exit 0 and empty output, got exit ${headNone.status}`);
+  const headPlan = sel(['--base', 'HEAD', '--plan']);
+  if (headPlan.status !== 0 || !lines(headPlan).includes('skip=true')) err('scripts/eval-select.mjs', `smoke "plan --base HEAD": expected exit 0 and skip=true, got exit ${headPlan.status}`);
 }
 
 // 8i. Smoke tests: scripts/otel-export.mjs writes GenAI spans without message content (temp dir only)

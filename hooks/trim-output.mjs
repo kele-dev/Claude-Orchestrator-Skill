@@ -3,14 +3,16 @@
 // Fails open: on any error or unexpected input it prints nothing and exits 0.
 import { appendFileSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, statSync, unlinkSync } from 'node:fs';
 import { join } from 'node:path';
-import { cachedStoreFor, makeDbg, posInt, readStdin } from './lib.mjs';
+import { cachedStoreFor, makeDbg, posInt, readStdin, sanitizeSid, writeAtomic } from './lib.mjs';
 
 const dbg = makeDbg('trim-output');
+const NO_STATS = 'TRIM: none';
 
 // Stats mode: `node trim-output.mjs --stats <store> [<session-id>]` prints one TRIM line for that session's file;
 // without a session id it uses the newest trim-stats-*.jsonl and says so ("newest session").
+// "TRIM: none" = nothing recorded; "TRIM: unavailable (<reason>)" = the stats could not be read (exit 0 either way).
 if (process.argv[2] === '--stats') {
-  try { process.stdout.write(statsLine(process.argv[3], process.argv[4]) + '\n'); } catch (e) { dbg(e); process.stdout.write('TRIM: none\n'); }
+  try { process.stdout.write(statsLine(process.argv[3], process.argv[4]) + '\n'); } catch (e) { dbg(e); process.stdout.write(`TRIM: unavailable (error: ${e?.code || e?.name})\n`); }
 } else readStdin((raw) => {
   try {
     if (raw.length < 3000) return;
@@ -85,23 +87,36 @@ function trimLines(text, maxLines, exitFailed = false) {
   ].join('\n');
 }
 
-const NO_STATS = 'TRIM: none';
-
 // Appends one tiny {ts, before, after, saved} record to <store>/trim-stats-<session>.jsonl; never throws.
 function record(input, before, after) {
   try {
-    const sid = String(input?.session_id ?? '').replace(/[^A-Za-z0-9_-]/g, '').slice(0, 64);
+    const sid = sanitizeSid(input?.session_id);
     const cwd = typeof input?.cwd === 'string' && input.cwd !== '' ? input.cwd : process.cwd();
     if (sid === '') return;
     const store = cachedStoreFor(cwd, input?.session_id);
     const file = join(store, `trim-stats-${sid}.jsonl`);
     if (!existsSync(store)) mkdirSync(store, { recursive: true });
-    if (existsSync(file) && statSync(file).size > 65536) return;
+    if (existsSync(file) && statSync(file).size > 65536 && !compact(file)) return;
     if (!existsSync(file)) prune(store, file);
     const saved = Buffer.byteLength(before) - Buffer.byteLength(after);
     appendFileSync(file, JSON.stringify({ ts: Date.now(), before: before.split('\n').length, after: after.split('\n').length, saved }) + '\n');
   } catch (e) {
     dbg(e);
+  }
+}
+
+// IC-159: folds an over-64 KB session file into one {ts, n, saved, summary} line; returns false on error (never throws).
+function compact(file) {
+  try {
+    let n = 0, saved = 0;
+    for (const l of readFileSync(file, 'utf8').split('\n')) {
+      try { const r = JSON.parse(l); n += Number(r.n) || 1; saved += Number(r.saved) || 0; } catch { /* skip */ }
+    }
+    writeAtomic(file, JSON.stringify({ ts: Date.now(), n, saved, summary: true }) + '\n');
+    return true;
+  } catch (e) {
+    dbg(e);
+    return false;
   }
 }
 
@@ -123,11 +138,12 @@ function prune(store, current) {
 }
 
 function statsLine(store, sessionArg) {
-  if (typeof store !== 'string' || store === '') return NO_STATS;
+  if (typeof store !== 'string' || store === '') return 'TRIM: unavailable (no store given)';
+  if (!existsSync(store)) return 'TRIM: unavailable (store not found)';
   let file, suffix = '';
   if (typeof sessionArg === 'string' && sessionArg !== '') {
     // IC-135: same sanitizing as record(); only this session's file is read
-    const sid = sessionArg.replace(/[^A-Za-z0-9_-]/g, '').slice(0, 64);
+    const sid = sanitizeSid(sessionArg);
     file = join(store, `trim-stats-${sid}.jsonl`);
     if (!existsSync(file)) return NO_STATS;
   } else {
@@ -139,7 +155,7 @@ function statsLine(store, sessionArg) {
   }
   let n = 0, saved = 0;
   for (const l of readFileSync(file, 'utf8').split('\n')) {
-    try { const r = JSON.parse(l); n++; saved += Number(r.saved) || 0; } catch { /* skip */ }
+    try { const r = JSON.parse(l); n += Number(r.n) || 1; saved += Number(r.saved) || 0; } catch { /* skip */ }
   }
   return n ? `TRIM: ${n} trims, ${saved} bytes saved${suffix}` : NO_STATS;
 }

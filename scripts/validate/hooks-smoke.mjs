@@ -66,6 +66,18 @@ const { root, err, exists, readText, runHook, rmQuiet, trimPayload, sessionInfo,
       if (newest.stdout.trim() !== 'TRIM: 2 trims, 100 bytes saved (newest session)') err('hooks/trim-output.mjs', `smoke "trim stats newest": unexpected output "${newest.stdout.trim()}"`);
       const nosuch = spawnSync(process.execPath, [path.join(root, 'hooks', 'trim-output.mjs'), '--stats', store, 'nosuch'], { encoding: 'utf8', cwd: root, env: { ...process.env, ...homeEnv } });
       if (nosuch.stdout.trim() !== 'TRIM: none') err('hooks/trim-output.mjs', `smoke "trim stats unknown session": unexpected output "${nosuch.stdout.trim()}"`);
+      // IC-161: "unavailable" is for a store that cannot be read; "none" stays for nothing recorded
+      const noStore = spawnSync(process.execPath, [path.join(root, 'hooks', 'trim-output.mjs'), '--stats'], { encoding: 'utf8', cwd: root, env: { ...process.env, ...homeEnv } });
+      if (noStore.stdout.trim() !== 'TRIM: unavailable (no store given)') err('hooks/trim-output.mjs', `smoke "trim stats no store": unexpected output "${noStore.stdout.trim()}"`);
+      const noDir = spawnSync(process.execPath, [path.join(root, 'hooks', 'trim-output.mjs'), '--stats', path.join(home, 'nosuch-store')], { encoding: 'utf8', cwd: root, env: { ...process.env, ...homeEnv } });
+      if (noDir.stdout.trim() !== 'TRIM: unavailable (store not found)') err('hooks/trim-output.mjs', `smoke "trim stats missing store": unexpected output "${noDir.stdout.trim()}"`);
+      // IC-159: a session file over 64 KB is compacted to one summary line (1200 trims) before the new record is appended
+      const bigFile = path.join(store, 'trim-stats-big.jsonl');
+      fs.writeFileSync(bigFile, Array.from({ length: 1200 }, () => JSON.stringify({ ts: 1, before: 10, after: 2, saved: 10, pad: 'x'.repeat(20) })).join('\n') + '\n');
+      runHook('trim-output.mjs', { ...trimPayload('npm test'), cwd: tcwd, session_id: 'big' }, homeEnv);
+      const big = spawnSync(process.execPath, [path.join(root, 'hooks', 'trim-output.mjs'), '--stats', store, 'big'], { encoding: 'utf8', cwd: root, env: { ...process.env, ...homeEnv } });
+      if (!/^TRIM: 1201 trims, 1[2-9]\d{3,} bytes saved$/.test(big.stdout.trim())) err('hooks/trim-output.mjs', `smoke "trim stats big file": unexpected output "${big.stdout.trim()}"`);
+      if (fs.readFileSync(bigFile, 'utf8').split('\n').filter(Boolean).length !== 2) err('hooks/trim-output.mjs', 'smoke "trim stats big file": expected exactly 2 lines after compaction');
     } finally {
       fs.rmSync(home, { recursive: true, force: true });
       fs.rmSync(tcwd, { recursive: true, force: true });
@@ -239,6 +251,14 @@ const { root, err, exists, readText, runHook, rmQuiet, trimPayload, sessionInfo,
       if (listed !== 10 || !lessonLine.includes('+5 more') || !lc.includes('big head ok')) {
         err('hooks/session-info.mjs', `smoke "session-info lesson cap": expected 10 listed lessons, "+5 more" and "big head ok", got ${listed} listed`);
       }
+      // IC-163: session-start reads only the lesson head (4096 bytes): a description past it is not shown; a control lesson with its description in the head is listed
+      for (let i = 1; i <= 12; i++) fs.rmSync(path.join(store, 'lessons', `learned-cap${String(i).padStart(2, '0')}.md`));
+      fs.rmSync(path.join(store, 'lessons', 'learned-a-big.md'));
+      fs.writeFileSync(path.join(store, 'lessons', 'learned-deep.md'), `---\npad: ${'x'.repeat(5000)}\ndescription: deep tail desc\n---\n`);
+      fs.writeFileSync(path.join(store, 'lessons', 'learned-control.md'), '---\ndescription: head control desc\n---\n');
+      const hd = sess({});
+      if (!hd.includes('head control desc')) err('hooks/session-info.mjs', 'smoke "session-info lesson head control": expected the control lesson description listed');
+      if (!hd.includes('learned-deep.md') || hd.includes('deep tail desc')) err('hooks/session-info.mjs', 'smoke "session-info lesson head only": expected learned-deep.md listed without its tail description');
     }
   } finally {
     fs.rmSync(sh, { recursive: true, force: true });

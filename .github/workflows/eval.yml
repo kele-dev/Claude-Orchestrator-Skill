@@ -57,32 +57,13 @@ jobs:
             echo "partial=false" >> "$out"
             exit 0
           fi
-          if ! names=$(node scripts/eval-select.mjs --base "$BASE"); then
+          if ! plan=$(node scripts/eval-select.mjs --base "$BASE" --plan); then
             echo "::error::could not select eval cases for git ref $BASE"
             exit 1
           fi
-          list=$(printf '%s\n' "$names" | sed '/^$/d')
-          count=$(printf '%s\n' "$list" | sed '/^$/d' | wc -l | tr -d ' ')
-          total=$(node -e 'console.log(Object.keys(require("./evals/touches.json")).length)')
-          selected=$(printf '%s\n' "$list" | sed '/^$/d' | paste -sd, -)
-          echo "selected=$selected" >> "$out"
-          if [ "$count" -eq 0 ]; then
+          printf '%s\n' "$plan" >> "$out"
+          if printf '%s\n' "$plan" | grep -qx 'skip=true'; then
             echo "::notice::no eval case is affected since $BASE; eval skipped"
-            echo "case=$CASE_IN" >> "$out"
-            echo "skip=true" >> "$out"
-            echo "partial=false" >> "$out"
-          elif [ "$count" -eq "$total" ]; then
-            echo "case=*" >> "$out"
-            echo "skip=false" >> "$out"
-            echo "partial=false" >> "$out"
-          elif [ "$count" -eq 1 ]; then
-            echo "case=$selected" >> "$out"
-            echo "skip=false" >> "$out"
-            echo "partial=true" >> "$out"
-          else
-            echo "case={$selected}" >> "$out"
-            echo "skip=false" >> "$out"
-            echo "partial=true" >> "$out"
           fi
 
       - name: Install sandbox backend
