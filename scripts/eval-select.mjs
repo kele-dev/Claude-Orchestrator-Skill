@@ -30,9 +30,9 @@ if (argValue('--files') !== undefined) {
 } else if (argValue('--base') !== undefined) {
   const ref = argValue('--base');
   if (!/^[A-Za-z0-9][A-Za-z0-9._\/@^~-]*$/.test(ref)) fail(`eval-select: invalid --base ref ${JSON.stringify(ref)}`);
-  const r = spawnSync('git', ['diff', '--name-only', `${ref}...HEAD`], { cwd: root, encoding: 'utf8' });
+  const r = spawnSync('git', ['-c', 'core.quotePath=false', 'diff', '--name-only', '-z', `${ref}...HEAD`], { cwd: root, encoding: 'utf8' });
   if (r.status !== 0) fail((r.stderr ?? '').trim() || `eval-select: git diff ${ref}...HEAD failed`);
-  files = r.stdout.split('\n').filter(Boolean);
+  files = r.stdout.split('\0').filter(Boolean);
 } else {
   fail('eval-select: usage: --files a,b | --base <ref> [--plan]');
 }
@@ -51,6 +51,11 @@ const all = () => cases.forEach((c) => picked.add(c));
 const NO_EVAL = ['skills/help/'];
 
 for (const raw of files) {
+  // A quoted name is a path git could not spell plainly; it might be a hooks change, so fail closed.
+  if (raw.startsWith('"')) {
+    all();
+    continue;
+  }
   const f = raw.replace(/\\/g, '/');
   if (f.startsWith('hooks/') || f.startsWith('.claude-plugin/') || f === 'evals/touches.json' || f.startsWith('scripts/eval-') || f.startsWith('.github/workflows/')) {
     all();
