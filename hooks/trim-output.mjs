@@ -10,7 +10,7 @@ const NO_STATS = 'TRIM: none';
 
 // Stats mode: `node trim-output.mjs --stats <store> [<session-id>]` prints one TRIM line for that session's file;
 // without a session id it uses the newest trim-stats-*.jsonl and says so ("newest session").
-// "TRIM: none" = nothing recorded; "TRIM: unavailable (<reason>)" = the stats could not be read (exit 0 either way).
+// "TRIM: none" = nothing recorded (including a store not created yet); "TRIM: unavailable (<reason>)" = the stats exist but cannot be read (exit 0 either way).
 if (process.argv[2] === '--stats') {
   try { process.stdout.write(statsLine(process.argv[3], process.argv[4]) + '\n'); } catch (e) { dbg(e); process.stdout.write(`TRIM: unavailable (error: ${e?.code || e?.name})\n`); }
 } else readStdin((raw) => {
@@ -138,7 +138,6 @@ function prune(store, current) {
 
 function statsLine(store, sessionArg) {
   if (typeof store !== 'string' || store === '') return 'TRIM: unavailable (no store given)';
-  if (!existsSync(store)) return 'TRIM: unavailable (store not found)';
   let file, suffix = '';
   if (typeof sessionArg === 'string' && sessionArg !== '') {
     // IC-135: same sanitizing as record(); only this session's file is read
@@ -146,6 +145,7 @@ function statsLine(store, sessionArg) {
     file = join(store, `trim-stats-${sid}.jsonl`);
     if (!existsSync(file)) return NO_STATS;
   } else {
+    if (!existsSync(store)) return NO_STATS;
     const files = readdirSync(store).filter((f) => /^trim-stats-.*\.jsonl$/.test(f))
       .map((f) => ({ f, t: statSync(join(store, f)).mtimeMs })).sort((a, b) => b.t - a.t);
     if (!files.length) return NO_STATS;
