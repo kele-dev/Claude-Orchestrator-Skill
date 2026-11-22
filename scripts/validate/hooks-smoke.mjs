@@ -251,6 +251,14 @@ const { root, err, exists, readText, runHook, rmQuiet, trimPayload, sessionInfo,
       if (listed !== 10 || !lessonLine.includes('+5 more') || !lc.includes('big head ok')) {
         err('hooks/session-info.mjs', `smoke "session-info lesson cap": expected 10 listed lessons, "+5 more" and "big head ok", got ${listed} listed`);
       }
+      // IC-163: session-start reads only the lesson head (4096 bytes): a description past it is not shown; a control lesson with its description in the head is listed
+      for (let i = 1; i <= 12; i++) fs.rmSync(path.join(store, 'lessons', `learned-cap${String(i).padStart(2, '0')}.md`));
+      fs.rmSync(path.join(store, 'lessons', 'learned-a-big.md'));
+      fs.writeFileSync(path.join(store, 'lessons', 'learned-deep.md'), `---\npad: ${'x'.repeat(5000)}\ndescription: deep tail desc\n---\n`);
+      fs.writeFileSync(path.join(store, 'lessons', 'learned-control.md'), '---\ndescription: head control desc\n---\n');
+      const hd = sess({});
+      if (!hd.includes('head control desc')) err('hooks/session-info.mjs', 'smoke "session-info lesson head control": expected the control lesson description listed');
+      if (!hd.includes('learned-deep.md') || hd.includes('deep tail desc')) err('hooks/session-info.mjs', 'smoke "session-info lesson head only": expected learned-deep.md listed without its tail description');
     }
   } finally {
     fs.rmSync(sh, { recursive: true, force: true });
