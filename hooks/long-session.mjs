@@ -6,7 +6,7 @@
 // Fails open: on any error or unexpected input it prints nothing and exits 0.
 import { closeSync, existsSync, openSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { join } from 'node:path';
-import { isMainAssistant, makeDbg, posInt, readBytes, readStdin, stateDir, writeAtomic } from './lib.mjs';
+import { isMainAssistant, makeDbg, posInt, readBytes, readStdin, sanitizeSid, stateDir, writeAtomic } from './lib.mjs';
 
 const dbg = makeDbg('long-session');
 
@@ -189,7 +189,7 @@ function readLevel(marker) {
 function run(input) {
   if (process.env.ORCH_LONG === 'off') return '';
 
-  const id = String(input?.session_id ?? '').replace(/[^A-Za-z0-9-]/g, '');
+  const id = sanitizeSid(input?.session_id);
   if (id === '') return '';
   const dir = stateDir();
   if (dir === null) return '';

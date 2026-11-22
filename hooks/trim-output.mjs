@@ -14,7 +14,7 @@ const STATS_MAX_AGE_MS = 14 * 24 * 3600 * 1000;
 // With `--project` instead of a session id it sums every trim-stats-*.jsonl modified in the last 14 days ("all sessions").
 // "TRIM: none" = nothing recorded (including a store not created yet); "TRIM: unavailable (<reason>)" = the stats exist but cannot be read (exit 0 either way).
 if (process.argv[2] === '--stats') {
-  try { process.stdout.write(statsLine(process.argv[3], process.argv[4], process.argv[4] === '--project') + '\n'); } catch (e) { dbg(e); process.stdout.write(`TRIM: unavailable (error: ${e?.code || e?.name})\n`); }
+  try { process.stdout.write(statsLine(process.argv[3], process.argv[4], process.argv[4] === '--project') + '\n'); } catch (e) { dbg(e); process.stdout.write(`TRIM: unavailable (error: ${e?.code || e?.name}; rerun with ORCH_DEBUG=1 for details)\n`); }
 } else readStdin((raw) => {
   try {
     if (raw.length < 3000) return;
@@ -62,8 +62,7 @@ function trim(text, noLines, readCmd, exitFailed) {
 const ERROR_LINE = /error|fail|exception|panic|traceback|assert|not ok|✗|✖|×|^E\s|warning:/i;
 const HEAD_FAILED = 10;
 
-// When the command failed (non-zero exit code, or an error line anywhere), keep the first HEAD_FAILED lines instead of 3:
-// failure lines without a keyword (e.g. "fatal: ...") usually come first.
+// Keep the first HEAD_FAILED lines instead of 3 when any line is an error line (failure lines without a keyword, e.g. "fatal: ...", come first). exitFailed is defensive only: Claude Code sends a non-zero exit to PostToolUseFailure, which this hook does not handle.
 function trimLines(text, maxLines, exitFailed = false) {
   const lines = text.split('\n');
   if (lines.length <= maxLines || text.length <= 4000) return null;

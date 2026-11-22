@@ -4,6 +4,10 @@ Per-version release notes. The README keeps only the current version's "Baru di"
 
 ## English
 
+### Unreleased
+- Fixed: lesson index without dangling colon; TRIM unavailable names ORCH_DEBUG=1; long-session uses shared session-id sanitizer; eval-select selects every case for an unmapped scripts/ file; README no longer claims failed commands keep a 10-line head; ideas doc store-key wording.
+- CI: partial eval runs call the eval once per selected case; pinned Claude Code version recorded in evals/README.md and checked by the validator; smoke tests cover the 64 KB boundary and the root-fallback guard without inherited GIT_* env.
+
 ### 1.15.1
 - New: `SECURITY.md` with a private vulnerability-reporting route; the team PLAN step derives lanes with `scripts/plan-dag.mjs` when the PRD has a task table; README and help document `ORCH_STALE_DAYS`, `ORCH_STATE_DIR`, the ledger hook and the `verify.ps1` fallback.
 - Fixed: long-session counts delegations only in the last 4 MB of a transcript on a cold start; `trace-tokens` and `eval-compare` read a result's trace only inside the results folder (a relative `tracePath` now resolves against it); the no-Node warning names the read guard; init and learn print the `verify.sh` command lines and `on` shows them to the user first when they were not reported.

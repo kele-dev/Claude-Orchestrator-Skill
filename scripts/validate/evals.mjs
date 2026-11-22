@@ -18,6 +18,18 @@ const { root, err, exists, readText, frontmatter, listDirs, listMd } = ctx;
   }
 }
 
+// 8y. The Claude Code CLI pin in evals/README.md must match .github/workflows/eval.yml
+{
+  const pinOf = (t) => (/@anthropic-ai\/claude-code@(\d+\.\d+\.\d+)/.exec(t) || [])[1] ?? null;
+  if (pinOf('npm i -g @anthropic-ai/claude-code@2.1.317') !== '2.1.317' || pinOf('') !== null) err('scripts/validate.mjs', 'pinOf self-test failed');
+  const wf = '.github/workflows/eval.yml', rm = 'evals/README.md';
+  if (exists(path.join(root, wf)) && exists(path.join(root, rm))) {
+    const a = pinOf(readText(path.join(root, wf))), b = pinOf(readText(path.join(root, rm)));
+    if (a === null) err(wf, 'Claude Code pin (@anthropic-ai/claude-code@x.y.z) not found');
+    else if (a !== b) err(rm, `Claude Code pin ${b ?? 'missing'} does not match eval.yml ${a}`);
+  }
+}
+
 // 9. Eval cases: case.yaml name matches folder, prompt.md and scaffold script exist, graders use a known type with required keys
 // evals/touches.json: keys match the case folders and every prefix is an existing path
 {

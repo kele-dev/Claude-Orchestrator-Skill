@@ -567,11 +567,11 @@ const { root, err, exists, readText, runHook, rmQuiet } = ctx;
 {
   const sel = (args) => spawnSync(process.execPath, [path.join(root, 'scripts', 'eval-select.mjs'), ...args], { encoding: 'utf8', cwd: root });
   const lines = (r) => (r.stdout ?? '').split('\n').filter(Boolean);
-  for (const [f, want] of [['skills/status/SKILL.md', ['status-slash']], ['skills/help/SKILL.md', []], ['README.md', []], ['evals/chat-terse/prompt.md', ['chat-terse']]]) {
+  for (const [f, want] of [['skills/status/SKILL.md', ['status-slash']], ['skills/help/SKILL.md', []], ['README.md', []], ['scripts/validate.mjs', []], ['scripts/validate/hooks-smoke.mjs', []], ['evals/README.md', []], ['scripts/budget.mjs', ['autopilot-budget-stop', 'status-slash']], ['evals/chat-terse/prompt.md', ['chat-terse']]]) {
     const r = sel(['--files', f]);
     if (r.status !== 0 || JSON.stringify(lines(r)) !== JSON.stringify(want)) err('scripts/eval-select.mjs', `smoke "select ${f}": expected [${want.join(', ')}] with exit 0, got exit ${r.status} [${lines(r).join(', ')}]`);
   }
-  for (const [f, n] of [['hooks/guard-edit.mjs', 12], ['skills/init/SKILL.md', 12], ['agents/haiku-coder.md', 9], ['evals/touches.json', 12], ['scripts/eval-compare.mjs', 12], ['.github/workflows/eval.yml', 12]]) {
+  for (const [f, n] of [['hooks/guard-edit.mjs', 12], ['skills/init/SKILL.md', 12], ['agents/haiku-coder.md', 9], ['evals/touches.json', 12], ['scripts/eval-compare.mjs', 12], ['.github/workflows/eval.yml', 12], ['scripts/plan-dag.mjs', 12], ['scripts/digest.mjs', 12], ['scripts/transcript.mjs', 12]]) {
     const r = sel(['--files', f]);
     if (r.status !== 0 || lines(r).length !== n) err('scripts/eval-select.mjs', `smoke "select ${f}": expected ${n} cases with exit 0, got exit ${r.status} and ${lines(r).length} cases`);
   }
