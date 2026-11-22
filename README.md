@@ -12,7 +12,7 @@ Runs on Windows, macOS, and Linux.
 - Claude Code.
 - Node 18+ on PATH (hooks: guards, trim, session info; without it they do nothing).
 - git 2.31+ (project store key).
-- bash for `verify.sh` (Git Bash on Windows).
+- bash for `verify.sh` (Git Bash on Windows), or `verify.ps1` with PowerShell when Git Bash is missing.
 
 **Terminal (Windows, macOS, Linux)** - one command:
 
@@ -47,7 +47,7 @@ Orchestration mode is active automatically in every session. Manual commands:
 - `/orchestrator:autopilot <task>` - autonomous mode: one short clarification round, a PRD, then batch after batch without asking in between, until done or a cap is hit. Caps: 5 batches, 2 fix rounds per batch, raised automatically up to 8 batches / 4 rounds only while work keeps passing (a cap you set, e.g. `batches=N`, is never raised; optional `budget=<N>k` stops with status BUDGET and a checkpoint once the agents' total tokens reach it). Add `--dry-run` to see the plan first.
 - Claude suggests `team` or `autopilot` when a task fits, but always starts in `on` mode; you decide whether to switch.
 - `/orchestrator:learn [list | add <lesson> | remove <lesson> | prune]` - project lessons: at the end of a task Claude decides by itself whether to save up to 3 verified lessons (working test commands, root causes, pitfalls) and fixes or removes outdated ones, as local files in the project store (see Data location below), so every later session in that project can read them, also from a git worktree. Nothing is written into the repo. Old `.claude/skills/learned-*` lessons are still read and copied into the store on the next save.
-- `/orchestrator:init [--refresh]` - maps a new project in one cheap Haiku pass: stack, key folders, and verified test/build/lint commands, saved as the `learned-map` lesson. It also writes `verify.sh` in the project store, one command that runs the verified checks and prints `VERIFY: PASS|FAIL`.
+- `/orchestrator:init [--refresh]` - maps a new project in one cheap Haiku pass: stack, key folders, and verified test/build/lint commands, saved as the `learned-map` lesson. It also writes `verify.sh` in the project store (or `verify.ps1` with PowerShell when Git Bash is missing), one command that runs the verified checks and prints `VERIFY: PASS|FAIL`.
 - `/orchestrator:resume [<name>]` - continues long work from a checkpoint after a context limit, rate limit, `/compact`, or crash. team/autopilot write checkpoints automatically at stops and between waves/batches. Checkpoints are kept in the project store.
 - `/orchestrator:status` - read-only summary: mode in this session, plugin version, project lessons, checkpoints, and team/autopilot caps.
 - `/orchestrator:help` - short list of commands, kill switches and where the docs live (release notes: [CHANGELOG.md](CHANGELOG.md))
@@ -93,7 +93,7 @@ Orchestration mode is active automatically in every session. Manual commands:
 - Skill `learn`: project lessons saved and maintained automatically as local files in the project store; one report line tells you what changed, and the manual commands are optional.
 - Skills `init`, `resume`, and `status`: one-pass project map, checkpoints to continue in a new session, and a read-only state summary.
 - Agents `haiku-coder` (executor), `sonnet-dev` (escalation), `opus-reviewer` (review, read-only; now runs on Opus), `opus-planner` (hard-design PRD and diagnosis when the main session is not Opus-class, read-only).
-- Hooks: SessionStart rules (loads the orchestration rules into every session), SessionStart session info (store path, lesson index, open checkpoints), edit guard (PreToolUse), review guard (PreToolUse, Agent/Task), read guard (PreToolUse, Read), output trim (PostToolUse), long-session reminder (UserPromptSubmit).
+- Hooks: SessionStart rules (loads the orchestration rules into every session), SessionStart session info (store path, lesson index, open checkpoints), edit guard (PreToolUse), review guard (PreToolUse, Agent/Task), read guard (PreToolUse, Read), output trim (PostToolUse), long-session reminder (UserPromptSubmit), delegation ledger (SubagentStop, appends one line per delegation to `delegations.jsonl` in the project store). The status LEDGER row shows the pass rate per tier from that file; `unknown` means no STATUS line was found and is not counted as a failure.
 
 ## Optional: reduce permission prompts
 
