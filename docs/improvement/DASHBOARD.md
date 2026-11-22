@@ -1,11 +1,11 @@
 # Improvement Dashboard
 
-Date: 2026-11-22 (cycle 017)
+Date: 2026-11-22 (cycle 018)
 
 Tick `[x]` to pre-select an item for the next cycle's phase 3. Ticks are suggestions; the skill still asks you.
 Mark `- [-]` to suggest rejecting an item permanently; the skill asks you to confirm before it marks anything `rejected`.
 
-Last cycle: 017 (2026-11-22): 8 done (IC-190, IC-191, IC-193, IC-194, IC-195, IC-197, IC-198, IC-199), IC-019 still blocked. Done total 155. Open: P0 0, P1 1 (blocked), P2 32, P3 16.
+Last cycle: 018 (2026-11-22): 8 done (IC-207, IC-208, IC-212, IC-213, IC-217, IC-218, IC-219, IC-221), IC-215 and IC-220 deferred, IC-019 still blocked. Open: P0 0, P1 1 (blocked), P2 27, P3 21.
 
 - [ ] IC-019 P1 DX/CI-CD/dependencies: Token-regression gate in eval CI is dead: evals/baseline.json not committed
 - [ ] IC-120 P2 Observability & ops: Debug log at a predictable tmp path follows symlinks and goes silent after the 256 KB cap
@@ -40,6 +40,11 @@ Last cycle: 017 (2026-11-22): 8 done (IC-190, IC-191, IC-193, IC-194, IC-195, IC
 - [ ] IC-203 P2 Performance: SessionStart starts node twice (rules.mjs prints one static file) and the rules hook entry has no timeout
 - [ ] IC-205 P2 DX/CI-CD/dependencies: The Claude Code CLI pin in eval.yml has no update path and no recorded measured version
 - [ ] IC-206 P2 DX/CI-CD/dependencies: No parity check between the English README and the Indonesian Ringkasan, so the summary keeps drifting
+- [ ] IC-220 P2 UX & accessibility: resume argument named <slug>, <name> and [<name>] across files
+- [ ] IC-222 P2 UX & accessibility: evals/README.md says every case has fixture.sh, two have none
+- [ ] IC-215 P2 Code quality & tests: trim-stats smoke repeats the same spawnSync call about 11 times
+- [ ] IC-211 P2 Performance: validate wall time grew from 30 s to 181 s, cause not measured
+- [ ] IC-210 P2 Stability: writeAtomic stale same-pid temp file fails one write
 - [ ] IC-117 P3 UX & accessibility: status 16-row cap is ambiguous with per-file lesson and checkpoint rows
 - [ ] IC-118 P3 Code quality & tests: Validator split left module bodies unindented inside run(ctx)
 - [ ] IC-133 P3 Performance: Per-session marker and deny-streak files in the state and temp dirs are never pruned
@@ -56,3 +61,8 @@ Last cycle: 017 (2026-11-22): 8 done (IC-190, IC-191, IC-193, IC-194, IC-195, IC
 - [ ] IC-185 P3 DX/CI-CD/dependencies: eval.yml checks out full history on every run, though only the --base diff needs it
 - [ ] IC-187 P3 UX & accessibility: docs/ideas/token-saving.md still says the session index lists 20 lessons; code and README say 10
 - [ ] IC-204 P3 Code quality & tests: hooks-smoke.mjs and scripts-smoke.mjs are each one 700 to 770 line run function
+- [ ] IC-209 P3 Security: session-info Legacy files line prints the raw main path without clean()
+- [ ] IC-214 P3 Code quality & tests: long-session countDelegations cache check weaker than loadGrowthCache
+- [ ] IC-216 P3 DX/CI-CD/dependencies: eval.yml installs apt packages and the pinned CLI with no cache
+- [ ] IC-223 P3 UX & accessibility: README sentence about ORCH_TRIM_ERRORS "the 10" is ambiguous
+- [ ] IC-224 P3 New features: Proposal: review two old claude/* branches and delete or log them
