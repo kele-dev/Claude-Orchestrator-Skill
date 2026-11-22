@@ -53,7 +53,7 @@ const { root, err, exists, readText, runHook, rmQuiet, trimPayload, sessionInfo,
       const recs = fs.existsSync(statsFile) ? fs.readFileSync(statsFile, 'utf8').split('\n').filter(Boolean) : [];
       if (recs.length !== 1 || !(JSON.parse(recs[0]).saved > 0)) err('hooks/trim-output.mjs', 'smoke "trim stats record": expected one record with saved > 0');
       const st = spawnSync(process.execPath, [path.join(root, 'hooks', 'trim-output.mjs'), '--stats', store], { encoding: 'utf8', cwd: root, env: { ...process.env, ...homeEnv } });
-      if (!/^TRIM: 1 trims, [1-9]\d* bytes saved \(newest session\)$/.test(st.stdout.trim())) err('hooks/trim-output.mjs', `smoke "trim stats --stats": unexpected output "${st.stdout.trim()}"`);
+      if (!/^TRIM: 1 trims, ~\d+ tokens saved \([1-9]\d* bytes\) \(newest session\)$/.test(st.stdout.trim())) err('hooks/trim-output.mjs', `smoke "trim stats --stats": unexpected output "${st.stdout.trim()}"`);
       // IC-135: a session id selects its own file; no id keeps the newest file; unknown id -> none
       const otherFile = path.join(store, 'trim-stats-other.jsonl');
       fs.mkdirSync(store, { recursive: true });
@@ -61,26 +61,73 @@ const { root, err, exists, readText, runHook, rmQuiet, trimPayload, sessionInfo,
       const future = new Date(Date.now() + 3600e3);
       fs.utimesSync(otherFile, future, future);
       const bySid = spawnSync(process.execPath, [path.join(root, 'hooks', 'trim-output.mjs'), '--stats', store, 'smoke1'], { encoding: 'utf8', cwd: root, env: { ...process.env, ...homeEnv } });
-      if (!/^TRIM: 1 trims, [1-9]\d* bytes saved$/.test(bySid.stdout.trim())) err('hooks/trim-output.mjs', `smoke "trim stats session id": unexpected output "${bySid.stdout.trim()}"`);
+      if (!/^TRIM: 1 trims, ~\d+ tokens saved \([1-9]\d* bytes\)$/.test(bySid.stdout.trim())) err('hooks/trim-output.mjs', `smoke "trim stats session id": unexpected output "${bySid.stdout.trim()}"`);
       const newest = spawnSync(process.execPath, [path.join(root, 'hooks', 'trim-output.mjs'), '--stats', store], { encoding: 'utf8', cwd: root, env: { ...process.env, ...homeEnv } });
-      if (newest.stdout.trim() !== 'TRIM: 2 trims, 100 bytes saved (newest session)') err('hooks/trim-output.mjs', `smoke "trim stats newest": unexpected output "${newest.stdout.trim()}"`);
+      if (newest.stdout.trim() !== 'TRIM: 2 trims, ~25 tokens saved (100 bytes) (newest session)') err('hooks/trim-output.mjs', `smoke "trim stats newest": unexpected output "${newest.stdout.trim()}"`);
       const nosuch = spawnSync(process.execPath, [path.join(root, 'hooks', 'trim-output.mjs'), '--stats', store, 'nosuch'], { encoding: 'utf8', cwd: root, env: { ...process.env, ...homeEnv } });
       if (nosuch.stdout.trim() !== 'TRIM: none') err('hooks/trim-output.mjs', `smoke "trim stats unknown session": unexpected output "${nosuch.stdout.trim()}"`);
-      // IC-161: "unavailable" is for a store that cannot be read; "none" stays for nothing recorded
+      // IC-161/IC-175: "unavailable" is for a store that cannot be read; "none" stays for nothing recorded (including a store not created yet)
       const noStore = spawnSync(process.execPath, [path.join(root, 'hooks', 'trim-output.mjs'), '--stats'], { encoding: 'utf8', cwd: root, env: { ...process.env, ...homeEnv } });
       if (noStore.stdout.trim() !== 'TRIM: unavailable (no store given)') err('hooks/trim-output.mjs', `smoke "trim stats no store": unexpected output "${noStore.stdout.trim()}"`);
       const noDir = spawnSync(process.execPath, [path.join(root, 'hooks', 'trim-output.mjs'), '--stats', path.join(home, 'nosuch-store')], { encoding: 'utf8', cwd: root, env: { ...process.env, ...homeEnv } });
-      if (noDir.stdout.trim() !== 'TRIM: unavailable (store not found)') err('hooks/trim-output.mjs', `smoke "trim stats missing store": unexpected output "${noDir.stdout.trim()}"`);
+      if (noDir.stdout.trim() !== 'TRIM: none') err('hooks/trim-output.mjs', `smoke "trim stats missing store": unexpected output "${noDir.stdout.trim()}"`);
+      // IC-174: a stats file with content but no parsable line is unavailable, not none
+      const badStore = fs.mkdtempSync(path.join(os.tmpdir(), 'orch-trimstat-bad-'));
+      try {
+        fs.writeFileSync(path.join(badStore, 'trim-stats-bad.jsonl'), 'not json\n');
+        const badOut = spawnSync(process.execPath, [path.join(root, 'hooks', 'trim-output.mjs'), '--stats', badStore, 'bad'], { encoding: 'utf8', cwd: root, env: { ...process.env, ...homeEnv } });
+        if (badOut.stdout.trim() !== 'TRIM: unavailable (unreadable stats file)') err('hooks/trim-output.mjs', `smoke "trim stats unreadable file": unexpected output "${badOut.stdout.trim()}"`);
+      } finally {
+        fs.rmSync(badStore, { recursive: true, force: true });
+      }
+      // IC-180: a stats path that cannot be read as a file (a directory) takes the error path of --stats
+      const isdirStore = fs.mkdtempSync(path.join(os.tmpdir(), 'orch-trimstat-isdir-'));
+      try {
+        fs.mkdirSync(path.join(isdirStore, 'trim-stats-isdir.jsonl'));
+        const isdirOut = spawnSync(process.execPath, [path.join(root, 'hooks', 'trim-output.mjs'), '--stats', isdirStore, 'isdir'], { encoding: 'utf8', cwd: root, env: { ...process.env, ...homeEnv } });
+        if (!isdirOut.stdout.startsWith('TRIM: unavailable (error:')) err('hooks/trim-output.mjs', `smoke "trim stats error path": unexpected output "${isdirOut.stdout.trim()}"`);
+      } finally {
+        fs.rmSync(isdirStore, { recursive: true, force: true });
+      }
+      // IC-189: --project sums all recent session files, skips files older than 14 days, missing store -> none
+      const projStore = fs.mkdtempSync(path.join(os.tmpdir(), 'orch-trimstat-proj-'));
+      try {
+        const rec = '{"ts":1,"before":10,"after":2,"saved":8}\n';
+        fs.writeFileSync(path.join(projStore, 'trim-stats-a.jsonl'), rec + rec);
+        fs.writeFileSync(path.join(projStore, 'trim-stats-b.jsonl'), rec);
+        const oldF = path.join(projStore, 'trim-stats-old.jsonl');
+        fs.writeFileSync(oldF, rec);
+        const oldT = new Date(Date.now() - 30 * 24 * 3600e3);
+        fs.utimesSync(oldF, oldT, oldT);
+        const proj = spawnSync(process.execPath, [path.join(root, 'hooks', 'trim-output.mjs'), '--stats', projStore, '--project'], { encoding: 'utf8', cwd: root, env: { ...process.env, ...homeEnv } });
+        if (proj.stdout.trim() !== 'TRIM: 3 trims, ~6 tokens saved (24 bytes) (all sessions, last 14 days)') err('hooks/trim-output.mjs', `smoke "trim stats project": unexpected output "${proj.stdout.trim()}"`);
+        const projNone = spawnSync(process.execPath, [path.join(root, 'hooks', 'trim-output.mjs'), '--stats', path.join(projStore, 'nosuch'), '--project'], { encoding: 'utf8', cwd: root, env: { ...process.env, ...homeEnv } });
+        if (projNone.stdout.trim() !== 'TRIM: none') err('hooks/trim-output.mjs', `smoke "trim stats project missing store": unexpected output "${projNone.stdout.trim()}"`);
+      } finally {
+        fs.rmSync(projStore, { recursive: true, force: true });
+      }
       // IC-159: a session file over 64 KB is compacted to one summary line (1200 trims) before the new record is appended
       const bigFile = path.join(store, 'trim-stats-big.jsonl');
       fs.writeFileSync(bigFile, Array.from({ length: 1200 }, () => JSON.stringify({ ts: 1, before: 10, after: 2, saved: 10, pad: 'x'.repeat(20) })).join('\n') + '\n');
       runHook('trim-output.mjs', { ...trimPayload('npm test'), cwd: tcwd, session_id: 'big' }, homeEnv);
       const big = spawnSync(process.execPath, [path.join(root, 'hooks', 'trim-output.mjs'), '--stats', store, 'big'], { encoding: 'utf8', cwd: root, env: { ...process.env, ...homeEnv } });
-      if (!/^TRIM: 1201 trims, 1[2-9]\d{3,} bytes saved$/.test(big.stdout.trim())) err('hooks/trim-output.mjs', `smoke "trim stats big file": unexpected output "${big.stdout.trim()}"`);
+      if (!/^TRIM: 1201 trims, ~\d+ tokens saved \(1[2-9]\d{3,} bytes\)$/.test(big.stdout.trim())) err('hooks/trim-output.mjs', `smoke "trim stats big file": unexpected output "${big.stdout.trim()}"`);
       if (fs.readFileSync(bigFile, 'utf8').split('\n').filter(Boolean).length !== 2) err('hooks/trim-output.mjs', 'smoke "trim stats big file": expected exactly 2 lines after compaction');
     } finally {
       fs.rmSync(home, { recursive: true, force: true });
       fs.rmSync(tcwd, { recursive: true, force: true });
+    }
+  }
+  {
+    // IC-173: writeAtomic returns true only when the rename happened (trim-stats compaction relies on it)
+    const wdir = fs.mkdtempSync(path.join(os.tmpdir(), 'orch-atomic-'));
+    try {
+      const libUrl = pathToFileURL(path.join(root, 'hooks', 'lib.mjs')).href;
+      const wr = (file) => spawnSync(process.execPath, ['--input-type=module', '-e', `import { writeAtomic } from ${JSON.stringify(libUrl)}; console.log(String(writeAtomic(${JSON.stringify(file)}, 'x')));`], { encoding: 'utf8' });
+      if (wr(path.join(wdir, 'ok.txt')).stdout.trim() !== 'true') err('hooks/lib.mjs', 'smoke "writeAtomic ok": expected true');
+      if (wr(path.join(wdir, 'no-such-dir', 'x.txt')).stdout.trim() !== 'false') err('hooks/lib.mjs', 'smoke "writeAtomic failure": expected false');
+    } finally {
+      fs.rmSync(wdir, { recursive: true, force: true });
     }
   }
   r = runHook('trim-output.mjs', trimPayload('git diff'));
@@ -325,6 +372,13 @@ const { root, err, exists, readText, runHook, rmQuiet, trimPayload, sessionInfo,
       if (denies(rd(big, { session_id: sid2 }, {}, { limit: 50 }))) err('hooks/guard-read.mjs', 'smoke "read with limit": expected allow');
       if (denies(rd(big, { session_id: sid2 }, { ORCH_READ_GUARD: 'off' }))) err('hooks/guard-read.mjs', 'smoke "read ORCH_READ_GUARD=off": expected allow');
       if (!denies(rd(big, { session_id: sid2 }))) err('hooks/guard-read.mjs', 'smoke "read big other session": expected deny');
+      // IC-141: line counting applies to every file over 2000 bytes, so a small many-line file (5 KB, 2500 lines) is denied and 1500 lines pass
+      const manyLines = path.join(rdir, 'many.txt');
+      const fewLines = path.join(rdir, 'few.txt');
+      fs.writeFileSync(manyLines, 'x\n'.repeat(2500));
+      fs.writeFileSync(fewLines, 'x\n'.repeat(1500));
+      if (!denies(rd(manyLines, { session_id: sid + '-ml' }))) err('hooks/guard-read.mjs', 'smoke "read 2500 short lines": expected deny');
+      if (denies(rd(fewLines, { session_id: sid + '-ml' }))) err('hooks/guard-read.mjs', 'smoke "read 1500 short lines": expected allow');
       // /orchestrator:off in the transcript turns the read guard off; the same transcript ending with on still denies
       const cmdLine = (name) => JSON.stringify({ type: 'user', message: { content: `<command-message>orchestrator:${name}</command-message>\n<command-name>/orchestrator:${name}</command-name>` } });
       const tOff = path.join(rdir, 't-off.jsonl');

@@ -574,6 +574,7 @@ const { root, err, exists, readText, runHook, rmQuiet } = ctx;
     ['skills/status/SKILL.md', ['selected=status-slash', 'case=status-slash', 'skip=false', 'partial=true']],
     ['skills/learn/SKILL.md', ['selected=on-learned-errors,on-learned-errors-write', 'case={on-learned-errors,on-learned-errors-write}', 'skip=false', 'partial=true']],
     ['hooks/x.mjs', [`selected=${allCases}`, 'case=*', 'skip=false', 'partial=false']],
+    ['"hooks/x.mjs"', [`selected=${allCases}`, 'case=*', 'skip=false', 'partial=false']],
   ]) {
     const r = sel(['--files', f, '--plan']);
     if (r.status !== 0 || JSON.stringify(lines(r)) !== JSON.stringify(want)) err('scripts/eval-select.mjs', `smoke "plan ${f}": expected [${want.join(' | ')}] with exit 0, got exit ${r.status} [${lines(r).join(' | ')}]`);

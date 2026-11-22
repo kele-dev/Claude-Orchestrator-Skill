@@ -67,15 +67,18 @@ jobs:
           fi
 
       - name: Install sandbox backend
+        if: steps.select.outputs.skip != 'true'
         run: |
           sudo apt-get update && sudo apt-get install -y bubblewrap socat
           sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || echo "::warning::could not relax the AppArmor user-namespace restriction; the Claude sandbox may fail"
 
       - name: Install Claude Code
+        if: steps.select.outputs.skip != 'true'
         run: npm install -g @anthropic-ai/claude-code@2.1.317
 
       # The eval agent runs with Bash and can read ANTHROPIC_API_KEY from its environment: use a dedicated key with a low spend limit, and keep this workflow workflow_dispatch-only.
       - name: Check secret
+        if: steps.select.outputs.skip != 'true'
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |

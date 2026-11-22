@@ -7,12 +7,14 @@ import { cachedStoreFor, makeDbg, posInt, readStdin, sanitizeSid, writeAtomic } 
 
 const dbg = makeDbg('trim-output');
 const NO_STATS = 'TRIM: none';
+const STATS_MAX_AGE_MS = 14 * 24 * 3600 * 1000;
 
 // Stats mode: `node trim-output.mjs --stats <store> [<session-id>]` prints one TRIM line for that session's file;
 // without a session id it uses the newest trim-stats-*.jsonl and says so ("newest session").
-// "TRIM: none" = nothing recorded; "TRIM: unavailable (<reason>)" = the stats could not be read (exit 0 either way).
+// With `--project` instead of a session id it sums every trim-stats-*.jsonl modified in the last 14 days ("all sessions").
+// "TRIM: none" = nothing recorded (including a store not created yet); "TRIM: unavailable (<reason>)" = the stats exist but cannot be read (exit 0 either way).
 if (process.argv[2] === '--stats') {
-  try { process.stdout.write(statsLine(process.argv[3], process.argv[4]) + '\n'); } catch (e) { dbg(e); process.stdout.write(`TRIM: unavailable (error: ${e?.code || e?.name})\n`); }
+  try { process.stdout.write(statsLine(process.argv[3], process.argv[4], process.argv[4] === '--project') + '\n'); } catch (e) { dbg(e); process.stdout.write(`TRIM: unavailable (error: ${e?.code || e?.name})\n`); }
 } else readStdin((raw) => {
   try {
     if (raw.length < 3000) return;
@@ -112,15 +114,12 @@ function compact(file) {
     for (const l of readFileSync(file, 'utf8').split('\n')) {
       try { const r = JSON.parse(l); n += Number(r.n) || 1; saved += Number(r.saved) || 0; } catch { /* skip */ }
     }
-    writeAtomic(file, JSON.stringify({ ts: Date.now(), n, saved, summary: true }) + '\n');
-    return true;
+    return writeAtomic(file, JSON.stringify({ ts: Date.now(), n, saved, summary: true }) + '\n');
   } catch (e) {
     dbg(e);
     return false;
   }
 }
-
-const STATS_MAX_AGE_MS = 14 * 24 * 3600 * 1000;
 
 // Removes trim-stats files older than STATS_MAX_AGE_MS (regular files only, never the current one); never throws.
 function prune(store, current) {
@@ -137,9 +136,9 @@ function prune(store, current) {
   }
 }
 
-function statsLine(store, sessionArg) {
+function statsLine(store, sessionArg, project = false) {
   if (typeof store !== 'string' || store === '') return 'TRIM: unavailable (no store given)';
-  if (!existsSync(store)) return 'TRIM: unavailable (store not found)';
+  if (project) return projectLine(store);
   let file, suffix = '';
   if (typeof sessionArg === 'string' && sessionArg !== '') {
     // IC-135: same sanitizing as record(); only this session's file is read
@@ -147,15 +146,48 @@ function statsLine(store, sessionArg) {
     file = join(store, `trim-stats-${sid}.jsonl`);
     if (!existsSync(file)) return NO_STATS;
   } else {
+    if (!existsSync(store)) return NO_STATS;
     const files = readdirSync(store).filter((f) => /^trim-stats-.*\.jsonl$/.test(f))
-      .map((f) => ({ f, t: statSync(join(store, f)).mtimeMs })).sort((a, b) => b.t - a.t);
+      .flatMap((f) => {
+        // a file pruned or removed mid-scan is dropped instead of making the whole line unavailable
+        try { return [{ f, t: statSync(join(store, f)).mtimeMs }]; } catch (e) { if (e?.code === 'ENOENT') return []; throw e; }
+      }).sort((a, b) => b.t - a.t);
     if (!files.length) return NO_STATS;
     file = join(store, files[0].f);
     suffix = ' (newest session)';
   }
-  let n = 0, saved = 0;
+  const { n, saved, bad } = sumFile(file);
+  return format(n, saved, bad, suffix);
+}
+
+// Sums one stats file: n counts r.n || 1 per parsable line, bad counts unparsable non-empty lines.
+function sumFile(file) {
+  let n = 0, saved = 0, bad = 0;
   for (const l of readFileSync(file, 'utf8').split('\n')) {
-    try { const r = JSON.parse(l); n += Number(r.n) || 1; saved += Number(r.saved) || 0; } catch { /* skip */ }
+    if (l.trim() === '') continue;
+    try { const r = JSON.parse(l); n += Number(r.n) || 1; saved += Number(r.saved) || 0; } catch { bad++; }
   }
-  return n ? `TRIM: ${n} trims, ${saved} bytes saved${suffix}` : NO_STATS;
+  return { n, saved, bad };
+}
+
+function format(n, saved, bad, suffix) {
+  if (!n && bad) return 'TRIM: unavailable (unreadable stats file)';
+  // approximate tokens: 4 chars (bytes) per token
+  return n ? `TRIM: ${n} trims, ~${Math.round(saved / 4)} tokens saved (${saved} bytes)${suffix}` : NO_STATS;
+}
+
+// IC-189: totals over all trim-stats files modified within STATS_MAX_AGE_MS.
+function projectLine(store) {
+  if (!existsSync(store)) return NO_STATS;
+  let n = 0, saved = 0, bad = 0;
+  for (const f of readdirSync(store)) {
+    if (!/^trim-stats-.*\.jsonl$/.test(f)) continue;
+    const p = join(store, f);
+    try {
+      if (Date.now() - statSync(p).mtimeMs > STATS_MAX_AGE_MS) continue;
+      const r = sumFile(p);
+      n += r.n; saved += r.saved; bad += r.bad;
+    } catch (e) { if (e?.code !== 'ENOENT') throw e; }
+  }
+  return format(n, saved, bad, ' (all sessions, last 14 days)');
 }
