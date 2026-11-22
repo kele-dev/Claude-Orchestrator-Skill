@@ -57,7 +57,7 @@ Delegate the write to `orchestrator:haiku-coder` in one brief with the exact tex
 One special lesson file, `learned-map`, saves re-exploring the project in every session:
 - At most 20 lines: key folders and what lives there, entry points, test/build/lint commands, generated or do-not-edit paths.
 - Create it at the end of the first task that had to explore the project; update it when a task finds it wrong or incomplete. Same save rules as other lessons (automatic, verified facts only, one report line).
-- Whenever a save changes a command in `learned-map`, regenerate `<store>/verify.sh` in the same delegation, in the format of `init` step 5.
+- Whenever a save changes a command in `learned-map`, regenerate `<store>/verify.sh` in the same delegation, in the format of `init` step 5, and list its changed command lines in the report, one line each.
 - It counts toward the 6-file limit, but not toward the 3-lessons-per-task limit.
 - `/orchestrator:init` creates it in one cheap pass for a new project.
 

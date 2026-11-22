@@ -26,7 +26,7 @@ Both paths: read only needed files, send subagents only relevant excerpts.
 
 ## Token rules (all paths)
 - Output over 80 lines and 4000 chars from Bash/PowerShell is auto-trimmed by a hook to error lines + last 30; put `# notrim` in the command to bypass. Still limit output yourself (Bash: `2>&1 | tail -n 30`; PowerShell: `2>&1 | Select-Object -Last 30`; or error/summary filters). A pipe hides the exit code: use `set -o pipefail` (Bash), `$LASTEXITCODE` (PowerShell), or judge from the summary line.
-- Project checks: if `<store>/verify.sh` exists (`<store>`: see `orchestrator:learn`), run it with the Bash tool (from PowerShell call Git Bash by full path, default `C:\Program Files\Git\bin\bash.exe`, never bare `bash`, which may be WSL; no bash: run `verify.ps1` with PowerShell) (prints `VERIFY: PASS|FAIL`) instead of ad-hoc commands.
+- Project checks: if `<store>/verify.sh` exists (`<store>`: see `orchestrator:learn`), run it with the Bash tool (from PowerShell call Git Bash by full path, default `C:\Program Files\Git\bin\bash.exe`, never bare `bash`, which may be WSL; no bash: run `verify.ps1` with PowerShell) (prints `VERIFY: PASS|FAIL`) instead of ad-hoc commands; show its command lines to the user first if init or learn has not reported them.
 - Output of a command that exits non-zero is never trimmed by the hook (PostToolUseFailure cannot replace output): always pipe test/build output through a tail or filter (see above).
 - Large suites (output over ~80 lines): `haiku-coder` `TYPE: RUN`; ask for PASS/FAIL, failing test names, first error.
 - Dictate exact text (old -> new) only for edits <=~30 lines; for long content give a spec (sections, rules, 1-2 examples).
