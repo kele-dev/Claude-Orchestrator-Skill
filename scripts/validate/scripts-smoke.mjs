@@ -558,7 +558,7 @@ const { root, err, exists, readText, runHook, rmQuiet } = ctx;
     const r = sel(['--files', f]);
     if (r.status !== 0 || JSON.stringify(lines(r)) !== JSON.stringify(want)) err('scripts/eval-select.mjs', `smoke "select ${f}": expected [${want.join(', ')}] with exit 0, got exit ${r.status} [${lines(r).join(', ')}]`);
   }
-  for (const [f, n] of [['hooks/guard-edit.mjs', 12], ['skills/init/SKILL.md', 12], ['agents/haiku-coder.md', 9]]) {
+  for (const [f, n] of [['hooks/guard-edit.mjs', 12], ['skills/init/SKILL.md', 12], ['agents/haiku-coder.md', 9], ['evals/touches.json', 12], ['scripts/eval-compare.mjs', 12], ['.github/workflows/eval.yml', 12]]) {
     const r = sel(['--files', f]);
     if (r.status !== 0 || lines(r).length !== n) err('scripts/eval-select.mjs', `smoke "select ${f}": expected ${n} cases with exit 0, got exit ${r.status} and ${lines(r).length} cases`);
   }

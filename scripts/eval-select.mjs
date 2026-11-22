@@ -2,7 +2,7 @@
 // Pick the eval cases affected by changed files, so a run skips the rest. A manual all-cases run (--case "*") stays available.
 // Usage: node scripts/eval-select.mjs --files a,b,c | --base <git-ref>   (--base uses git diff --name-only <ref>...HEAD)
 // Output: selected case names, sorted, one per line (nothing when none). Exit: 0 ok, 2 bad args or git/read failure.
-// Unknown skills/, agents/ or hooks/ paths select every case, so a wrong map never skips a regression.
+// Unknown skills/, agents/ or hooks/ paths, and changes to evals/touches.json, scripts/eval-* or .github/workflows/, select every case, so a wrong map never skips a regression.
 import { readFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { dirname, join } from 'node:path';
@@ -50,7 +50,7 @@ const all = () => cases.forEach((c) => picked.add(c));
 
 for (const raw of files) {
   const f = raw.replace(/\\/g, '/');
-  if (f.startsWith('hooks/') || f.startsWith('.claude-plugin/')) {
+  if (f.startsWith('hooks/') || f.startsWith('.claude-plugin/') || f === 'evals/touches.json' || f.startsWith('scripts/eval-') || f.startsWith('.github/workflows/')) {
     all();
     continue;
   }

@@ -114,4 +114,4 @@ The CI step runs only when `evals/baseline.json` exists. There is no schedule tr
 
 ## Run only affected cases
 
-`evals/touches.json` maps each case folder to the repo path prefixes it depends on (an empty list means the case never reruns on repo changes). `node scripts/eval-select.mjs --base <git-ref>` (or `--files a,b`) prints the affected case names. A change under `hooks/` or `.claude-plugin/`, or an unmapped `skills/` or `agents/` path, selects every case. A full run is still available with `--case "*"`.
+`evals/touches.json` maps each case folder to the repo path prefixes it depends on (an empty list means the case never reruns on repo changes). `node scripts/eval-select.mjs --base <git-ref>` (or `--files a,b`) prints the affected case names. A change under `hooks/`, `.claude-plugin/`, `scripts/eval-*` or `.github/workflows/`, a change to `evals/touches.json`, or an unmapped `skills/` or `agents/` path, selects every case. A full run is still available with `--case "*"`.
