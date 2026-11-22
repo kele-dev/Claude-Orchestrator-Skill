@@ -410,6 +410,19 @@ const { root, err, exists, readText, runHook, rmQuiet } = ctx;
       fs.writeFileSync(path.join(d, 'moved.json'), J({ suite: { plugins: [{ version: '9.9.9' }] }, cases: [{ name: 'c3', arms: { with: [{ passed: true, tracePath: path.join(d, 'gone-folder', 'moved-trace.jsonl') }] } }] }));
       const moved = trace(path.join(d, 'moved.json')).out.split('\n');
       if (moved[0] !== 'RUN: c3 with #1 PASS' || !moved[1]?.startsWith('TRACE: total 36k tokens')) err('scripts/trace-tokens.mjs', `smoke "moved tracePath fallback": expected RUN line then token lines, got "${moved.slice(0, 2).join(' | ')}"`);
+      // tracePath outside the results folder is never read; the same basename inside the folder is used when present
+      const outside = fs.mkdtempSync(path.join(os.tmpdir(), 'orch-trace-outside-'));
+      try {
+        fs.writeFileSync(path.join(outside, 'escape-trace.jsonl'), fs.readFileSync(path.join(d, 't.jsonl'), 'utf8'));
+        fs.writeFileSync(path.join(d, 'escape.json'), J({ suite: { plugins: [{ version: '9.9.9' }] }, cases: [{ name: 'c4', arms: { with: [{ passed: true, tracePath: path.join(outside, 'escape-trace.jsonl') }] } }] }));
+        const escaped = trace(path.join(d, 'escape.json')).out.split('\n');
+        if (escaped[0] !== 'RUN: c4 with #1 PASS' || escaped[1] !== 'TRACE: unreadable') err('scripts/trace-tokens.mjs', `smoke "outside tracePath": expected RUN line then TRACE: unreadable, got "${escaped.slice(0, 2).join(' | ')}"`);
+        fs.copyFileSync(path.join(d, 't.jsonl'), path.join(d, 'escape-trace.jsonl'));
+        const basenameUsed = trace(path.join(d, 'escape.json')).out.split('\n');
+        if (basenameUsed[0] !== 'RUN: c4 with #1 PASS' || !basenameUsed[1]?.startsWith('TRACE: total 36k tokens')) err('scripts/trace-tokens.mjs', `smoke "outside tracePath basename fallback": expected token lines, got "${basenameUsed.slice(0, 2).join(' | ')}"`);
+      } finally {
+        fs.rmSync(outside, { recursive: true, force: true });
+      }
     }
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });

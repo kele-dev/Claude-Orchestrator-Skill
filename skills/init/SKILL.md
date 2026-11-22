@@ -45,3 +45,4 @@ Same delegation: also copy missing legacy topics (`legacy.md` in the `orchestrat
 ## 6. Report
 - The main session reads only the Haiku report and the written map.
 - Report in one short block (stack, commands with their status, the verify.sh result, anything broken, the store path, and that `/orchestrator:init --refresh` re-maps the project) plus the token line.
+- If verify.sh was written: print its command lines (one line each, not the whole script) and say they run automatically in later tasks, so the user should review them.
