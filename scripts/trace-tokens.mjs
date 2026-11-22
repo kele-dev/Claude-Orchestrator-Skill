@@ -2,7 +2,7 @@
 // Token trace summary (exits 0; 2 on an unknown --option).
 // Usage: node scripts/trace-tokens.mjs <trace.jsonl | result.json> [--md]
 import { readFileSync, realpathSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const UNREADABLE = 'TRACE: unreadable';
@@ -25,11 +25,17 @@ export function readText(path) {
   }
 }
 
-// Trace text for one result run: tracePath as given, else the same basename inside the result's folder.
+// Trace text for one result run: tracePath when it resolves inside the result's folder (confined to the results folder), else the same basename inside that folder.
 export function readRunTrace(run, dir) {
-  let text = readText(safeTracePath(run?.tracePath));
+  const base = resolve(dir);
+  const p = safeTracePath(run?.tracePath);
+  let text = null;
+  if (p !== null) {
+    const rel = relative(base, resolve(base, p));
+    if (!rel.startsWith('..') && !isAbsolute(rel)) text = readText(resolve(base, p));
+  }
   if (text == null && typeof run?.tracePath === 'string') {
-    text = readText(safeTracePath(join(dir, run.tracePath.split(/[\\/]/).pop())));
+    text = readText(safeTracePath(join(base, run.tracePath.split(/[\\/]/).pop())));
   }
   return text;
 }
