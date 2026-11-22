@@ -28,7 +28,8 @@ readStdin((raw) => {
 
     const st = statSync(file);
     if (!st.isFile()) return;
-    const big = st.size > MAX_BYTES || (st.size > 20000 && countLines(file, st.size) > MAX_LINES);
+    const lines = st.size > 20000 && st.size <= MAX_BYTES ? countLines(file, st.size) : null;
+    const big = st.size > MAX_BYTES || (lines !== null && lines > MAX_LINES);
     if (!big) return;
     const dir = stateDir();
     if (dir === null) return;
@@ -40,11 +41,12 @@ readStdin((raw) => {
 
     try { writeFileSync(marker, '1', { flag: 'wx' }); } catch { return; }
     const kb = Math.round(st.size / 1024);
+    const size = lines !== null ? `${lines} lines, ${kb} KB` : `${kb} KB`;
     process.stdout.write(JSON.stringify({
       hookSpecificOutput: {
         hookEventName: 'PreToolUse',
         permissionDecision: 'deny',
-        permissionDecisionReason: `orchestrator: ${file} is large (${kb} KB); a whole-file Read costs many tokens. Read only what you need with offset/limit, find it with Grep, or ask the Explore agent. If you really need the whole file, repeat the same Read and it will be allowed. Set ORCH_READ_GUARD=off to disable this guard.`,
+        permissionDecisionReason: `orchestrator: ${file} is large (${size}); a whole-file Read costs many tokens. Read only the part you need: Read with offset and limit (for example offset 1, limit 200 for the top), or Grep -n for a symbol and then Read from that line, or ask the Explore agent. If you really need the whole file, repeat the same Read and it will be allowed. Set ORCH_READ_GUARD=off to disable this guard.`,
       },
     }));
   } catch (e) {
