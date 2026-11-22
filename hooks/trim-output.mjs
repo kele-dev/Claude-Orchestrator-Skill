@@ -6,11 +6,13 @@ import { join } from 'node:path';
 import { cachedStoreFor, makeDbg, posInt, readStdin, sanitizeSid, writeAtomic } from './lib.mjs';
 
 const dbg = makeDbg('trim-output');
+const NO_STATS = 'TRIM: none';
 
 // Stats mode: `node trim-output.mjs --stats <store> [<session-id>]` prints one TRIM line for that session's file;
 // without a session id it uses the newest trim-stats-*.jsonl and says so ("newest session").
+// "TRIM: none" = nothing recorded; "TRIM: unavailable (<reason>)" = the stats could not be read (exit 0 either way).
 if (process.argv[2] === '--stats') {
-  try { process.stdout.write(statsLine(process.argv[3], process.argv[4]) + '\n'); } catch (e) { dbg(e); process.stdout.write('TRIM: none\n'); }
+  try { process.stdout.write(statsLine(process.argv[3], process.argv[4]) + '\n'); } catch (e) { dbg(e); process.stdout.write(`TRIM: unavailable (error: ${e?.code || e?.name})\n`); }
 } else readStdin((raw) => {
   try {
     if (raw.length < 3000) return;
@@ -85,8 +87,6 @@ function trimLines(text, maxLines, exitFailed = false) {
   ].join('\n');
 }
 
-const NO_STATS = 'TRIM: none';
-
 // Appends one tiny {ts, before, after, saved} record to <store>/trim-stats-<session>.jsonl; never throws.
 function record(input, before, after) {
   try {
@@ -138,7 +138,8 @@ function prune(store, current) {
 }
 
 function statsLine(store, sessionArg) {
-  if (typeof store !== 'string' || store === '') return NO_STATS;
+  if (typeof store !== 'string' || store === '') return 'TRIM: unavailable (no store given)';
+  if (!existsSync(store)) return 'TRIM: unavailable (store not found)';
   let file, suffix = '';
   if (typeof sessionArg === 'string' && sessionArg !== '') {
     // IC-135: same sanitizing as record(); only this session's file is read

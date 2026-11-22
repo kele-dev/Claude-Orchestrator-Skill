@@ -66,6 +66,11 @@ const { root, err, exists, readText, runHook, rmQuiet, trimPayload, sessionInfo,
       if (newest.stdout.trim() !== 'TRIM: 2 trims, 100 bytes saved (newest session)') err('hooks/trim-output.mjs', `smoke "trim stats newest": unexpected output "${newest.stdout.trim()}"`);
       const nosuch = spawnSync(process.execPath, [path.join(root, 'hooks', 'trim-output.mjs'), '--stats', store, 'nosuch'], { encoding: 'utf8', cwd: root, env: { ...process.env, ...homeEnv } });
       if (nosuch.stdout.trim() !== 'TRIM: none') err('hooks/trim-output.mjs', `smoke "trim stats unknown session": unexpected output "${nosuch.stdout.trim()}"`);
+      // IC-161: "unavailable" is for a store that cannot be read; "none" stays for nothing recorded
+      const noStore = spawnSync(process.execPath, [path.join(root, 'hooks', 'trim-output.mjs'), '--stats'], { encoding: 'utf8', cwd: root, env: { ...process.env, ...homeEnv } });
+      if (noStore.stdout.trim() !== 'TRIM: unavailable (no store given)') err('hooks/trim-output.mjs', `smoke "trim stats no store": unexpected output "${noStore.stdout.trim()}"`);
+      const noDir = spawnSync(process.execPath, [path.join(root, 'hooks', 'trim-output.mjs'), '--stats', path.join(home, 'nosuch-store')], { encoding: 'utf8', cwd: root, env: { ...process.env, ...homeEnv } });
+      if (noDir.stdout.trim() !== 'TRIM: unavailable (store not found)') err('hooks/trim-output.mjs', `smoke "trim stats missing store": unexpected output "${noDir.stdout.trim()}"`);
       // IC-159: a session file over 64 KB is compacted to one summary line (1200 trims) before the new record is appended
       const bigFile = path.join(store, 'trim-stats-big.jsonl');
       fs.writeFileSync(bigFile, Array.from({ length: 1200 }, () => JSON.stringify({ ts: 1, before: 10, after: 2, saved: 10, pad: 'x'.repeat(20) })).join('\n') + '\n');
