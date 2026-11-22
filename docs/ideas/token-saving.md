@@ -1,6 +1,6 @@
 # Token-saving ideas (backlog, from v1.4.0 review, rechecked on v1.5.0)
 
-Status: implemented 1-5 (v1.6.0), 7 (v1.7.1), 9-10 (v1.7.1, partly), 12 (evals/), 6 (implemented v1.9.0, saving not measured (see evals/README.md token log)), 8 (team/autopilot only, v1.9.0), 11 (v1.9.0), 13 (delegation startup measured v1.11.0: no change, see below); open: 13-15 and 17 (see "Proposed after v1.11.1"; the 13 above is the older startup-measurement item), 16 partly done (v1.12.0), 18 done (v1.12.0).
+Status: implemented 1-5 (v1.6.0), 7 (v1.7.1), 9-10 (v1.7.1, partly), 12 (evals/), 6 (implemented v1.9.0, saving not measured (see evals/README.md token log)), 8 (team/autopilot only, v1.9.0), 11 (v1.9.0), 13 (delegation startup measured v1.11.0: no change, see below); open: 13 (see "Proposed after v1.11.1"; the 13 above is the older startup-measurement item), 16 partly done (v1.12.0), 18 done (v1.12.0), 14, 15 and 17 done (v1.14.0).
 
 Since v1.5.0: `rules.md` is also injected on resume (idea 3 matters more), and every change must pass `node scripts/validate.mjs` (idea 4 must keep its cross-references valid).
 
@@ -43,13 +43,13 @@ Since v1.5.0: `rules.md` is also injected on resume (idea 3 matters more), and e
 - Decision: no reduction. Trimming `agents/haiku-coder.md` saves under 1k per delegation and risks TYPE-rule regressions. The real lever is fewer delegations: `SendMessage` reuse, the short path. The multi-task bundling rule tried during 1.11.0 was removed (no measured effect); housekeeping bundling (v1.8.2, `orchestrator:on` token rules) stays. Cost is in Opus (main session turns and opus-planner/opus-reviewer), not in haiku-coder delegations; report cost by model (scripts/trace-tokens.mjs), not raw tokens.
 - Revisit only if R3 shows the plugin-controlled share above 3k.
 
-## Proposed after v1.11.1 (16 partly and 18 done in v1.12.0; rest not implemented)
+## Proposed after v1.11.1 (16 partly and 18 done in v1.12.0; 14, 15 and 17 done in v1.14.0; rest not implemented)
 
 13. Direct-edit lane when the main model is already cheap (Haiku/Sonnet main) for 1-3 line edits: a Haiku -> Haiku delegation is pure overhead (~10k startup). Changes the core "main session never edits" rule: needs an owner decision.
-14. Read guard hook: warn or deny a main-session Read of a large file without `offset`/`limit`; whole-file reads are the largest token sink no hook guards yet.
-15. Trim-hook statistics: log lines/chars saved per call to the store and show totals in `/orchestrator:status`, so trim thresholds are tuned from data.
+14. **Done (v1.14.0).** Read guard hook: warn or deny a main-session Read of a large file without `offset`/`limit`; whole-file reads are the largest token sink no hook guards yet.
+15. **Done (v1.14.0).** Trim-hook statistics: log lines/chars saved per call to the store and show totals in `/orchestrator:status`, so trim thresholds are tuned from data. Shipped as the TRIM row in `/orchestrator:status` (`hooks/trim-output.mjs --stats`).
 16. **Partially done (compare script; scheduled run is opt-in).** Token regression gate in CI: run the eval suite on pull requests and fail when tokens rise more than X% over the stored baseline (builds on the plugin-eval-suite work).
-17. Store key from repo identity (remote URL or first-commit hash) instead of the folder path, so lessons survive a moved or re-cloned repo; keep the path key as fallback and migrate.
+17. **Done (v1.14.0).** Store key from repo identity (remote URL or first-commit hash) instead of the folder path, so lessons survive a moved or re-cloned repo; keep the path key as fallback and migrate. Shipped for new stores; an existing path-based store keeps being used (no migration).
 18. **Done.** Checkpoint expiry: mark checkpoints older than N days in the session-info line and offer deletion; stale ones are printed at every session start.
 
 ## Done in v1.12.0
