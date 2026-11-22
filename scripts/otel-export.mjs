@@ -5,8 +5,9 @@
 // Content capture is off: no prompts, message text, tool outputs or tool inputs are written (only Agent/Task subagent_type).
 // Schema pinned to 1.37.0 because the GenAI conventions are at Development stability.
 // Trace and span IDs are deterministic: sha256 of the absolute transcript path (trace), and of path + span index (span).
+// Missing timestamps take the last earlier one (else the file mtime); a call without a result ends at the transcript's last timestamp.
 import { createHash } from 'node:crypto';
-import { writeFileSync } from 'node:fs';
+import { statSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { readTranscript, entries } from './transcript.mjs';
 
@@ -59,14 +60,22 @@ for (const u of usageById.values()) {
   outTok += u.output_tokens ?? 0;
 }
 
+const stamps = list.map((o) => toNs(o.timestamp)).filter((t) => t !== null);
+const fileNs = BigInt(Math.round(statSync(abs).mtimeMs)) * 1000000n;
+const rootStart = stamps.length ? stamps[0] : fileNs;
+const rootEnd = stamps.length ? stamps[stamps.length - 1] : fileNs;
+
 // Tool calls and their results (first tool_result per tool_use_id).
 const calls = [];
 const results = new Map();
+let last = rootStart;
 for (const o of list) {
+  const t = toNs(o.timestamp);
+  if (t !== null) last = t;
   const content = Array.isArray(o.message?.content) ? o.message.content : [];
   if (o.type === 'assistant') {
     for (const b of content) {
-      if (b?.type === 'tool_use') calls.push({ block: b, start: toNs(o.timestamp) ?? 0n });
+      if (b?.type === 'tool_use') calls.push({ block: b, start: last });
     }
   } else if (o.type === 'user') {
     for (const b of content) {
@@ -76,10 +85,6 @@ for (const o of list) {
     }
   }
 }
-
-const stamps = list.map((o) => toNs(o.timestamp)).filter((t) => t !== null);
-const rootStart = stamps.length ? stamps[0] : 0n;
-const rootEnd = stamps.length ? stamps[stamps.length - 1] : 0n;
 
 const spans = [{
   traceId,
@@ -113,7 +118,7 @@ calls.forEach(({ block, start }, k) => {
     name: isAgent ? `invoke_agent ${sub}` : `execute_tool ${block.name ?? 'unknown'}`,
     kind: 1,
     startTimeUnixNano: String(start),
-    endTimeUnixNano: String(end ?? start),
+    endTimeUnixNano: String(end ?? (rootEnd > start ? rootEnd : start)),
     attributes,
   };
   if (result) span.status = { code: result.isError ? 2 : 1 };

@@ -611,6 +611,31 @@ const { root, err, exists, readText, runHook, rmQuiet } = ctx;
       }
       const missing = spawnSync(process.execPath, [exportPath, path.join(tmp, 'none.jsonl')], { encoding: 'utf8', cwd: root });
       if (missing.status !== 2) fails(`missing file: expected exit 2, got ${missing.status}`);
+      // IC-109: no span before 2020; a missing timestamp takes the last earlier one; an unfinished call ends at the last timestamp; no-timestamp transcript uses the file mtime
+      const y2020 = BigInt(Date.parse('2020-01-01T00:00:00Z')) * 1000000n;
+      const t109 = path.join(tmp, 'ic109.jsonl');
+      fs.writeFileSync(t109, [
+        J({ type: 'user', timestamp: '2026-01-01T00:00:00Z', message: { content: 'hi' } }),
+        J({ type: 'assistant', message: { id: 'm1', content: [{ type: 'tool_use', id: 'a', name: 'Bash', input: {} }] } }),
+        J({ type: 'user', timestamp: '2026-01-01T00:00:02Z', message: { content: [{ type: 'tool_result', tool_use_id: 'a', content: 'x' }] } }),
+        J({ type: 'assistant', timestamp: '2026-01-01T00:00:03Z', message: { id: 'm2', content: [{ type: 'tool_use', id: 'b', name: 'Read', input: {} }] } }),
+        J({ type: 'assistant', timestamp: '2026-01-01T00:00:08Z', message: { id: 'm3', content: [{ type: 'text', text: 'x' }] } }),
+      ].join('\n') + '\n');
+      const r109 = spawnSync(process.execPath, [exportPath, t109], { encoding: 'utf8', cwd: root });
+      if (r109.status !== 0) fails(`IC-109 exit ${r109.status}, expected 0`);
+      let s109 = [];
+      try { s109 = JSON.parse(r109.stdout).resourceSpans[0].scopeSpans[0].spans; } catch { fails('IC-109 output is not JSON'); }
+      const bash109 = s109.find((s) => s.name === 'execute_tool Bash');
+      const read109 = s109.find((s) => s.name === 'execute_tool Read');
+      if (s109.some((s) => BigInt(s.startTimeUnixNano) < y2020 || BigInt(s.endTimeUnixNano) < y2020)) fails('IC-109 span before 2020');
+      if (!bash109 || bash109.startTimeUnixNano !== String(BigInt(Date.parse('2026-01-01T00:00:00Z')) * 1000000n)) fails('IC-109 Bash start is not the last known timestamp');
+      if (!read109 || read109.endTimeUnixNano !== String(BigInt(Date.parse('2026-01-01T00:00:08Z')) * 1000000n)) fails('IC-109 unfinished Read does not end at the last timestamp');
+      if (read109 && read109.status !== undefined) fails('IC-109 unfinished Read has a status');
+      const t109b = path.join(tmp, 'ic109b.jsonl');
+      fs.writeFileSync(t109b, J({ type: 'assistant', message: { id: 'm1', content: [{ type: 'tool_use', id: 'c', name: 'Grep', input: {} }] } }) + '\n');
+      const r109b = spawnSync(process.execPath, [exportPath, t109b], { encoding: 'utf8', cwd: root });
+      if (r109b.status !== 0) fails(`IC-109 no-timestamp exit ${r109b.status}, expected 0`);
+      else if (JSON.parse(r109b.stdout).resourceSpans[0].scopeSpans[0].spans.some((s) => BigInt(s.startTimeUnixNano) < y2020)) fails('IC-109 no-timestamp transcript starts before 2020');
     }
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
