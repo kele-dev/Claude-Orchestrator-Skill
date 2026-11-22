@@ -49,13 +49,16 @@ export function stateDir() {
 export const posInt = (v, d) => (/^[1-9]\d*$/.test(v ?? '') ? Number(v) : d);
 
 // Atomic write: temp file (flag 'wx', so an existing file or symlink is never followed) then rename over the target; fails silently.
+// Returns true when the rename succeeded, false otherwise (never throws).
 export function writeAtomic(path, data) {
   const tmp = `${path}.${process.pid}.tmp`;
   try {
     writeFileSync(tmp, data, { flag: 'wx' });
     renameSync(tmp, path);
+    return true;
   } catch {
     try { unlinkSync(tmp); } catch { /* ignore */ }
+    return false;
   }
 }
 

@@ -83,6 +83,18 @@ const { root, err, exists, readText, runHook, rmQuiet, trimPayload, sessionInfo,
       fs.rmSync(tcwd, { recursive: true, force: true });
     }
   }
+  {
+    // IC-173: writeAtomic returns true only when the rename happened (trim-stats compaction relies on it)
+    const wdir = fs.mkdtempSync(path.join(os.tmpdir(), 'orch-atomic-'));
+    try {
+      const libUrl = pathToFileURL(path.join(root, 'hooks', 'lib.mjs')).href;
+      const wr = (file) => spawnSync(process.execPath, ['--input-type=module', '-e', `import { writeAtomic } from ${JSON.stringify(libUrl)}; console.log(String(writeAtomic(${JSON.stringify(file)}, 'x')));`], { encoding: 'utf8' });
+      if (wr(path.join(wdir, 'ok.txt')).stdout.trim() !== 'true') err('hooks/lib.mjs', 'smoke "writeAtomic ok": expected true');
+      if (wr(path.join(wdir, 'no-such-dir', 'x.txt')).stdout.trim() !== 'false') err('hooks/lib.mjs', 'smoke "writeAtomic failure": expected false');
+    } finally {
+      fs.rmSync(wdir, { recursive: true, force: true });
+    }
+  }
   r = runHook('trim-output.mjs', trimPayload('git diff'));
   if (r && r.stdout.trim() !== '') err('hooks/trim-output.mjs', 'smoke "git diff untouched": expected empty stdout');
   {

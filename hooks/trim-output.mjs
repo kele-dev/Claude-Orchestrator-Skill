@@ -112,8 +112,7 @@ function compact(file) {
     for (const l of readFileSync(file, 'utf8').split('\n')) {
       try { const r = JSON.parse(l); n += Number(r.n) || 1; saved += Number(r.saved) || 0; } catch { /* skip */ }
     }
-    writeAtomic(file, JSON.stringify({ ts: Date.now(), n, saved, summary: true }) + '\n');
-    return true;
+    return writeAtomic(file, JSON.stringify({ ts: Date.now(), n, saved, summary: true }) + '\n');
   } catch (e) {
     dbg(e);
     return false;
