@@ -1,12 +1,11 @@
 #!/usr/bin/env node
 // PreToolUse hook for Edit/Write/NotebookEdit: denies project edits from the main session while orchestration is on.
 // Fails open on malformed input or hook errors (prints nothing, exits 0). Default mode is "on": no on/off info, or an unreadable transcript, means edits are denied.
-// Counts consecutive main-session denials per session in the temp dir; from the 3rd on, the deny reason tells the model to stop retrying. An allowed main-session call resets the count.
+// Counts consecutive main-session denials per session in the private state dir (lib stateDir); from the 3rd on, the deny reason tells the model to stop retrying. An allowed main-session call resets the count.
 import fs from 'fs';
-import os from 'os';
 import { execFileSync } from 'child_process';
 import path from 'path';
-import { makeDbg, orchestrationOff, readStdin, writeAtomic } from './lib.mjs';
+import { makeDbg, orchestrationOff, readStdin, stateDir, writeAtomic } from './lib.mjs';
 
 const dbg = makeDbg('guard-edit');
 
@@ -36,10 +35,11 @@ readStdin((raw) => {
 
 const DENY_STREAK = 3;
 
-// Per-session counter file in the temp dir; empty session id means no counter.
+// Per-session counter file in the private state dir; empty session id or no usable state dir means no counter.
 function denyFile(input) {
   const sid = String(input.session_id ?? '').replace(/[^A-Za-z0-9_-]/g, '').slice(0, 80);
-  return sid === '' ? null : path.join(os.tmpdir(), `orchestrator-deny-${sid}`);
+  const dir = sid === '' ? null : stateDir();
+  return dir === null ? null : path.join(dir, `orchestrator-deny-${sid}`);
 }
 
 // Adds one to the streak and returns it. Never throws: counter errors must not block the deny.

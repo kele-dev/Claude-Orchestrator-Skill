@@ -87,7 +87,7 @@ const { root, err, exists, readText, runHook, rmQuiet, trimPayload, sessionInfo,
     if (!trimmedOut('git ls-files', 350).includes('[orchestrator: trimmed')) err('hooks/trim-output.mjs', 'smoke "trim read 350 lines": expected trimmed above 300 lines');
   }
 
-  const guard = (file, extra = {}) =>
+  const guard = (file, extra = {}, env = {}) =>
     runHook('guard-edit.mjs', {
       hook_event_name: 'PreToolUse',
       tool_name: 'Edit',
@@ -95,7 +95,7 @@ const { root, err, exists, readText, runHook, rmQuiet, trimPayload, sessionInfo,
       transcript_path: path.join(root, 'no-such-transcript.jsonl'),
       cwd: root,
       ...extra,
-    });
+    }, env);
   const guardCases = [
     ['guard agents/x.md main thread denied', path.join(root, 'agents', 'x.md'), {}, true],
     ['guard agents/x.md subagent allowed', path.join(root, 'agents', 'x.md'), { agent_id: 'a1' }, false],
@@ -145,18 +145,23 @@ const { root, err, exists, readText, runHook, rmQuiet, trimPayload, sessionInfo,
   {
     // IC-093: 3 denials in a row add the stop hint; an allowed main-thread edit resets the streak
     const sid = `smoke-streak-${process.pid}-${Date.now()}`;
-    const counter = path.join(os.tmpdir(), `orchestrator-deny-${sid}`);
+    // IC-140: the counter lives in a private state dir (ORCH_STATE_DIR), not the shared temp dir
+    const sdir = fs.mkdtempSync(path.join(os.tmpdir(), 'orch-deny-state-'));
+    const senv = { ORCH_STATE_DIR: sdir };
     try {
       const deniedFile = path.join(root, 'agents', 'x.md');
-      const [g1, , g3] = [1, 2, 3].map(() => guard(deniedFile, { session_id: sid }));
+      const [g1, , g3] = [1, 2, 3].map(() => guard(deniedFile, { session_id: sid }, senv));
       if (g1 && g1.stdout.includes('in a row')) err('hooks/guard-edit.mjs', 'smoke "guard streak 1st denial": unexpected "in a row"');
       if (g3 && !g3.stdout.includes('denial 3 in a row')) err('hooks/guard-edit.mjs', 'smoke "guard streak 3rd denial": expected "denial 3 in a row"');
-      const allowed = guard(path.join(root, 'docs', 'prd', 'x.md'), { session_id: sid });
+      if (!fs.existsSync(path.join(sdir, `orchestrator-deny-${sid}`)) || fs.existsSync(path.join(os.tmpdir(), `orchestrator-deny-${sid}`))) {
+        err('hooks/guard-edit.mjs', 'smoke "guard streak state dir": expected the deny counter in ORCH_STATE_DIR and none in the temp dir');
+      }
+      const allowed = guard(path.join(root, 'docs', 'prd', 'x.md'), { session_id: sid }, senv);
       if (allowed && allowed.stdout.trim() !== '') err('hooks/guard-edit.mjs', 'smoke "guard streak allowed reset": expected empty stdout');
-      const g4 = guard(deniedFile, { session_id: sid });
+      const g4 = guard(deniedFile, { session_id: sid }, senv);
       if (g4 && g4.stdout.includes('in a row')) err('hooks/guard-edit.mjs', 'smoke "guard streak after reset": unexpected "in a row"');
     } finally {
-      fs.rmSync(counter, { force: true });
+      fs.rmSync(sdir, { recursive: true, force: true });
     }
   }
 
