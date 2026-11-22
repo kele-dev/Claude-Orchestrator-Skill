@@ -53,7 +53,7 @@ const { root, err, exists, readText, runHook, rmQuiet, trimPayload, sessionInfo,
       const recs = fs.existsSync(statsFile) ? fs.readFileSync(statsFile, 'utf8').split('\n').filter(Boolean) : [];
       if (recs.length !== 1 || !(JSON.parse(recs[0]).saved > 0)) err('hooks/trim-output.mjs', 'smoke "trim stats record": expected one record with saved > 0');
       const st = spawnSync(process.execPath, [path.join(root, 'hooks', 'trim-output.mjs'), '--stats', store], { encoding: 'utf8', cwd: root, env: { ...process.env, ...homeEnv } });
-      if (!/^TRIM: 1 trims, [1-9]\d* bytes saved \(newest session\)$/.test(st.stdout.trim())) err('hooks/trim-output.mjs', `smoke "trim stats --stats": unexpected output "${st.stdout.trim()}"`);
+      if (!/^TRIM: 1 trims, ~\d+ tokens saved \([1-9]\d* bytes\) \(newest session\)$/.test(st.stdout.trim())) err('hooks/trim-output.mjs', `smoke "trim stats --stats": unexpected output "${st.stdout.trim()}"`);
       // IC-135: a session id selects its own file; no id keeps the newest file; unknown id -> none
       const otherFile = path.join(store, 'trim-stats-other.jsonl');
       fs.mkdirSync(store, { recursive: true });
@@ -61,9 +61,9 @@ const { root, err, exists, readText, runHook, rmQuiet, trimPayload, sessionInfo,
       const future = new Date(Date.now() + 3600e3);
       fs.utimesSync(otherFile, future, future);
       const bySid = spawnSync(process.execPath, [path.join(root, 'hooks', 'trim-output.mjs'), '--stats', store, 'smoke1'], { encoding: 'utf8', cwd: root, env: { ...process.env, ...homeEnv } });
-      if (!/^TRIM: 1 trims, [1-9]\d* bytes saved$/.test(bySid.stdout.trim())) err('hooks/trim-output.mjs', `smoke "trim stats session id": unexpected output "${bySid.stdout.trim()}"`);
+      if (!/^TRIM: 1 trims, ~\d+ tokens saved \([1-9]\d* bytes\)$/.test(bySid.stdout.trim())) err('hooks/trim-output.mjs', `smoke "trim stats session id": unexpected output "${bySid.stdout.trim()}"`);
       const newest = spawnSync(process.execPath, [path.join(root, 'hooks', 'trim-output.mjs'), '--stats', store], { encoding: 'utf8', cwd: root, env: { ...process.env, ...homeEnv } });
-      if (newest.stdout.trim() !== 'TRIM: 2 trims, 100 bytes saved (newest session)') err('hooks/trim-output.mjs', `smoke "trim stats newest": unexpected output "${newest.stdout.trim()}"`);
+      if (newest.stdout.trim() !== 'TRIM: 2 trims, ~25 tokens saved (100 bytes) (newest session)') err('hooks/trim-output.mjs', `smoke "trim stats newest": unexpected output "${newest.stdout.trim()}"`);
       const nosuch = spawnSync(process.execPath, [path.join(root, 'hooks', 'trim-output.mjs'), '--stats', store, 'nosuch'], { encoding: 'utf8', cwd: root, env: { ...process.env, ...homeEnv } });
       if (nosuch.stdout.trim() !== 'TRIM: none') err('hooks/trim-output.mjs', `smoke "trim stats unknown session": unexpected output "${nosuch.stdout.trim()}"`);
       // IC-161/IC-175: "unavailable" is for a store that cannot be read; "none" stays for nothing recorded (including a store not created yet)
@@ -94,7 +94,7 @@ const { root, err, exists, readText, runHook, rmQuiet, trimPayload, sessionInfo,
       fs.writeFileSync(bigFile, Array.from({ length: 1200 }, () => JSON.stringify({ ts: 1, before: 10, after: 2, saved: 10, pad: 'x'.repeat(20) })).join('\n') + '\n');
       runHook('trim-output.mjs', { ...trimPayload('npm test'), cwd: tcwd, session_id: 'big' }, homeEnv);
       const big = spawnSync(process.execPath, [path.join(root, 'hooks', 'trim-output.mjs'), '--stats', store, 'big'], { encoding: 'utf8', cwd: root, env: { ...process.env, ...homeEnv } });
-      if (!/^TRIM: 1201 trims, 1[2-9]\d{3,} bytes saved$/.test(big.stdout.trim())) err('hooks/trim-output.mjs', `smoke "trim stats big file": unexpected output "${big.stdout.trim()}"`);
+      if (!/^TRIM: 1201 trims, ~\d+ tokens saved \(1[2-9]\d{3,} bytes\)$/.test(big.stdout.trim())) err('hooks/trim-output.mjs', `smoke "trim stats big file": unexpected output "${big.stdout.trim()}"`);
       if (fs.readFileSync(bigFile, 'utf8').split('\n').filter(Boolean).length !== 2) err('hooks/trim-output.mjs', 'smoke "trim stats big file": expected exactly 2 lines after compaction');
     } finally {
       fs.rmSync(home, { recursive: true, force: true });

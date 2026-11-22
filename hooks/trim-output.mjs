@@ -161,5 +161,6 @@ function statsLine(store, sessionArg) {
     try { const r = JSON.parse(l); n += Number(r.n) || 1; saved += Number(r.saved) || 0; } catch { bad++; }
   }
   if (!n && bad) return 'TRIM: unavailable (unreadable stats file)';
-  return n ? `TRIM: ${n} trims, ${saved} bytes saved${suffix}` : NO_STATS;
+  // approximate tokens: 4 chars (bytes) per token
+  return n ? `TRIM: ${n} trims, ~${Math.round(saved / 4)} tokens saved (${saved} bytes)${suffix}` : NO_STATS;
 }
