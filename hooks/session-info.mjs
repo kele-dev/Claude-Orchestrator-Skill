@@ -96,7 +96,7 @@ function run(input) {
       staleAny = true;
       stale = ` (stale ${Math.floor(age / 864e5)}d)`;
     }
-    return `${f.replace(/\.md$/, '')} (${task})${stale}`;
+    return `${f.replace(/\.md$/, '')}${task ? ` (${task})` : ''}${stale}`;
   });
   if (allCps.length > 5) cps.push(`+${allCps.length - 5} more`);
   if (cps.length) {
@@ -111,10 +111,11 @@ function run(input) {
   if (!legacy) legacy = listMd(join(main, '.claude', 'orchestrator', 'checkpoints')).length > 0;
   if (legacy) lines.push(`Legacy files present in ${main}/.claude (read legacy.md in the orchestrator:learn skill folder).`);
 
-  if (typeof input?.transcript_path === 'string' && input.transcript_path !== '' && !/["\r\n]/.test(input.transcript_path)) {
-    const pluginRoot = fwd(dirname(dirname(fileURLToPath(import.meta.url))));
-    lines.push(`Digest: node "${pluginRoot}/scripts/digest.mjs" "${fwd(input.transcript_path)}" --last 60`);
-  }
+  // IC-208: the Digest line is a bash command; omit it when a path could expand ($, backtick) or break the quoting
+  const tp = typeof input?.transcript_path === 'string' ? fwd(input.transcript_path) : '';
+  const pluginRoot = fwd(dirname(dirname(fileURLToPath(import.meta.url))));
+  const unsafe = /["\r\n$`\\]/;
+  if (tp !== '' && !unsafe.test(tp) && !unsafe.test(pluginRoot)) lines.push(`Digest: node "${pluginRoot}/scripts/digest.mjs" "${tp}" --last 60`);
 
   return lines.join('\n');
 }
