@@ -7,9 +7,10 @@ import { cachedStoreFor, makeDbg, posInt, readStdin } from './lib.mjs';
 
 const dbg = makeDbg('trim-output');
 
-// Stats mode: `node trim-output.mjs --stats <store>` prints one TRIM line for the newest session file.
+// Stats mode: `node trim-output.mjs --stats <store> [<session-id>]` prints one TRIM line for that session's file;
+// without a session id it uses the newest trim-stats-*.jsonl and says so ("newest session").
 if (process.argv[2] === '--stats') {
-  try { process.stdout.write(statsLine(process.argv[3]) + '\n'); } catch (e) { dbg(e); process.stdout.write('TRIM: none\n'); }
+  try { process.stdout.write(statsLine(process.argv[3], process.argv[4]) + '\n'); } catch (e) { dbg(e); process.stdout.write('TRIM: none\n'); }
 } else readStdin((raw) => {
   try {
     if (raw.length < 3000) return;
@@ -121,14 +122,24 @@ function prune(store, current) {
   }
 }
 
-function statsLine(store) {
+function statsLine(store, sessionArg) {
   if (typeof store !== 'string' || store === '') return NO_STATS;
-  const files = readdirSync(store).filter((f) => /^trim-stats-.*\.jsonl$/.test(f))
-    .map((f) => ({ f, t: statSync(join(store, f)).mtimeMs })).sort((a, b) => b.t - a.t);
-  if (!files.length) return NO_STATS;
+  let file, suffix = '';
+  if (typeof sessionArg === 'string' && sessionArg !== '') {
+    // IC-135: same sanitizing as record(); only this session's file is read
+    const sid = sessionArg.replace(/[^A-Za-z0-9_-]/g, '').slice(0, 64);
+    file = join(store, `trim-stats-${sid}.jsonl`);
+    if (!existsSync(file)) return NO_STATS;
+  } else {
+    const files = readdirSync(store).filter((f) => /^trim-stats-.*\.jsonl$/.test(f))
+      .map((f) => ({ f, t: statSync(join(store, f)).mtimeMs })).sort((a, b) => b.t - a.t);
+    if (!files.length) return NO_STATS;
+    file = join(store, files[0].f);
+    suffix = ' (newest session)';
+  }
   let n = 0, saved = 0;
-  for (const l of readFileSync(join(store, files[0].f), 'utf8').split('\n')) {
+  for (const l of readFileSync(file, 'utf8').split('\n')) {
     try { const r = JSON.parse(l); n++; saved += Number(r.saved) || 0; } catch { /* skip */ }
   }
-  return n ? `TRIM: ${n} trims, ${saved} bytes saved` : NO_STATS;
+  return n ? `TRIM: ${n} trims, ${saved} bytes saved${suffix}` : NO_STATS;
 }

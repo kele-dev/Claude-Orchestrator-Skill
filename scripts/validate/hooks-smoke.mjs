@@ -52,7 +52,18 @@ const { root, err, exists, readText, runHook, rmQuiet, trimPayload, sessionInfo,
       const recs = fs.existsSync(statsFile) ? fs.readFileSync(statsFile, 'utf8').split('\n').filter(Boolean) : [];
       if (recs.length !== 1 || !(JSON.parse(recs[0]).saved > 0)) err('hooks/trim-output.mjs', 'smoke "trim stats record": expected one record with saved > 0');
       const st = spawnSync(process.execPath, [path.join(root, 'hooks', 'trim-output.mjs'), '--stats', store], { encoding: 'utf8', cwd: root, env: { ...process.env, ...homeEnv } });
-      if (!/^TRIM: 1 trims, [1-9]\d* bytes saved$/.test(st.stdout.trim())) err('hooks/trim-output.mjs', `smoke "trim stats --stats": unexpected output "${st.stdout.trim()}"`);
+      if (!/^TRIM: 1 trims, [1-9]\d* bytes saved \(newest session\)$/.test(st.stdout.trim())) err('hooks/trim-output.mjs', `smoke "trim stats --stats": unexpected output "${st.stdout.trim()}"`);
+      // IC-135: a session id selects its own file; no id keeps the newest file; unknown id -> none
+      const otherFile = path.join(store, 'trim-stats-other.jsonl');
+      fs.writeFileSync(otherFile, '{"ts":1,"before":10,"after":2,"saved":50}\n{"ts":1,"before":10,"after":2,"saved":50}\n');
+      const future = new Date(Date.now() + 3600e3);
+      fs.utimesSync(otherFile, future, future);
+      const bySid = spawnSync(process.execPath, [path.join(root, 'hooks', 'trim-output.mjs'), '--stats', store, 'smoke1'], { encoding: 'utf8', cwd: root, env: { ...process.env, ...homeEnv } });
+      if (!/^TRIM: 1 trims, [1-9]\d* bytes saved$/.test(bySid.stdout.trim())) err('hooks/trim-output.mjs', `smoke "trim stats session id": unexpected output "${bySid.stdout.trim()}"`);
+      const newest = spawnSync(process.execPath, [path.join(root, 'hooks', 'trim-output.mjs'), '--stats', store], { encoding: 'utf8', cwd: root, env: { ...process.env, ...homeEnv } });
+      if (newest.stdout.trim() !== 'TRIM: 2 trims, 100 bytes saved (newest session)') err('hooks/trim-output.mjs', `smoke "trim stats newest": unexpected output "${newest.stdout.trim()}"`);
+      const nosuch = spawnSync(process.execPath, [path.join(root, 'hooks', 'trim-output.mjs'), '--stats', store, 'nosuch'], { encoding: 'utf8', cwd: root, env: { ...process.env, ...homeEnv } });
+      if (nosuch.stdout.trim() !== 'TRIM: none') err('hooks/trim-output.mjs', `smoke "trim stats unknown session": unexpected output "${nosuch.stdout.trim()}"`);
     } finally {
       fs.rmSync(home, { recursive: true, force: true });
       fs.rmSync(tcwd, { recursive: true, force: true });
