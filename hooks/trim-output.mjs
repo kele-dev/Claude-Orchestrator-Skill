@@ -147,14 +147,19 @@ function statsLine(store, sessionArg) {
   } else {
     if (!existsSync(store)) return NO_STATS;
     const files = readdirSync(store).filter((f) => /^trim-stats-.*\.jsonl$/.test(f))
-      .map((f) => ({ f, t: statSync(join(store, f)).mtimeMs })).sort((a, b) => b.t - a.t);
+      .flatMap((f) => {
+        // a file pruned or removed mid-scan is dropped instead of making the whole line unavailable
+        try { return [{ f, t: statSync(join(store, f)).mtimeMs }]; } catch (e) { if (e?.code === 'ENOENT') return []; throw e; }
+      }).sort((a, b) => b.t - a.t);
     if (!files.length) return NO_STATS;
     file = join(store, files[0].f);
     suffix = ' (newest session)';
   }
-  let n = 0, saved = 0;
+  let n = 0, saved = 0, bad = 0;
   for (const l of readFileSync(file, 'utf8').split('\n')) {
-    try { const r = JSON.parse(l); n += Number(r.n) || 1; saved += Number(r.saved) || 0; } catch { /* skip */ }
+    if (l.trim() === '') continue;
+    try { const r = JSON.parse(l); n += Number(r.n) || 1; saved += Number(r.saved) || 0; } catch { bad++; }
   }
+  if (!n && bad) return 'TRIM: unavailable (unreadable stats file)';
   return n ? `TRIM: ${n} trims, ${saved} bytes saved${suffix}` : NO_STATS;
 }

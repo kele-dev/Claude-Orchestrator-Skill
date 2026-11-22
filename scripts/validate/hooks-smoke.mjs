@@ -71,6 +71,15 @@ const { root, err, exists, readText, runHook, rmQuiet, trimPayload, sessionInfo,
       if (noStore.stdout.trim() !== 'TRIM: unavailable (no store given)') err('hooks/trim-output.mjs', `smoke "trim stats no store": unexpected output "${noStore.stdout.trim()}"`);
       const noDir = spawnSync(process.execPath, [path.join(root, 'hooks', 'trim-output.mjs'), '--stats', path.join(home, 'nosuch-store')], { encoding: 'utf8', cwd: root, env: { ...process.env, ...homeEnv } });
       if (noDir.stdout.trim() !== 'TRIM: none') err('hooks/trim-output.mjs', `smoke "trim stats missing store": unexpected output "${noDir.stdout.trim()}"`);
+      // IC-174: a stats file with content but no parsable line is unavailable, not none
+      const badStore = fs.mkdtempSync(path.join(os.tmpdir(), 'orch-trimstat-bad-'));
+      try {
+        fs.writeFileSync(path.join(badStore, 'trim-stats-bad.jsonl'), 'not json\n');
+        const badOut = spawnSync(process.execPath, [path.join(root, 'hooks', 'trim-output.mjs'), '--stats', badStore, 'bad'], { encoding: 'utf8', cwd: root, env: { ...process.env, ...homeEnv } });
+        if (badOut.stdout.trim() !== 'TRIM: unavailable (unreadable stats file)') err('hooks/trim-output.mjs', `smoke "trim stats unreadable file": unexpected output "${badOut.stdout.trim()}"`);
+      } finally {
+        fs.rmSync(badStore, { recursive: true, force: true });
+      }
       // IC-159: a session file over 64 KB is compacted to one summary line (1200 trims) before the new record is appended
       const bigFile = path.join(store, 'trim-stats-big.jsonl');
       fs.writeFileSync(bigFile, Array.from({ length: 1200 }, () => JSON.stringify({ ts: 1, before: 10, after: 2, saved: 10, pad: 'x'.repeat(20) })).join('\n') + '\n');
