@@ -372,6 +372,13 @@ const { root, err, exists, readText, runHook, rmQuiet, trimPayload, sessionInfo,
       if (denies(rd(big, { session_id: sid2 }, {}, { limit: 50 }))) err('hooks/guard-read.mjs', 'smoke "read with limit": expected allow');
       if (denies(rd(big, { session_id: sid2 }, { ORCH_READ_GUARD: 'off' }))) err('hooks/guard-read.mjs', 'smoke "read ORCH_READ_GUARD=off": expected allow');
       if (!denies(rd(big, { session_id: sid2 }))) err('hooks/guard-read.mjs', 'smoke "read big other session": expected deny');
+      // IC-141: line counting applies to every file over 2000 bytes, so a small many-line file (5 KB, 2500 lines) is denied and 1500 lines pass
+      const manyLines = path.join(rdir, 'many.txt');
+      const fewLines = path.join(rdir, 'few.txt');
+      fs.writeFileSync(manyLines, 'x\n'.repeat(2500));
+      fs.writeFileSync(fewLines, 'x\n'.repeat(1500));
+      if (!denies(rd(manyLines, { session_id: sid + '-ml' }))) err('hooks/guard-read.mjs', 'smoke "read 2500 short lines": expected deny');
+      if (denies(rd(fewLines, { session_id: sid + '-ml' }))) err('hooks/guard-read.mjs', 'smoke "read 1500 short lines": expected allow');
       // /orchestrator:off in the transcript turns the read guard off; the same transcript ending with on still denies
       const cmdLine = (name) => JSON.stringify({ type: 'user', message: { content: `<command-message>orchestrator:${name}</command-message>\n<command-name>/orchestrator:${name}</command-name>` } });
       const tOff = path.join(rdir, 't-off.jsonl');

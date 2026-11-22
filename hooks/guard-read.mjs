@@ -28,7 +28,7 @@ readStdin((raw) => {
 
     const st = statSync(file);
     if (!st.isFile()) return;
-    const lines = st.size > 20000 && st.size <= MAX_BYTES ? countLines(file, st.size) : null;
+    const lines = st.size > MAX_LINES && st.size <= MAX_BYTES ? countLines(file, st.size) : null;
     const big = st.size > MAX_BYTES || (lines !== null && lines > MAX_LINES);
     if (!big) return;
     const dir = stateDir();
