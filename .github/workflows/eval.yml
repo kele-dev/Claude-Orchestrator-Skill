@@ -7,6 +7,10 @@ on:
         description: "case name glob"
         type: string
         default: "*"
+      changed_since:
+        description: "git ref: run only the cases scripts/eval-select.mjs picks for changes since this ref (empty: use case)"
+        type: string
+        default: ""
       runs:
         description: "runs per case"
         type: string
@@ -33,10 +37,53 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
+
+      - name: Select cases
+        id: select
+        env:
+          BASE: ${{ inputs.changed_since }}
+          CASE_IN: ${{ inputs.case || '*' }}
+        run: |
+          out="$GITHUB_OUTPUT"
+          if [ -z "$BASE" ]; then
+            echo "case=$CASE_IN" >> "$out"
+            echo "skip=false" >> "$out"
+            echo "partial=false" >> "$out"
+            exit 0
+          fi
+          if ! names=$(node scripts/eval-select.mjs --base "$BASE"); then
+            echo "::error::could not select eval cases for git ref $BASE"
+            exit 1
+          fi
+          list=$(printf '%s\n' "$names" | sed '/^$/d')
+          count=$(printf '%s\n' "$list" | sed '/^$/d' | wc -l | tr -d ' ')
+          total=$(node -e 'console.log(Object.keys(require("./evals/touches.json")).length)')
+          selected=$(printf '%s\n' "$list" | sed '/^$/d' | paste -sd, -)
+          echo "selected=$selected" >> "$out"
+          if [ "$count" -eq 0 ]; then
+            echo "::notice::no eval case is affected since $BASE; eval skipped"
+            echo "case=$CASE_IN" >> "$out"
+            echo "skip=true" >> "$out"
+            echo "partial=false" >> "$out"
+          elif [ "$count" -eq "$total" ]; then
+            echo "case=*" >> "$out"
+            echo "skip=false" >> "$out"
+            echo "partial=false" >> "$out"
+          elif [ "$count" -eq 1 ]; then
+            echo "case=$selected" >> "$out"
+            echo "skip=false" >> "$out"
+            echo "partial=true" >> "$out"
+          else
+            echo "case={$selected}" >> "$out"
+            echo "skip=false" >> "$out"
+            echo "partial=true" >> "$out"
+          fi
 
       - name: Install sandbox backend
         run: |
@@ -58,9 +105,10 @@ jobs:
 
       - name: Run eval
         id: eval
+        if: steps.select.outputs.skip != 'true'
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          CASE: ${{ inputs.case || '*' }}
+          CASE: ${{ steps.select.outputs.case }}
           RUNS: ${{ inputs.runs || '1' }}
           MODEL: ${{ inputs.model || 'claude-opus-5-5' }}
           MAX_COST: ${{ inputs.max_cost_usd || '3' }}
@@ -75,14 +123,35 @@ jobs:
             exit 1
           fi
 
+      - name: Check selected cases ran
+        if: success() && steps.select.outputs.partial == 'true'
+        env:
+          SELECTED: ${{ steps.select.outputs.selected }}
+        run: |
+          node -e '
+            const want = process.env.SELECTED.split(",").filter(Boolean).sort();
+            const got = (require("./evals/ci-result.json").cases || []).map(c => c.name).sort();
+            if (JSON.stringify(want) !== JSON.stringify(got)) {
+              console.log("::error::the --case glob did not run exactly the selected cases (want " + want.join(",") + ", got " + got.join(",") + ")");
+              process.exit(1);
+            }
+          '
+
       - name: Warn when baseline is missing
-        if: success() && hashFiles('evals/baseline.json') == ''
+        if: success() && hashFiles('evals/baseline.json') == '' && steps.select.outputs.skip != 'true'
         run: |
           echo "::warning::evals/baseline.json is missing, so the token-regression gate is SKIPPED. To create it: download ci-result.json and its trace files from a CI eval run, run 'node scripts/eval-compare.mjs ci-result.json --write evals/baseline.json', and commit evals/baseline.json (see evals/README.md)."
 
       - name: Compare tokens with baseline
-        if: success() && hashFiles('evals/baseline.json') != ''
-        run: node scripts/eval-compare.mjs evals/ci-result.json evals/baseline.json --threshold 15 --strict
+        if: success() && hashFiles('evals/baseline.json') != '' && steps.select.outputs.skip != 'true'
+        env:
+          PARTIAL: ${{ steps.select.outputs.partial }}
+        run: |
+          if [ "$PARTIAL" = "true" ]; then
+            node scripts/eval-compare.mjs evals/ci-result.json evals/baseline.json --threshold 15
+          else
+            node scripts/eval-compare.mjs evals/ci-result.json evals/baseline.json --threshold 15 --strict
+          fi
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
