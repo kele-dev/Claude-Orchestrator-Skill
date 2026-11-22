@@ -115,17 +115,26 @@ function contextGrowth(path, size, cachePath) {
   }
 }
 
+// Cold start (no valid cache) over a transcript larger than this counts only its last COLD_SCAN_BYTES; the partial first line fails JSON.parse and is skipped.
+const COLD_SCAN_BYTES = 4 * 1024 * 1024;
+
 // Counts Agent/Task delegations in new complete lines since the cached offset; returns the total count.
+// Without a valid cache, a transcript over COLD_SCAN_BYTES is counted from its last COLD_SCAN_BYTES only (the cache write below keeps later prompts incremental).
 // Fails open: on any error returns the cached count.
 function countDelegations(path, size, cachePath) {
   let cache = { offset: 0, count: 0 };
+  let hasCache = false;
   try {
     const c = JSON.parse(readFileSync(cachePath, 'utf8'));
-    if (Number.isInteger(c?.offset) && Number.isInteger(c?.count) && c.offset >= 0 && c.count >= 0 && c.offset <= size) cache = c;
+    if (Number.isInteger(c?.offset) && Number.isInteger(c?.count) && c.offset >= 0 && c.count >= 0 && c.offset <= size) {
+      cache = c;
+      hasCache = true;
+    }
   } catch (e) {
     dbg(e);
     // missing or invalid cache: start from zero
   }
+  if (!hasCache && size > COLD_SCAN_BYTES) cache = { offset: size - COLD_SCAN_BYTES, count: 0 };
   let next;
   try {
     const fd = openSync(path, 'r');

@@ -587,6 +587,22 @@ const { root, err, exists, readText, runHook, rmQuiet, trimPayload, sessionInfo,
     fs.writeFileSync(longPath, usage(1000) + '\n' + 'y'.repeat(2.5 * 1024 * 1024) + '\n' + usage(131000) + '\n');
     const rl = runHook('long-session.mjs', { hook_event_name: 'UserPromptSubmit', session_id: sid, transcript_path: longPath, cwd: root }, { ORCH_LONG: '', ORCH_LONG_DELEGATIONS: '', ORCH_LONG_BYTES: '999999999', ORCH_LONG_TOKENS: '', ORCH_LONG_REPEAT: '' });
     if (rl && (!rl.stdout.includes('systemMessage') || !rl.stdout.includes('+130k'))) err('hooks/long-session.mjs', 'smoke "long large head/tail": expected systemMessage with "+130k" in stdout');
+
+    // long-session cold start: no cache over 4 MB counts only the tail; 40 head delegations are skipped, 3 tail delegations count
+    const coldDir = fs.mkdtempSync(path.join(os.tmpdir(), 'orch-cold-state-'));
+    const coldPath = path.join(tmp, 'cold-deleg.jsonl');
+    const deleg = JSON.stringify({ type: 'assistant', message: { content: [{ type: 'tool_use', name: 'Agent', input: { subagent_type: 'haiku-coder' } }] } });
+    try {
+      fs.writeFileSync(coldPath, Array(40).fill(deleg).join('\n') + '\n' + 'z'.repeat(4.5 * 1024 * 1024) + '\n' + Array(3).fill(deleg).join('\n') + '\n');
+      const coldEnv = { ORCH_STATE_DIR: coldDir, ORCH_LONG: '', ORCH_LONG_BYTES: '999999999', ORCH_LONG_TOKENS: '', ORCH_LONG_REPEAT: '' };
+      const coldInput = { hook_event_name: 'UserPromptSubmit', session_id: `${sid}-cold`, transcript_path: coldPath, cwd: root };
+      const rc = runHook('long-session.mjs', coldInput, { ...coldEnv, ORCH_LONG_DELEGATIONS: '4' });
+      if (rc && rc.stdout.trim() !== '') err('hooks/long-session.mjs', 'smoke "long cold tail": expected only the tail to count (3 < 4), so no warning');
+      const rc2 = runHook('long-session.mjs', coldInput, { ...coldEnv, ORCH_LONG_DELEGATIONS: '3' });
+      if (rc2 && !rc2.stdout.includes('systemMessage')) err('hooks/long-session.mjs', 'smoke "long cold tail cached": expected systemMessage at 3 tail delegations');
+    } finally {
+      rmQuiet(coldDir, { recursive: true });
+    }
   } finally {
     rmQuiet(tmp, { recursive: true });
     rmQuiet(path.join(os.tmpdir(), `orchestrator-long-${sid}`));
