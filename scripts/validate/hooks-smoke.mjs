@@ -80,6 +80,15 @@ const { root, err, exists, readText, runHook, rmQuiet, trimPayload, sessionInfo,
       } finally {
         fs.rmSync(badStore, { recursive: true, force: true });
       }
+      // IC-180: a stats path that cannot be read as a file (a directory) takes the error path of --stats
+      const isdirStore = fs.mkdtempSync(path.join(os.tmpdir(), 'orch-trimstat-isdir-'));
+      try {
+        fs.mkdirSync(path.join(isdirStore, 'trim-stats-isdir.jsonl'));
+        const isdirOut = spawnSync(process.execPath, [path.join(root, 'hooks', 'trim-output.mjs'), '--stats', isdirStore, 'isdir'], { encoding: 'utf8', cwd: root, env: { ...process.env, ...homeEnv } });
+        if (!isdirOut.stdout.startsWith('TRIM: unavailable (error:')) err('hooks/trim-output.mjs', `smoke "trim stats error path": unexpected output "${isdirOut.stdout.trim()}"`);
+      } finally {
+        fs.rmSync(isdirStore, { recursive: true, force: true });
+      }
       // IC-159: a session file over 64 KB is compacted to one summary line (1200 trims) before the new record is appended
       const bigFile = path.join(store, 'trim-stats-big.jsonl');
       fs.writeFileSync(bigFile, Array.from({ length: 1200 }, () => JSON.stringify({ ts: 1, before: 10, after: 2, saved: 10, pad: 'x'.repeat(20) })).join('\n') + '\n');
