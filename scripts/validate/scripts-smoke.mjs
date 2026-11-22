@@ -568,6 +568,10 @@ const { root, err, exists, readText, runHook, rmQuiet } = ctx;
   }
   const none = sel([]);
   if (none.status !== 2) err('scripts/eval-select.mjs', `smoke "select no args": expected exit 2, got ${none.status}`);
+  for (const args of [['--base', '--output=x'], ['--base', 'HEAD;rm']]) {
+    const r = sel(args);
+    if (r.status !== 2) err('scripts/eval-select.mjs', `smoke "select ${args.join(' ')}": expected exit 2, got ${r.status}`);
+  }
 }
 
 // 8i. Smoke tests: scripts/otel-export.mjs writes GenAI spans without message content (temp dir only)
