@@ -3,7 +3,7 @@
 // Fails open: on any error or unexpected input it prints nothing and exits 0.
 import { appendFileSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, statSync, unlinkSync } from 'node:fs';
 import { join } from 'node:path';
-import { cachedStoreFor, makeDbg, posInt, readStdin } from './lib.mjs';
+import { cachedStoreFor, makeDbg, posInt, readStdin, sanitizeSid } from './lib.mjs';
 
 const dbg = makeDbg('trim-output');
 
@@ -90,7 +90,7 @@ const NO_STATS = 'TRIM: none';
 // Appends one tiny {ts, before, after, saved} record to <store>/trim-stats-<session>.jsonl; never throws.
 function record(input, before, after) {
   try {
-    const sid = String(input?.session_id ?? '').replace(/[^A-Za-z0-9_-]/g, '').slice(0, 64);
+    const sid = sanitizeSid(input?.session_id);
     const cwd = typeof input?.cwd === 'string' && input.cwd !== '' ? input.cwd : process.cwd();
     if (sid === '') return;
     const store = cachedStoreFor(cwd, input?.session_id);
@@ -127,7 +127,7 @@ function statsLine(store, sessionArg) {
   let file, suffix = '';
   if (typeof sessionArg === 'string' && sessionArg !== '') {
     // IC-135: same sanitizing as record(); only this session's file is read
-    const sid = sessionArg.replace(/[^A-Za-z0-9_-]/g, '').slice(0, 64);
+    const sid = sanitizeSid(sessionArg);
     file = join(store, `trim-stats-${sid}.jsonl`);
     if (!existsSync(file)) return NO_STATS;
   } else {

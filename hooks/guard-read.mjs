@@ -5,7 +5,7 @@
 import { createHash } from 'node:crypto';
 import { closeSync, lstatSync, openSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { makeDbg, orchestrationOff, readBytes, readStdin, stateDir } from './lib.mjs';
+import { makeDbg, orchestrationOff, readBytes, readStdin, sanitizeSid, stateDir } from './lib.mjs';
 
 const dbg = makeDbg('guard-read');
 const MAX_BYTES = 100 * 1024;
@@ -23,7 +23,7 @@ readStdin((raw) => {
     if (ti.limit !== undefined && ti.limit !== null) return;
     if (ti.pages !== undefined && ti.pages !== null && ti.pages !== '') return;
     if (/\.(pdf|png|jpe?g|gif|webp|bmp|svg|ipynb)$/i.test(file)) return;
-    const sid = String(input.session_id ?? '').replace(/[^A-Za-z0-9_-]/g, '').slice(0, 80);
+    const sid = sanitizeSid(input.session_id);
     if (sid === '') return;
 
     const st = statSync(file);

@@ -5,7 +5,7 @@
 import fs from 'fs';
 import { execFileSync } from 'child_process';
 import path from 'path';
-import { makeDbg, orchestrationOff, readStdin, stateDir, writeAtomic } from './lib.mjs';
+import { makeDbg, orchestrationOff, readStdin, sanitizeSid, stateDir, writeAtomic } from './lib.mjs';
 
 const dbg = makeDbg('guard-edit');
 
@@ -37,7 +37,7 @@ const DENY_STREAK = 3;
 
 // Per-session counter file in the private state dir; empty session id or no usable state dir means no counter.
 function denyFile(input) {
-  const sid = String(input.session_id ?? '').replace(/[^A-Za-z0-9_-]/g, '').slice(0, 80);
+  const sid = sanitizeSid(input.session_id);
   const dir = sid === '' ? null : stateDir();
   return dir === null ? null : path.join(dir, `orchestrator-deny-${sid}`);
 }

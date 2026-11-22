@@ -236,8 +236,13 @@ export function storeInfo(cwd) {
 export const storeFor = (cwd) => storeInfo(cwd).store;
 
 // Per-session cache file for the store path (in the state dir); null when there is no session id or no usable state dir.
+// Session ids reduced to [A-Za-z0-9_-] and capped at max chars (file-name safe).
+export function sanitizeSid(id, max = 80) {
+  return String(id ?? '').replace(/[^A-Za-z0-9_-]/g, '').slice(0, max);
+}
+
 export function storeCacheFile(sessionId) {
-  const sid = String(sessionId ?? '').replace(/[^A-Za-z0-9_-]/g, '').slice(0, 80);
+  const sid = sanitizeSid(sessionId);
   const dir = sid === '' ? null : stateDir();
   return dir === null ? null : join(dir, `orchestrator-store-${sid}.json`);
 }
