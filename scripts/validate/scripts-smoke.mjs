@@ -636,6 +636,13 @@ const { root, err, exists, readText, runHook, rmQuiet } = ctx;
       const r109b = spawnSync(process.execPath, [exportPath, t109b], { encoding: 'utf8', cwd: root });
       if (r109b.status !== 0) fails(`IC-109 no-timestamp exit ${r109b.status}, expected 0`);
       else if (JSON.parse(r109b.stdout).resourceSpans[0].scopeSpans[0].spans.some((s) => BigInt(s.startTimeUnixNano) < y2020)) fails('IC-109 no-timestamp transcript starts before 2020');
+      // IC-110: a failing --out write exits 3 with a one-line message and no stack trace
+      const w110 = spawnSync(process.execPath, [exportPath, transcript, '--out', tmp], { encoding: 'utf8', cwd: root });
+      if (w110.status !== 3) fails(`IC-110 expected exit 3, got ${w110.status}`);
+      if (!/cannot write output/.test(w110.stderr)) fails('IC-110 message missing');
+      if (/\n\s+at /.test(w110.stderr)) fails('IC-110 stack trace printed');
+      const ok110 = spawnSync(process.execPath, [exportPath, transcript, '--out', path.join(tmp, 'out.json')], { encoding: 'utf8', cwd: root });
+      if (ok110.status !== 0) fails(`IC-110 normal --out exit ${ok110.status}, expected 0`);
     }
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });

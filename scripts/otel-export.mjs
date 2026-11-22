@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Export a Claude Code session transcript (JSONL) as OTLP/JSON spans, using OpenTelemetry GenAI semantic conventions.
 // Usage: node scripts/otel-export.mjs <transcript.jsonl> [--out <file>]   (default: stdout)
-// Exit: 0 ok, 2 unreadable transcript or invalid arguments.
+// Exit: 0 ok, 2 unreadable transcript or invalid arguments, 3 output write failed.
 // Content capture is off: no prompts, message text, tool outputs or tool inputs are written (only Agent/Task subagent_type).
 // Schema pinned to 1.37.0 because the GenAI conventions are at Development stability.
 // Trace and span IDs are deterministic: sha256 of the absolute transcript path (trace), and of path + span index (span).
@@ -13,9 +13,9 @@ import { readTranscript, entries } from './transcript.mjs';
 
 const SCHEMA_URL = 'https://opentelemetry.io/schemas/1.37.0';
 
-function fail(msg) {
+function fail(msg, code = 2) {
   process.stderr.write(msg + '\n');
-  process.exit(2);
+  process.exit(code);
 }
 
 const args = process.argv.slice(2);
@@ -137,5 +137,6 @@ const doc = {
 };
 
 const text = JSON.stringify(doc, null, 2) + '\n';
-if (out) writeFileSync(out, text);
-else process.stdout.write(text);
+if (out) {
+  try { writeFileSync(out, text); } catch { fail(`cannot write output: ${out}`, 3); }
+} else process.stdout.write(text);
