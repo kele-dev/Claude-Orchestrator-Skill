@@ -188,6 +188,33 @@ for (const s of ['off', 'team', 'autopilot', 'status', 'help']) {
   const fm = frontmatter(f);
   if (fm && fm['disable-model-invocation'] !== 'true') err(f, 'frontmatter must set disable-model-invocation: true');
 }
+// 7e. skills/help/SKILL.md lists every skill as /orchestrator:<name> and every learn subcommand (argument-hint of skills/learn/SKILL.md)
+const learnSubs = (hint) => hint.trim().replace(/^["']|["']$/g, '').replace(/^\[|\]$/g, '').split('|').map((p) => p.trim().split(/\s+/)[0]).filter(Boolean);
+const helpGaps = (helpText, skillNames, learnHint) => {
+  const gaps = [];
+  for (const name of skillNames) {
+    const escaped = name.replace(/[.*+?^${}()|[\]\\-]/g, '\\$&');
+    if (!new RegExp(`/orchestrator:${escaped}(?![a-z0-9-])`).test(helpText)) gaps.push(`/orchestrator:${name}`);
+  }
+  const learnLine = helpText.split(/\r?\n/).find((l) => l.includes('/orchestrator:learn')) ?? '';
+  for (const sub of learnSubs(learnHint)) {
+    if (!new RegExp(`\\b${sub}\\b`).test(learnLine)) gaps.push(`learn ${sub}`);
+  }
+  return gaps;
+};
+const helpFile = 'skills/help/SKILL.md';
+if (exists(path.join(root, helpFile))) {
+  const helpSkillNames = skillDirs.filter((d) => exists(path.join(root, `skills/${d}/SKILL.md`)));
+  const learnHint = frontmatter('skills/learn/SKILL.md')?.['argument-hint'] ?? '';
+  if (learnSubs(learnHint).length === 0) err('skills/learn/SKILL.md', 'argument-hint lists no learn subcommands');
+  for (const gap of helpGaps(readText(path.join(root, helpFile)), helpSkillNames, learnHint)) err(helpFile, `help misses ${gap}`);
+  // in-memory smoke of helpGaps: a removed status command and a removed learn prune are each reported exactly
+  const helpSrc = readText(path.join(root, helpFile));
+  const noStatus = helpGaps(helpSrc.replace(/\/orchestrator:status/g, ''), helpSkillNames, learnHint);
+  if (JSON.stringify(noStatus) !== JSON.stringify(['/orchestrator:status'])) err('scripts/validate.mjs', `smoke "help gaps status": expected ["/orchestrator:status"], got ${JSON.stringify(noStatus)}`);
+  const noPrune = helpGaps(helpSrc.split(/\r?\n/).map((l) => (l.includes('/orchestrator:learn') ? l.replace('| prune', '') : l)).join('\n'), helpSkillNames, learnHint);
+  if (JSON.stringify(noPrune) !== JSON.stringify(['learn prune'])) err('scripts/validate.mjs', `smoke "help gaps prune": expected ["learn prune"], got ${JSON.stringify(noPrune)}`);
+}
 // Exact version token: "Baru di 1.13.0" must not match "Baru di 1.13.01" or "Baru di 1.13.0-rc" (a trailing sentence period is fine).
 const readmeHasVersion = (text, v) => new RegExp(`Baru di ${v.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![0-9A-Za-z+-]|\\.[0-9A-Za-z])`).test(text);
 if (exists(path.join(root, 'README.md')) && plugin && !readmeHasVersion(readText(path.join(root, 'README.md')), String(plugin.version))) {
