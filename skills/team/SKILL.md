@@ -25,6 +25,7 @@ Team mode is `orchestrator:on` with parallel execution (the main session never e
 
 ## 1. PLAN (main session)
 - Read only the files you need.
+- If the PRD has a task table (Task, Files columns), run `node "${CLAUDE_PLUGIN_ROOT}/scripts/plan-dag.mjs" <prd> --lanes 3` and use its waves as the lane plan (exit 2 or no table: derive lanes by hand as below).
 - Split the work into lanes. Each lane has: id, goal, owned files, PRD excerpt, acceptance test, verification command.
 - Owned files are exclusive: no file appears in two lanes.
 - Lanes in one wave must be independent: no lane needs another lane's output. Dependent work goes into a later wave. Waves run one after another; lanes inside a wave run in parallel.
