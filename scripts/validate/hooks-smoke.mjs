@@ -3,6 +3,7 @@ import crypto from 'crypto';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
+import { pathToFileURL } from 'url';
 import { spawnSync } from 'child_process';
 
 // Independent copy of the path store-key rule in hooks/lib.mjs (storeInfo); the test keeps its own oracle on purpose.
@@ -55,6 +56,7 @@ const { root, err, exists, readText, runHook, rmQuiet, trimPayload, sessionInfo,
       if (!/^TRIM: 1 trims, [1-9]\d* bytes saved \(newest session\)$/.test(st.stdout.trim())) err('hooks/trim-output.mjs', `smoke "trim stats --stats": unexpected output "${st.stdout.trim()}"`);
       // IC-135: a session id selects its own file; no id keeps the newest file; unknown id -> none
       const otherFile = path.join(store, 'trim-stats-other.jsonl');
+      fs.mkdirSync(store, { recursive: true });
       fs.writeFileSync(otherFile, '{"ts":1,"before":10,"after":2,"saved":50}\n{"ts":1,"before":10,"after":2,"saved":50}\n');
       const future = new Date(Date.now() + 3600e3);
       fs.utimesSync(otherFile, future, future);
@@ -649,6 +651,51 @@ if (spawnSync('git', ['--version']).status === 0) {
   } finally {
     for (const d of dirs) rmQuiet(d, { recursive: true });
     rmQuiet(shome, { recursive: true });
+  }
+}
+
+// IC-139: store-path cache (cachedStoreFor, storeCacheFile)
+{
+  const sdir = fs.mkdtempSync(path.join(os.tmpdir(), 'orch-sc-state-'));
+  const cwdA = fs.mkdtempSync(path.join(os.tmpdir(), 'orch-sc-a-'));
+  const cwdB = fs.mkdtempSync(path.join(os.tmpdir(), 'orch-sc-b-'));
+  try {
+    // hooks/lib.mjs is ESM with no top-level await here: each call runs in a child with ORCH_STATE_DIR set to the temp dir
+    const libUrl = pathToFileURL(path.join(root, 'hooks', 'lib.mjs')).href;
+    const lib = (expr) => {
+      const r = spawnSync(process.execPath, ['--input-type=module', '-e', `import * as l from ${JSON.stringify(libUrl)}; console.log(JSON.stringify(${expr}));`], { encoding: 'utf8', env: { ...process.env, ORCH_STATE_DIR: sdir } });
+      if (r.status !== 0) return 'CHILD_FAILED';
+      return JSON.parse(r.stdout);
+    };
+    const want = (cwd) => lib(`l.storeFor(${JSON.stringify(cwd)})`);
+    const cached = (cwd, sid) => lib(`l.cachedStoreFor(${JSON.stringify(cwd)}, ${JSON.stringify(sid)})`);
+    const cacheFile = path.join(sdir, 'orchestrator-store-smoke-cache.json');
+    const readCache = () => JSON.parse(fs.readFileSync(cacheFile, 'utf8'));
+
+    // 1. empty or missing session id: no cache file, plain storeFor
+    if (lib('l.storeCacheFile("")') !== null || lib('l.storeCacheFile(undefined)') !== null) {
+      err('hooks/lib.mjs', 'smoke "store cache empty id": expected storeCacheFile to return null for "" and undefined');
+    }
+    if (cached(cwdA, '') !== want(cwdA)) err('hooks/lib.mjs', 'smoke "store cache empty id": expected cachedStoreFor(cwd, "") to equal storeFor(cwd)');
+    if (fs.readdirSync(sdir).some((f) => f.startsWith('orchestrator-store-'))) err('hooks/lib.mjs', 'smoke "store cache empty id": expected no orchestrator-store-*.json file');
+
+    // 2. miss then hit
+    if (cached(cwdA, 'smoke-cache') !== want(cwdA)) err('hooks/lib.mjs', 'smoke "store cache miss": expected cachedStoreFor to equal storeFor(cwd)');
+    if (!fs.existsSync(cacheFile) || readCache().cwd !== cwdA) err('hooks/lib.mjs', 'smoke "store cache miss": expected cache file with cwd of the first call');
+    fs.writeFileSync(cacheFile, JSON.stringify({ cwd: cwdA, store: 'SENTINEL' }));
+    if (cached(cwdA, 'smoke-cache') !== 'SENTINEL') err('hooks/lib.mjs', 'smoke "store cache hit": expected the cached store for the same cwd');
+
+    // 3. other cwd ignores the cache and rewrites it
+    if (cached(cwdB, 'smoke-cache') !== want(cwdB)) err('hooks/lib.mjs', 'smoke "store cache other cwd": expected storeFor(other cwd), not the cached store');
+    if (!fs.existsSync(cacheFile) || readCache().cwd !== cwdB) err('hooks/lib.mjs', 'smoke "store cache other cwd": expected cache file rewritten with the other cwd');
+
+    // 4. corrupt cache falls back to storeFor
+    fs.writeFileSync(cacheFile, 'not json');
+    if (cached(cwdA, 'smoke-cache') !== want(cwdA)) err('hooks/lib.mjs', 'smoke "store cache corrupt": expected storeFor(cwd) when the cache file is not JSON');
+  } finally {
+    fs.rmSync(sdir, { recursive: true, force: true });
+    fs.rmSync(cwdA, { recursive: true, force: true });
+    fs.rmSync(cwdB, { recursive: true, force: true });
   }
 }
 }
