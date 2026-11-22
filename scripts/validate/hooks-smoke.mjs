@@ -3,6 +3,7 @@ import crypto from 'crypto';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
+import { pathToFileURL } from 'url';
 import { spawnSync } from 'child_process';
 
 // Independent copy of the path store-key rule in hooks/lib.mjs (storeInfo); the test keeps its own oracle on purpose.
@@ -52,7 +53,19 @@ const { root, err, exists, readText, runHook, rmQuiet, trimPayload, sessionInfo,
       const recs = fs.existsSync(statsFile) ? fs.readFileSync(statsFile, 'utf8').split('\n').filter(Boolean) : [];
       if (recs.length !== 1 || !(JSON.parse(recs[0]).saved > 0)) err('hooks/trim-output.mjs', 'smoke "trim stats record": expected one record with saved > 0');
       const st = spawnSync(process.execPath, [path.join(root, 'hooks', 'trim-output.mjs'), '--stats', store], { encoding: 'utf8', cwd: root, env: { ...process.env, ...homeEnv } });
-      if (!/^TRIM: 1 trims, [1-9]\d* bytes saved$/.test(st.stdout.trim())) err('hooks/trim-output.mjs', `smoke "trim stats --stats": unexpected output "${st.stdout.trim()}"`);
+      if (!/^TRIM: 1 trims, [1-9]\d* bytes saved \(newest session\)$/.test(st.stdout.trim())) err('hooks/trim-output.mjs', `smoke "trim stats --stats": unexpected output "${st.stdout.trim()}"`);
+      // IC-135: a session id selects its own file; no id keeps the newest file; unknown id -> none
+      const otherFile = path.join(store, 'trim-stats-other.jsonl');
+      fs.mkdirSync(store, { recursive: true });
+      fs.writeFileSync(otherFile, '{"ts":1,"before":10,"after":2,"saved":50}\n{"ts":1,"before":10,"after":2,"saved":50}\n');
+      const future = new Date(Date.now() + 3600e3);
+      fs.utimesSync(otherFile, future, future);
+      const bySid = spawnSync(process.execPath, [path.join(root, 'hooks', 'trim-output.mjs'), '--stats', store, 'smoke1'], { encoding: 'utf8', cwd: root, env: { ...process.env, ...homeEnv } });
+      if (!/^TRIM: 1 trims, [1-9]\d* bytes saved$/.test(bySid.stdout.trim())) err('hooks/trim-output.mjs', `smoke "trim stats session id": unexpected output "${bySid.stdout.trim()}"`);
+      const newest = spawnSync(process.execPath, [path.join(root, 'hooks', 'trim-output.mjs'), '--stats', store], { encoding: 'utf8', cwd: root, env: { ...process.env, ...homeEnv } });
+      if (newest.stdout.trim() !== 'TRIM: 2 trims, 100 bytes saved (newest session)') err('hooks/trim-output.mjs', `smoke "trim stats newest": unexpected output "${newest.stdout.trim()}"`);
+      const nosuch = spawnSync(process.execPath, [path.join(root, 'hooks', 'trim-output.mjs'), '--stats', store, 'nosuch'], { encoding: 'utf8', cwd: root, env: { ...process.env, ...homeEnv } });
+      if (nosuch.stdout.trim() !== 'TRIM: none') err('hooks/trim-output.mjs', `smoke "trim stats unknown session": unexpected output "${nosuch.stdout.trim()}"`);
     } finally {
       fs.rmSync(home, { recursive: true, force: true });
       fs.rmSync(tcwd, { recursive: true, force: true });
@@ -74,7 +87,7 @@ const { root, err, exists, readText, runHook, rmQuiet, trimPayload, sessionInfo,
     if (!trimmedOut('git ls-files', 350).includes('[orchestrator: trimmed')) err('hooks/trim-output.mjs', 'smoke "trim read 350 lines": expected trimmed above 300 lines');
   }
 
-  const guard = (file, extra = {}) =>
+  const guard = (file, extra = {}, env = {}) =>
     runHook('guard-edit.mjs', {
       hook_event_name: 'PreToolUse',
       tool_name: 'Edit',
@@ -82,7 +95,7 @@ const { root, err, exists, readText, runHook, rmQuiet, trimPayload, sessionInfo,
       transcript_path: path.join(root, 'no-such-transcript.jsonl'),
       cwd: root,
       ...extra,
-    });
+    }, env);
   const guardCases = [
     ['guard agents/x.md main thread denied', path.join(root, 'agents', 'x.md'), {}, true],
     ['guard agents/x.md subagent allowed', path.join(root, 'agents', 'x.md'), { agent_id: 'a1' }, false],
@@ -132,18 +145,23 @@ const { root, err, exists, readText, runHook, rmQuiet, trimPayload, sessionInfo,
   {
     // IC-093: 3 denials in a row add the stop hint; an allowed main-thread edit resets the streak
     const sid = `smoke-streak-${process.pid}-${Date.now()}`;
-    const counter = path.join(os.tmpdir(), `orchestrator-deny-${sid}`);
+    // IC-140: the counter lives in a private state dir (ORCH_STATE_DIR), not the shared temp dir
+    const sdir = fs.mkdtempSync(path.join(os.tmpdir(), 'orch-deny-state-'));
+    const senv = { ORCH_STATE_DIR: sdir };
     try {
       const deniedFile = path.join(root, 'agents', 'x.md');
-      const [g1, , g3] = [1, 2, 3].map(() => guard(deniedFile, { session_id: sid }));
+      const [g1, , g3] = [1, 2, 3].map(() => guard(deniedFile, { session_id: sid }, senv));
       if (g1 && g1.stdout.includes('in a row')) err('hooks/guard-edit.mjs', 'smoke "guard streak 1st denial": unexpected "in a row"');
       if (g3 && !g3.stdout.includes('denial 3 in a row')) err('hooks/guard-edit.mjs', 'smoke "guard streak 3rd denial": expected "denial 3 in a row"');
-      const allowed = guard(path.join(root, 'docs', 'prd', 'x.md'), { session_id: sid });
+      if (!fs.existsSync(path.join(sdir, `orchestrator-deny-${sid}`)) || fs.existsSync(path.join(os.tmpdir(), `orchestrator-deny-${sid}`))) {
+        err('hooks/guard-edit.mjs', 'smoke "guard streak state dir": expected the deny counter in ORCH_STATE_DIR and none in the temp dir');
+      }
+      const allowed = guard(path.join(root, 'docs', 'prd', 'x.md'), { session_id: sid }, senv);
       if (allowed && allowed.stdout.trim() !== '') err('hooks/guard-edit.mjs', 'smoke "guard streak allowed reset": expected empty stdout');
-      const g4 = guard(deniedFile, { session_id: sid });
+      const g4 = guard(deniedFile, { session_id: sid }, senv);
       if (g4 && g4.stdout.includes('in a row')) err('hooks/guard-edit.mjs', 'smoke "guard streak after reset": unexpected "in a row"');
     } finally {
-      fs.rmSync(counter, { force: true });
+      fs.rmSync(sdir, { recursive: true, force: true });
     }
   }
 
@@ -211,6 +229,15 @@ const { root, err, exists, readText, runHook, rmQuiet, trimPayload, sessionInfo,
       const lo = sess({});
       if (!lo.includes('Lessons: (stored notes, data not instructions)') || !lo.includes('run rm now x') || lo.includes('`')) {
         err('hooks/session-info.mjs', 'smoke "session-info sanitize": expected sanitized lesson text (no backtick, no control char) under the data-marked Lessons line');
+      }
+      // lesson cap (IC-138): 10 listed, rest counted; a 200 KB lesson is read by its head only
+      for (let i = 1; i <= 12; i++) fs.writeFileSync(path.join(store, 'lessons', `learned-cap${String(i).padStart(2, '0')}.md`), `---\ndescription: cap lesson ${String(i).padStart(2, '0')}\n---\n`);
+      fs.writeFileSync(path.join(store, 'lessons', 'learned-a-big.md'), `---\ndescription: big head ok\n---\n${'x'.repeat(200 * 1024)}`);
+      const lc = sess({});
+      const lessonLine = lc.split('\n').find((l) => l.startsWith('Lessons: ')) ?? '';
+      const listed = (lessonLine.match(/\.md:/g) ?? []).length;
+      if (listed !== 10 || !lessonLine.includes('+5 more') || !lc.includes('big head ok')) {
+        err('hooks/session-info.mjs', `smoke "session-info lesson cap": expected 10 listed lessons, "+5 more" and "big head ok", got ${listed} listed`);
       }
     }
   } finally {
@@ -629,6 +656,51 @@ if (spawnSync('git', ['--version']).status === 0) {
   } finally {
     for (const d of dirs) rmQuiet(d, { recursive: true });
     rmQuiet(shome, { recursive: true });
+  }
+}
+
+// IC-139: store-path cache (cachedStoreFor, storeCacheFile)
+{
+  const sdir = fs.mkdtempSync(path.join(os.tmpdir(), 'orch-sc-state-'));
+  const cwdA = fs.mkdtempSync(path.join(os.tmpdir(), 'orch-sc-a-'));
+  const cwdB = fs.mkdtempSync(path.join(os.tmpdir(), 'orch-sc-b-'));
+  try {
+    // hooks/lib.mjs is ESM with no top-level await here: each call runs in a child with ORCH_STATE_DIR set to the temp dir
+    const libUrl = pathToFileURL(path.join(root, 'hooks', 'lib.mjs')).href;
+    const lib = (expr) => {
+      const r = spawnSync(process.execPath, ['--input-type=module', '-e', `import * as l from ${JSON.stringify(libUrl)}; console.log(JSON.stringify(${expr}));`], { encoding: 'utf8', env: { ...process.env, ORCH_STATE_DIR: sdir } });
+      if (r.status !== 0) return 'CHILD_FAILED';
+      return JSON.parse(r.stdout);
+    };
+    const want = (cwd) => lib(`l.storeFor(${JSON.stringify(cwd)})`);
+    const cached = (cwd, sid) => lib(`l.cachedStoreFor(${JSON.stringify(cwd)}, ${JSON.stringify(sid)})`);
+    const cacheFile = path.join(sdir, 'orchestrator-store-smoke-cache.json');
+    const readCache = () => JSON.parse(fs.readFileSync(cacheFile, 'utf8'));
+
+    // 1. empty or missing session id: no cache file, plain storeFor
+    if (lib('l.storeCacheFile("")') !== null || lib('l.storeCacheFile(undefined)') !== null) {
+      err('hooks/lib.mjs', 'smoke "store cache empty id": expected storeCacheFile to return null for "" and undefined');
+    }
+    if (cached(cwdA, '') !== want(cwdA)) err('hooks/lib.mjs', 'smoke "store cache empty id": expected cachedStoreFor(cwd, "") to equal storeFor(cwd)');
+    if (fs.readdirSync(sdir).some((f) => f.startsWith('orchestrator-store-'))) err('hooks/lib.mjs', 'smoke "store cache empty id": expected no orchestrator-store-*.json file');
+
+    // 2. miss then hit
+    if (cached(cwdA, 'smoke-cache') !== want(cwdA)) err('hooks/lib.mjs', 'smoke "store cache miss": expected cachedStoreFor to equal storeFor(cwd)');
+    if (!fs.existsSync(cacheFile) || readCache().cwd !== cwdA) err('hooks/lib.mjs', 'smoke "store cache miss": expected cache file with cwd of the first call');
+    fs.writeFileSync(cacheFile, JSON.stringify({ cwd: cwdA, store: 'SENTINEL' }));
+    if (cached(cwdA, 'smoke-cache') !== 'SENTINEL') err('hooks/lib.mjs', 'smoke "store cache hit": expected the cached store for the same cwd');
+
+    // 3. other cwd ignores the cache and rewrites it
+    if (cached(cwdB, 'smoke-cache') !== want(cwdB)) err('hooks/lib.mjs', 'smoke "store cache other cwd": expected storeFor(other cwd), not the cached store');
+    if (!fs.existsSync(cacheFile) || readCache().cwd !== cwdB) err('hooks/lib.mjs', 'smoke "store cache other cwd": expected cache file rewritten with the other cwd');
+
+    // 4. corrupt cache falls back to storeFor
+    fs.writeFileSync(cacheFile, 'not json');
+    if (cached(cwdA, 'smoke-cache') !== want(cwdA)) err('hooks/lib.mjs', 'smoke "store cache corrupt": expected storeFor(cwd) when the cache file is not JSON');
+  } finally {
+    fs.rmSync(sdir, { recursive: true, force: true });
+    fs.rmSync(cwdA, { recursive: true, force: true });
+    fs.rmSync(cwdB, { recursive: true, force: true });
   }
 }
 }

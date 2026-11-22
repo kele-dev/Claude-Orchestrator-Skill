@@ -72,6 +72,7 @@ Orchestration mode is active automatically in every session. Manual commands:
 - In a long conversation Claude writes a checkpoint and suggests continuing in a new session.
 - Always-loaded rules are smaller: `hooks/rules.md` is shortened, and `orchestrator:on` is split into a core plus an on-demand `reference.md`.
 - A long-session warning appears when the context grows by 120k tokens, again at +250k and +400k (`ORCH_LONG_REPEAT`: comma list or `off`), suggesting a checkpoint and a new session (from message usage; 2 MB transcript size if usage is missing) or after 30 delegations (`ORCH_LONG=off`, `ORCH_LONG_TOKENS`, `ORCH_LONG_BYTES`, `ORCH_LONG_DELEGATIONS`); `scripts/digest.mjs` gives planners a compact conversation summary.
+- `node scripts/otel-export.mjs <transcript.jsonl> [--out <file>]` exports a session as OTLP/JSON spans (OpenTelemetry GenAI conventions: agent calls, tool calls, token usage; no prompts, message text or tool output) for Jaeger, Langfuse or Grafana.
 
 ### Hooks
 
@@ -128,6 +129,7 @@ If you previously installed via `install.ps1`, delete `haiku-coder.md`, `sonnet-
 - Lokasi data: lessons, checkpoint dan `verify.sh` disimpan per project di `~/.claude/orchestrator/<project-key>/`, dipakai bersama semua worktree, tidak pernah di-commit.
 - cek `Guards: active` di `/orchestrator:status` (tanpa Node guard mati diam-diam)
 - `ORCH_DEBUG=1` menulis error hook ke stderr dan menambahkannya ke `<tmpdir>/orchestrator-debug.log` (berhenti di 256 KB), karena stderr hook pada exit 0 tidak tampil di chat
+- `node scripts/otel-export.mjs <transcript.jsonl> [--out <file>]` mengekspor sesi sebagai span OTLP/JSON (konvensi GenAI OpenTelemetry: panggilan agent, tool, pemakaian token; tanpa isi prompt, pesan atau output tool) untuk Jaeger, Langfuse atau Grafana.
 - Read guard (`guard-read`): Read sesi utama tanpa `offset`/`limit` untuk file di atas 2000 baris atau 100 KB ditolak sekali per file per sesi (gunakan `offset`/`limit`, Grep, atau agent Explore); Read yang sama diulang diizinkan; subagent tidak terpengaruh; matikan dengan `ORCH_READ_GUARD=off`
 - Claude akan menyarankan team/autopilot kalau tugasnya cocok, tapi default tetap `on`. Batas iterasi naik otomatis (maks 4 putaran fix) hanya selama perbaikannya ada kemajuan.
 - Belajar: di akhir tugas Claude sendiri yang memutuskan pelajaran mana yang disimpan (maks 3, hanya yang sudah terbukti), serta memperbaiki atau menghapus yang usang, sebagai file lokal di store project (`~/.claude/orchestrator/<project-key>/lessons/`). Satu baris di laporan memberi tahu apa yang berubah. `/orchestrator:learn list` untuk melihat, `prune` untuk merapikan.

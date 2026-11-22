@@ -19,7 +19,7 @@ disable-model-invocation: true
 - Session: delegations so far per agent (haiku-coder, sonnet-dev, opus-planner, opus-reviewer), counted from this conversation; "unknown" after a compaction.
 - Main-session tokens: run `node "${CLAUDE_PLUGIN_ROOT}/scripts/budget.mjs" auto --main` (fall back to the plugin root used for the version) and show its MAIN line as one row; sub-agent total: same command without --main.
 - Delegation ledger: run `node "${CLAUDE_PLUGIN_ROOT}/hooks/ledger.mjs" --stats "<store>"` and show its LEDGER line as one row (pass rate per tier from <store>/delegations.jsonl, written by the SubagentStop hook; unknown = no STATUS line found, not counted as a failure).
-- Trim savings: run `node "${CLAUDE_PLUGIN_ROOT}/hooks/trim-output.mjs" --stats "<store>"` and show its TRIM line as one row (trims and bytes saved this session, from the newest `trim-stats-*.jsonl`).
+- Trim savings: run `node "${CLAUDE_PLUGIN_ROOT}/hooks/trim-output.mjs" --stats "<store>" "<session id>"` and show its TRIM line as one row (trims and bytes saved this session). The session id is the transcript file name without `.jsonl` from the session-start `Digest:` line; if no Digest line was printed, omit the argument and label the row "newest session (may be another session)".
 
 ## Caps
 - Show the defaults and ceilings from `caps.md` in this skill's folder (it mirrors the `## Budget` bullets of `team` and `autopilot`; read those only if `caps.md` is missing); never restate numbers from memory. A cap the user sets (`lanes=N`, `batches=N`) is never raised.
