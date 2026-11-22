@@ -3,7 +3,7 @@
 // Fails open: on any error or unexpected input it prints nothing and exits 0.
 import { appendFileSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, statSync, unlinkSync } from 'node:fs';
 import { join } from 'node:path';
-import { cachedStoreFor, makeDbg, posInt, readStdin, sanitizeSid } from './lib.mjs';
+import { cachedStoreFor, makeDbg, posInt, readStdin, sanitizeSid, writeAtomic } from './lib.mjs';
 
 const dbg = makeDbg('trim-output');
 
@@ -96,12 +96,27 @@ function record(input, before, after) {
     const store = cachedStoreFor(cwd, input?.session_id);
     const file = join(store, `trim-stats-${sid}.jsonl`);
     if (!existsSync(store)) mkdirSync(store, { recursive: true });
-    if (existsSync(file) && statSync(file).size > 65536) return;
+    if (existsSync(file) && statSync(file).size > 65536 && !compact(file)) return;
     if (!existsSync(file)) prune(store, file);
     const saved = Buffer.byteLength(before) - Buffer.byteLength(after);
     appendFileSync(file, JSON.stringify({ ts: Date.now(), before: before.split('\n').length, after: after.split('\n').length, saved }) + '\n');
   } catch (e) {
     dbg(e);
+  }
+}
+
+// IC-159: folds an over-64 KB session file into one {ts, n, saved, summary} line; returns false on error (never throws).
+function compact(file) {
+  try {
+    let n = 0, saved = 0;
+    for (const l of readFileSync(file, 'utf8').split('\n')) {
+      try { const r = JSON.parse(l); n += Number(r.n) || 1; saved += Number(r.saved) || 0; } catch { /* skip */ }
+    }
+    writeAtomic(file, JSON.stringify({ ts: Date.now(), n, saved, summary: true }) + '\n');
+    return true;
+  } catch (e) {
+    dbg(e);
+    return false;
   }
 }
 
@@ -139,7 +154,7 @@ function statsLine(store, sessionArg) {
   }
   let n = 0, saved = 0;
   for (const l of readFileSync(file, 'utf8').split('\n')) {
-    try { const r = JSON.parse(l); n++; saved += Number(r.saved) || 0; } catch { /* skip */ }
+    try { const r = JSON.parse(l); n += Number(r.n) || 1; saved += Number(r.saved) || 0; } catch { /* skip */ }
   }
   return n ? `TRIM: ${n} trims, ${saved} bytes saved${suffix}` : NO_STATS;
 }
