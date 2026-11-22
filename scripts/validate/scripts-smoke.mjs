@@ -554,7 +554,7 @@ const { root, err, exists, readText, runHook, rmQuiet } = ctx;
 {
   const sel = (args) => spawnSync(process.execPath, [path.join(root, 'scripts', 'eval-select.mjs'), ...args], { encoding: 'utf8', cwd: root });
   const lines = (r) => (r.stdout ?? '').split('\n').filter(Boolean);
-  for (const [f, want] of [['skills/status/SKILL.md', ['status-slash']], ['README.md', []], ['evals/chat-terse/prompt.md', ['chat-terse']]]) {
+  for (const [f, want] of [['skills/status/SKILL.md', ['status-slash']], ['skills/help/SKILL.md', []], ['README.md', []], ['evals/chat-terse/prompt.md', ['chat-terse']]]) {
     const r = sel(['--files', f]);
     if (r.status !== 0 || JSON.stringify(lines(r)) !== JSON.stringify(want)) err('scripts/eval-select.mjs', `smoke "select ${f}": expected [${want.join(', ')}] with exit 0, got exit ${r.status} [${lines(r).join(', ')}]`);
   }
