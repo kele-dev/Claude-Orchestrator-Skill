@@ -4,6 +4,11 @@ Per-version release notes. The README keeps only the current version's "Baru di"
 
 ## English
 
+### 1.15.2
+- Fixed: lesson index without dangling colon; TRIM unavailable names ORCH_DEBUG=1; long-session uses shared session-id sanitizer; eval-select selects every case for an unmapped scripts/ file; README no longer claims failed commands keep a 10-line head; ideas doc store-key wording; session start omits the Digest line for transcript paths with `$`, backtick, quote or backslash, and checkpoint lines no longer print an empty `()`; long-session warning in plain language, resume steps only for the model; stats trim counts and reports unreadable lines; win32 smoke probes PowerShell once per run.
+- CI: partial eval runs call the eval once per selected case; pinned Claude Code version recorded in evals/README.md and checked by the validator; smoke tests cover the 64 KB boundary and the root-fallback guard without inherited GIT_* env; eval workflow validates `runs` and `max_cost_usd` before any step.
+- Docs: direct-edit lane first slice recorded as a docs-only proposal in token-saving.md.
+
 ### 1.15.1
 - New: `SECURITY.md` with a private vulnerability-reporting route; the team PLAN step derives lanes with `scripts/plan-dag.mjs` when the PRD has a task table; README and help document `ORCH_STALE_DAYS`, `ORCH_STATE_DIR`, the ledger hook and the `verify.ps1` fallback.
 - Fixed: long-session counts delegations only in the last 4 MB of a transcript on a cold start; `trace-tokens` and `eval-compare` read a result's trace only inside the results folder (a relative `tracePath` now resolves against it); the no-Node warning names the read guard; init and learn print the `verify.sh` command lines and `on` shows them to the user first when they were not reported.
@@ -105,3 +110,4 @@ Per-version release notes. The README keeps only the current version's "Baru di"
 - Juga di 1.15.0 (CI): validator mewajibkan entri CHANGELOG untuk versi plugin dan memeriksa help memuat setiap skill; validate.mjs dipecah ke modul; bump Dependabot untuk action (checkout, setup-node, upload-artifact).
 - Baru di 1.15.1: `SECURITY.md` dengan jalur pelaporan kerentanan privat; langkah PLAN di team memakai `scripts/plan-dag.mjs` untuk menurunkan lane jika PRD punya tabel tugas; README dan help mendokumentasikan `ORCH_STALE_DAYS`, `ORCH_STATE_DIR`, hook ledger, dan cadangan `verify.ps1`.
 - Juga di 1.15.1 (perbaikan): long-session pada start dingin hanya menghitung delegasi di 4 MB terakhir transkrip; `trace-tokens` dan `eval-compare` hanya membaca trace di dalam folder hasil (`tracePath` relatif kini dihitung dari folder itu); peringatan tanpa Node menyebut read guard; init dan learn menampilkan baris perintah `verify.sh`, dan `on` menampilkannya ke pengguna dulu bila belum dilaporkan.
+- Baru di 1.15.2: Digest tidak ditampilkan untuk path transkrip yang tidak aman dan baris checkpoint tidak lagi memuat `()` kosong; peringatan sesi panjang memakai bahasa biasa dan langkah resume hanya untuk model; statistik trim melaporkan baris yang tak terbaca; smoke Windows memanggil PowerShell sekali; workflow eval memvalidasi input sebelum langkah apa pun; dan proposal jalur edit langsung dicatat sebagai dokumen.

@@ -6,7 +6,7 @@
 // Fails open: on any error or unexpected input it prints nothing and exits 0.
 import { closeSync, existsSync, openSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { join } from 'node:path';
-import { isMainAssistant, makeDbg, posInt, readBytes, readStdin, stateDir, writeAtomic } from './lib.mjs';
+import { isMainAssistant, makeDbg, posInt, readBytes, readStdin, sanitizeSid, stateDir, writeAtomic } from './lib.mjs';
 
 const dbg = makeDbg('long-session');
 
@@ -189,7 +189,7 @@ function readLevel(marker) {
 function run(input) {
   if (process.env.ORCH_LONG === 'off') return '';
 
-  const id = String(input?.session_id ?? '').replace(/[^A-Za-z0-9-]/g, '');
+  const id = sanitizeSid(input?.session_id);
   if (id === '') return '';
   const dir = stateDir();
   if (dir === null) return '';
@@ -206,11 +206,11 @@ function run(input) {
   const g = contextGrowth(path, size, `${marker}.growth`);
   const growth = g ? g.last - g.first : 0;
   const level = levels.filter((t) => growth >= t).length;
-  const say = (line) => JSON.stringify({ systemMessage: line, hookSpecificOutput: { hookEventName: 'UserPromptSubmit', additionalContext: `${line} Tell the user in their language.` } });
+  const say = (user, model) => JSON.stringify({ systemMessage: user, hookSpecificOutput: { hookEventName: 'UserPromptSubmit', additionalContext: `${user} ${model} Tell the user in their language.` } });
   if (warned > 0) {
     if (!g || level <= warned) return '';
     writeAtomic(marker, String(level));
-    return say(`orchestrator: this session is very long (+${Math.round(growth / 1000)}k context tokens; reminder ${level - 1} of ${levels.length - 1}). Every turn re-reads the whole context. If a multi-step task is in progress, write a checkpoint per orchestrator:resume now (one haiku-coder delegation, bundled with any due housekeeping) and hand off per orchestrator:resume (summary plus a new-session card running /orchestrator:resume <slug>); otherwise suggest a new session or /compact in one line.`);
+    return say(`orchestrator: this session is very long (+${Math.round(growth / 1000)}k context tokens; reminder ${level - 1} of ${levels.length - 1}). Every new message re-sends the whole conversation, so each turn costs more. A fresh session is cheaper; Claude can save your progress first so you can continue there.`, 'If a multi-step task is in progress, write a checkpoint per orchestrator:resume now (one haiku-coder delegation, bundled with any due housekeeping) and hand off per orchestrator:resume (summary plus a new-session card running /orchestrator:resume the real checkpoint name (never a placeholder)); otherwise suggest a new session or /compact in one line.');
   }
 
   const bytesLimit = posInt(process.env.ORCH_LONG_BYTES, 2 * 1024 * 1024);
@@ -228,9 +228,9 @@ function run(input) {
     dbg(e);
     // ignore cleanup errors
   }
-  const tail = ' Write a checkpoint per orchestrator:resume and hand off per orchestrator:resume (summary plus a new-session card running /orchestrator:resume <slug>).';
+  const tail = 'Write a checkpoint per orchestrator:resume and hand off per orchestrator:resume (summary plus a new-session card running /orchestrator:resume the real checkpoint name (never a placeholder)).';
   const line = g
-    ? `orchestrator: this session is long (+${Math.round((g.last - g.first) / 1000)}k context tokens${tokensLong ? '' : `, ${delegations} delegations`}).${tail}`
-    : `orchestrator: this session is long (${(size / 1048576).toFixed(1)} MB, ${delegations} delegations).${tail}`;
-  return say(line);
+    ? `orchestrator: this session is long (+${Math.round((g.last - g.first) / 1000)}k context tokens${tokensLong ? '' : `, ${delegations} delegations`}). Every new message re-sends the whole conversation, so a fresh session is cheaper; Claude can save your progress first so you can continue there.`
+    : `orchestrator: this session is long (${(size / 1048576).toFixed(1)} MB, ${delegations} delegations). Every new message re-sends the whole conversation, so a fresh session is cheaper; Claude can save your progress first so you can continue there.`;
+  return say(line, tail);
 }

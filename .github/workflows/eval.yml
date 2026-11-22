@@ -36,6 +36,15 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
+      - name: Validate inputs
+        env:
+          RUNS: ${{ inputs.runs || '1' }}
+          MAX_COST: ${{ inputs.max_cost_usd || '3' }}
+        run: |
+          case "$RUNS" in ''|*[!0-9]*|0*) echo "::error::runs must be a whole number of at least 1, got '$RUNS'"; exit 1;; esac
+          printf '%s' "$MAX_COST" | grep -Eq '^[0-9]+(\.[0-9]+)?$' || { echo "::error::max_cost_usd must be a number such as 3 or 2.5, got '$MAX_COST'"; exit 1; }
+          awk -v c="$MAX_COST" 'BEGIN{exit !(c>0)}' || { echo "::error::max_cost_usd must be above 0"; exit 1; }
+
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
@@ -72,6 +81,7 @@ jobs:
           sudo apt-get update && sudo apt-get install -y bubblewrap socat
           sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || echo "::warning::could not relax the AppArmor user-namespace restriction; the Claude sandbox may fail"
 
+      # Pinned Claude Code CLI (no Dependabot path for a global npm install). Update: change the version here and in evals/README.md "Claude Code version in CI" together, run this workflow once, and refresh evals/baseline.json if token counts moved.
       - name: Install Claude Code
         if: steps.select.outputs.skip != 'true'
         run: npm install -g @anthropic-ai/claude-code@2.1.317
@@ -96,8 +106,20 @@ jobs:
           RUNS: ${{ inputs.runs || '1' }}
           MODEL: ${{ inputs.model || 'claude-opus-5-5' }}
           MAX_COST: ${{ inputs.max_cost_usd || '3' }}
+          PARTIAL: ${{ steps.select.outputs.partial }}
+          SELECTED: ${{ steps.select.outputs.selected }}
         run: |
-          claude plugin eval . --case "$CASE" --runs "$RUNS" --ablation none --scaffold --trust-plugin --allow-tools Bash Edit Write --model "$MODEL" --judge-model claude-haiku-5-5 --max-cost-usd "$MAX_COST" --no-publish --json evals/ci-result.json
+          if [ "$PARTIAL" = "true" ]; then
+            PER=$(node -e 'const n=process.env.SELECTED.split(",").filter(Boolean).length;const m=Number(process.env.MAX_COST);const p=n>0?m/n:m;console.log((p<0.01?m:p).toFixed(2))')
+            rc=0
+            for c in $(printf '%s' "$SELECTED" | tr ',' ' '); do
+              claude plugin eval . --case "$c" --runs "$RUNS" --ablation none --scaffold --trust-plugin --allow-tools Bash Edit Write --model "$MODEL" --judge-model claude-haiku-5-5 --max-cost-usd "$PER" --no-publish --json "evals/ci-result-$c.json" || rc=1
+            done
+            node -e 'const fs=require("fs");const p=process.env.SELECTED.split(",").filter(Boolean).map(c=>"evals/ci-result-"+c+".json").filter(f=>fs.existsSync(f)).map(f=>JSON.parse(fs.readFileSync(f,"utf8")));fs.writeFileSync("evals/ci-result.json",JSON.stringify({...p[0],cases:p.flatMap(x=>x.cases||[])}))'
+            exit $rc
+          else
+            claude plugin eval . --case "$CASE" --runs "$RUNS" --ablation none --scaffold --trust-plugin --allow-tools Bash Edit Write --model "$MODEL" --judge-model claude-haiku-5-5 --max-cost-usd "$MAX_COST" --no-publish --json evals/ci-result.json
+          fi
 
       - name: Require eval result
         if: always() && steps.eval.conclusion != 'skipped'
@@ -116,7 +138,7 @@ jobs:
             const want = process.env.SELECTED.split(",").filter(Boolean).sort();
             const got = (require("./evals/ci-result.json").cases || []).map(c => c.name).sort();
             if (JSON.stringify(want) !== JSON.stringify(got)) {
-              console.log("::error::the --case glob did not run exactly the selected cases (want " + want.join(",") + ", got " + got.join(",") + ")");
+              console.log("::error::the per-case eval runs did not cover exactly the selected cases (want " + want.join(",") + ", got " + got.join(",") + ")");
               process.exit(1);
             }
           '
@@ -143,5 +165,6 @@ jobs:
           name: eval-results
           path: |
             evals/ci-result.json
+            evals/ci-result-*.json
             evals/results/
           if-no-files-found: warn

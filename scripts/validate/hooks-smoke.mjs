@@ -6,6 +6,15 @@ import path from 'path';
 import { pathToFileURL } from 'url';
 import { spawnSync } from 'child_process';
 
+// IC-212: probe PowerShell once per run (each cold start costs about 0.5-1 s on win32)
+function winPs() {
+  if (winPs.v === undefined) {
+    const ok = (sh) => spawnSync(sh, ['-NoProfile', '-Command', 'exit 0']).status === 0;
+    winPs.v = process.platform !== 'win32' ? null : ok('pwsh') ? 'pwsh' : ok('powershell') ? 'powershell' : null;
+  }
+  return winPs.v;
+}
+
 // Independent copy of the path store-key rule in hooks/lib.mjs (storeInfo); the test keeps its own oracle on purpose.
 const pathKey = (p) => p.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(-80);
 
@@ -85,7 +94,7 @@ const { root, err, exists, readText, runHook, rmQuiet, trimPayload, sessionInfo,
       try {
         fs.mkdirSync(path.join(isdirStore, 'trim-stats-isdir.jsonl'));
         const isdirOut = spawnSync(process.execPath, [path.join(root, 'hooks', 'trim-output.mjs'), '--stats', isdirStore, 'isdir'], { encoding: 'utf8', cwd: root, env: { ...process.env, ...homeEnv } });
-        if (!isdirOut.stdout.startsWith('TRIM: unavailable (error:')) err('hooks/trim-output.mjs', `smoke "trim stats error path": unexpected output "${isdirOut.stdout.trim()}"`);
+        if (!isdirOut.stdout.startsWith('TRIM: unavailable (error:') || !isdirOut.stdout.includes('ORCH_DEBUG=1')) err('hooks/trim-output.mjs', `smoke "trim stats error path": unexpected output "${isdirOut.stdout.trim()}"`);
       } finally {
         fs.rmSync(isdirStore, { recursive: true, force: true });
       }
@@ -113,6 +122,29 @@ const { root, err, exists, readText, runHook, rmQuiet, trimPayload, sessionInfo,
       const big = spawnSync(process.execPath, [path.join(root, 'hooks', 'trim-output.mjs'), '--stats', store, 'big'], { encoding: 'utf8', cwd: root, env: { ...process.env, ...homeEnv } });
       if (!/^TRIM: 1201 trims, ~\d+ tokens saved \(1[2-9]\d{3,} bytes\)$/.test(big.stdout.trim())) err('hooks/trim-output.mjs', `smoke "trim stats big file": unexpected output "${big.stdout.trim()}"`);
       if (fs.readFileSync(bigFile, 'utf8').split('\n').filter(Boolean).length !== 2) err('hooks/trim-output.mjs', 'smoke "trim stats big file": expected exactly 2 lines after compaction');
+      // IC-213: unreadable lines in an over-64 KB file survive compaction and are reported by --stats
+      const bigBadFile = path.join(store, 'trim-stats-bigbad.jsonl');
+      fs.writeFileSync(bigBadFile, Array.from({ length: 1000 }, () => JSON.stringify({ ts: 1, before: 10, after: 2, saved: 10, pad: 'x'.repeat(80) })).join('\n') + '\nnot json\nnot json\nnot json\n');
+      runHook('trim-output.mjs', { ...trimPayload('npm test'), cwd: tcwd, session_id: 'bigbad' }, homeEnv);
+      const bigBad = spawnSync(process.execPath, [path.join(root, 'hooks', 'trim-output.mjs'), '--stats', store, 'bigbad'], { encoding: 'utf8', cwd: root, env: { ...process.env, ...homeEnv } });
+      if (!/^TRIM: 1001 trims, ~\d+ tokens saved \(\d+ bytes\), 3 unreadable lines skipped$/.test(bigBad.stdout.trim())) err('hooks/trim-output.mjs', `smoke "trim stats big bad lines": unexpected output "${bigBad.stdout.trim()}"`);
+      const bigBadLines = fs.readFileSync(bigBadFile, 'utf8').split('\n').filter(Boolean);
+      if (bigBadLines.length !== 2 || JSON.parse(bigBadLines[0]).bad !== 3) err('hooks/trim-output.mjs', `smoke "trim stats big bad lines": expected 2 lines with bad === 3 on the first, got ${bigBadLines.length} lines`);
+      // IC-181: a stats file of exactly 65536 bytes is appended to, not compacted; a small two-record file likewise
+      const edgeFile = path.join(store, 'trim-stats-edge.jsonl');
+      const edgeBase = { ts: 1, before: 10, after: 2, saved: 10, pad: '' };
+      const edgeLine = JSON.stringify({ ...edgeBase, pad: 'x'.repeat(65536 - (JSON.stringify(edgeBase).length + 1)) }) + '\n';
+      fs.writeFileSync(edgeFile, edgeLine);
+      if (fs.statSync(edgeFile).size !== 65536) err('hooks/trim-output.mjs', 'smoke "trim stats 64 KB edge": expected a 65536-byte stats file');
+      runHook('trim-output.mjs', { ...trimPayload('npm test'), cwd: tcwd, session_id: 'edge' }, homeEnv);
+      const edgeLines = fs.readFileSync(edgeFile, 'utf8').split('\n').filter(Boolean);
+      if (edgeLines.length !== 2 || edgeLines[0] !== edgeLine.slice(0, -1)) err('hooks/trim-output.mjs', `smoke "trim stats 64 KB edge": expected the 64 KB record kept and one appended line, got ${edgeLines.length} lines`);
+      const smallFile = path.join(store, 'trim-stats-small.jsonl');
+      const smallRec = '{"ts":1,"before":10,"after":2,"saved":10}';
+      fs.writeFileSync(smallFile, smallRec + '\n' + smallRec + '\n');
+      runHook('trim-output.mjs', { ...trimPayload('npm test'), cwd: tcwd, session_id: 'small' }, homeEnv);
+      const smallLines = fs.readFileSync(smallFile, 'utf8').split('\n').filter(Boolean);
+      if (smallLines.length !== 3 || smallLines[0] !== smallRec || smallLines[1] !== smallRec) err('hooks/trim-output.mjs', `smoke "trim stats small file": expected 3 lines with the first two unchanged, got ${smallLines.length} lines`);
     } finally {
       fs.rmSync(home, { recursive: true, force: true });
       fs.rmSync(tcwd, { recursive: true, force: true });
@@ -306,6 +338,8 @@ const { root, err, exists, readText, runHook, rmQuiet, trimPayload, sessionInfo,
       const hd = sess({});
       if (!hd.includes('head control desc')) err('hooks/session-info.mjs', 'smoke "session-info lesson head control": expected the control lesson description listed');
       if (!hd.includes('learned-deep.md') || hd.includes('deep tail desc')) err('hooks/session-info.mjs', 'smoke "session-info lesson head only": expected learned-deep.md listed without its tail description');
+      // IC-167: a lesson without a description is listed by its file name only (no colon); with one, name: description
+      if (hd.includes('learned-deep.md:') || !hd.includes('learned-control.md: head control desc')) err('hooks/session-info.mjs', 'smoke "session-info lesson no description": expected learned-deep.md without a colon and learned-control.md with its description');
     }
   } finally {
     fs.rmSync(sh, { recursive: true, force: true });
@@ -491,9 +525,16 @@ const { root, err, exists, readText, runHook, rmQuiet, trimPayload, sessionInfo,
         input: JSON.stringify(payload),
         encoding: 'utf8',
         cwd: gtmp,
-        env: { ...process.env, ORCH_GUARD: '', CLAUDE_PROJECT_DIR: '' },
+        env: { ...cleanEnv, ORCH_GUARD: '', CLAUDE_PROJECT_DIR: '' },
       });
       if (!(g.stdout ?? '').includes('"deny"')) err('hooks/guard-edit.mjs', 'smoke "guard root fallback": expected deny for a project file without CLAUDE_PROJECT_DIR');
+      const g2 = spawnSync(process.execPath, [path.join(root, 'hooks', 'guard-edit.mjs')], {
+        input: JSON.stringify({ ...payload, tool_input: { file_path: path.join(gtmp, 'docs', 'prd', 'x.md') } }),
+        encoding: 'utf8',
+        cwd: gtmp,
+        env: { ...cleanEnv, ORCH_GUARD: '', CLAUDE_PROJECT_DIR: '' },
+      });
+      if (!(g2.status === 0 && (g2.stdout ?? '').trim() === '')) err('hooks/guard-edit.mjs', 'smoke "guard root fallback allow": expected docs/prd/ allowed without CLAUDE_PROJECT_DIR');
     } finally {
       fs.rmSync(gtmp, { recursive: true, force: true });
     }
@@ -655,8 +696,7 @@ const { root, err, exists, readText, runHook, rmQuiet, trimPayload, sessionInfo,
 
   // on win32, run the PowerShell store command and session-info.mjs in the same fresh non-git dir; both must print the same path
   if (refText !== null && process.platform === 'win32') {
-    const psCheck = (sh) => spawnSync(sh, ['-NoProfile', '-Command', 'exit 0']).status === 0;
-    const shell = psCheck('pwsh') ? 'pwsh' : psCheck('powershell') ? 'powershell' : null;
+    const shell = winPs();
     if (shell) {
       const sdir = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'orch-key-cwd-')));
       const shome = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'orch-key-home-')));
@@ -696,8 +736,7 @@ if (spawnSync('git', ['--version']).status === 0) {
     const bodyStart = refText.indexOf('\n', fence) + 1;
     return refText.slice(bodyStart, refText.indexOf('```', bodyStart)).split('\n').map((l) => l.trim()).filter(Boolean).join('\n');
   };
-  const psCheck = (sh) => spawnSync(sh, ['-NoProfile', '-Command', 'exit 0']).status === 0;
-  const psShell = process.platform === 'win32' ? (psCheck('pwsh') ? 'pwsh' : psCheck('powershell') ? 'powershell' : null) : null;
+  const psShell = winPs();
   const bashOk = process.platform !== 'win32' && spawnSync('bash', ['--version']).status === 0;
   const fwdSlash = (p) => p.split(path.sep).join('/');
   const shome = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'orch-rkey-home-')));

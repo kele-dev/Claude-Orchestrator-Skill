@@ -1,11 +1,11 @@
 # Improvement Dashboard
 
-Date: 2026-11-22 (cycle 017)
+Date: 2026-11-22 (cycle 018)
 
 Tick `[x]` to pre-select an item for the next cycle's phase 3. Ticks are suggestions; the skill still asks you.
 Mark `- [-]` to suggest rejecting an item permanently; the skill asks you to confirm before it marks anything `rejected`.
 
-Last cycle: 017 (2026-11-22): 8 done (IC-190, IC-191, IC-193, IC-194, IC-195, IC-197, IC-198, IC-199), IC-019 still blocked. Done total 155. Open: P0 0, P1 1 (blocked), P2 32, P3 16.
+Last cycle: 018 (2026-11-22): 8 done (IC-207, IC-208, IC-212, IC-213, IC-217, IC-218, IC-219, IC-221), IC-215 and IC-220 deferred, IC-019 still blocked. Open: P0 0, P1 1 (blocked), P2 27, P3 21.
 
 - [ ] IC-019 P1 DX/CI-CD/dependencies: Token-regression gate in eval CI is dead: evals/baseline.json not committed
 - [ ] IC-120 P2 Observability & ops: Debug log at a predictable tmp path follows symlinks and goes silent after the 256 KB cap
@@ -20,26 +20,21 @@ Last cycle: 017 (2026-11-22): 8 done (IC-190, IC-191, IC-193, IC-194, IC-195, IC
 - [ ] IC-147 P2 Code quality & tests: ledger.mjs re-implements the bounded read loop that lib.mjs exports as readBytes
 - [ ] IC-148 P2 UX & accessibility: ledger --stats prints 0/0 pass for a tier with only unknown results
 - [ ] IC-149 P2 UX & accessibility: otel-export rejects --help as an unknown option and its messages lack the otel-export: prefix other scripts use
-- [ ] IC-166 P2 New features: Ideas doc says idea 17 keys the store by remote URL or first-commit hash; code uses the remote URL, else the path
-- [ ] IC-167 P2 UX & accessibility: Session-start lesson index prints "name.md: " with a dangling colon when a lesson has no description
 - [ ] IC-168 P2 Performance: SessionStart stats every checkpoint file before keeping the newest five
-- [ ] IC-169 P2 DX/CI-CD/dependencies: eval.yml passes an undocumented brace list to claude plugin eval --case; only the post-run check catches an unsupported form
-- [ ] IC-170 P2 Code quality & tests: eval-select selects no case for unmapped scripts/ and evals/ files (digest, plan-dag, transcript, otel-export, validate)
 - [ ] IC-171 P2 Code quality & tests: eval-select smoke hard-codes case counts 12 and 9, so adding an eval case breaks validate
-- [ ] IC-176 P2 UX & accessibility: TRIM: unavailable (error: code) gives a bare code and no next step
 - [ ] IC-179 P2 Security: eval.yml writes the unvalidated case input into $GITHUB_OUTPUT with echo, so a newline can add outputs such as skip=true
-- [ ] IC-181 P2 Code quality & tests: The 64 KB compaction threshold is tested only above the cap; a file just under it, or two small records, is never asserted to stay untouched
 - [ ] IC-182 P2 Code quality & tests: sanitizeSid in lib.mjs has no direct test of its charset, 80-char cap or empty result
-- [ ] IC-183 P2 Code quality & tests: long-session.mjs keeps a fifth session-id sanitizer (no underscore, no length cap) that IC-164 missed
 - [ ] IC-186 P2 UX & accessibility: eval-select accepts an empty --files value and prints skip=true with exit 0 instead of a usage error
 - [ ] IC-192 P2 Stability: long-session ignores the writeAtomic result for its warning marker, so a failed write repeats the long-session warning on every prompt
-- [ ] IC-196 P2 UX & accessibility: on/SKILL.md says output of a non-zero-exit command is never trimmed while README and trim-output.mjs keep 10 head lines for a failed command
 - [ ] IC-200 P2 New features: Proposal: extend the output trim to Grep results
 - [ ] IC-201 P2 UX & accessibility: eval-compare CLI errors lack the eval-compare: prefix and do not say which value is accepted
-- [ ] IC-202 P2 Code quality & tests: regression of IC-044: the root-fallback guard spawn in hooks-smoke inherits GIT_* env while only the git init call uses the cleaned env
 - [ ] IC-203 P2 Performance: SessionStart starts node twice (rules.mjs prints one static file) and the rules hook entry has no timeout
-- [ ] IC-205 P2 DX/CI-CD/dependencies: The Claude Code CLI pin in eval.yml has no update path and no recorded measured version
 - [ ] IC-206 P2 DX/CI-CD/dependencies: No parity check between the English README and the Indonesian Ringkasan, so the summary keeps drifting
+- [ ] IC-220 P2 UX & accessibility: resume argument named <slug>, <name> and [<name>] across files
+- [ ] IC-222 P2 UX & accessibility: evals/README.md says every case has fixture.sh, two have none
+- [ ] IC-215 P2 Code quality & tests: trim-stats smoke repeats the same spawnSync call about 11 times
+- [ ] IC-211 P2 Performance: validate wall time grew from 30 s to 181 s, cause not measured
+- [ ] IC-210 P2 Stability: writeAtomic stale same-pid temp file fails one write
 - [ ] IC-117 P3 UX & accessibility: status 16-row cap is ambiguous with per-file lesson and checkpoint rows
 - [ ] IC-118 P3 Code quality & tests: Validator split left module bodies unindented inside run(ctx)
 - [ ] IC-133 P3 Performance: Per-session marker and deny-streak files in the state and temp dirs are never pruned
@@ -56,3 +51,8 @@ Last cycle: 017 (2026-11-22): 8 done (IC-190, IC-191, IC-193, IC-194, IC-195, IC
 - [ ] IC-185 P3 DX/CI-CD/dependencies: eval.yml checks out full history on every run, though only the --base diff needs it
 - [ ] IC-187 P3 UX & accessibility: docs/ideas/token-saving.md still says the session index lists 20 lessons; code and README say 10
 - [ ] IC-204 P3 Code quality & tests: hooks-smoke.mjs and scripts-smoke.mjs are each one 700 to 770 line run function
+- [ ] IC-209 P3 Security: session-info Legacy files line prints the raw main path without clean()
+- [ ] IC-214 P3 Code quality & tests: long-session countDelegations cache check weaker than loadGrowthCache
+- [ ] IC-216 P3 DX/CI-CD/dependencies: eval.yml installs apt packages and the pinned CLI with no cache
+- [ ] IC-223 P3 UX & accessibility: README sentence about ORCH_TRIM_ERRORS "the 10" is ambiguous
+- [ ] IC-224 P3 New features: Proposal: review two old claude/* branches and delete or log them
