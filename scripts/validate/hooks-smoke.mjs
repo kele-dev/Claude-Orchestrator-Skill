@@ -6,6 +6,15 @@ import path from 'path';
 import { pathToFileURL } from 'url';
 import { spawnSync } from 'child_process';
 
+// IC-212: probe PowerShell once per run (each cold start costs about 0.5-1 s on win32)
+function winPs() {
+  if (winPs.v === undefined) {
+    const ok = (sh) => spawnSync(sh, ['-NoProfile', '-Command', 'exit 0']).status === 0;
+    winPs.v = process.platform !== 'win32' ? null : ok('pwsh') ? 'pwsh' : ok('powershell') ? 'powershell' : null;
+  }
+  return winPs.v;
+}
+
 // Independent copy of the path store-key rule in hooks/lib.mjs (storeInfo); the test keeps its own oracle on purpose.
 const pathKey = (p) => p.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(-80);
 
@@ -687,8 +696,7 @@ const { root, err, exists, readText, runHook, rmQuiet, trimPayload, sessionInfo,
 
   // on win32, run the PowerShell store command and session-info.mjs in the same fresh non-git dir; both must print the same path
   if (refText !== null && process.platform === 'win32') {
-    const psCheck = (sh) => spawnSync(sh, ['-NoProfile', '-Command', 'exit 0']).status === 0;
-    const shell = psCheck('pwsh') ? 'pwsh' : psCheck('powershell') ? 'powershell' : null;
+    const shell = winPs();
     if (shell) {
       const sdir = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'orch-key-cwd-')));
       const shome = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'orch-key-home-')));
@@ -728,8 +736,7 @@ if (spawnSync('git', ['--version']).status === 0) {
     const bodyStart = refText.indexOf('\n', fence) + 1;
     return refText.slice(bodyStart, refText.indexOf('```', bodyStart)).split('\n').map((l) => l.trim()).filter(Boolean).join('\n');
   };
-  const psCheck = (sh) => spawnSync(sh, ['-NoProfile', '-Command', 'exit 0']).status === 0;
-  const psShell = process.platform === 'win32' ? (psCheck('pwsh') ? 'pwsh' : psCheck('powershell') ? 'powershell' : null) : null;
+  const psShell = winPs();
   const bashOk = process.platform !== 'win32' && spawnSync('bash', ['--version']).status === 0;
   const fwdSlash = (p) => p.split(path.sep).join('/');
   const shome = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'orch-rkey-home-')));
