@@ -36,6 +36,15 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
+      - name: Validate inputs
+        env:
+          RUNS: ${{ inputs.runs || '1' }}
+          MAX_COST: ${{ inputs.max_cost_usd || '3' }}
+        run: |
+          case "$RUNS" in ''|*[!0-9]*|0*) echo "::error::runs must be a whole number of at least 1, got '$RUNS'"; exit 1;; esac
+          printf '%s' "$MAX_COST" | grep -Eq '^[0-9]+(\.[0-9]+)?$' || { echo "::error::max_cost_usd must be a number such as 3 or 2.5, got '$MAX_COST'"; exit 1; }
+          awk -v c="$MAX_COST" 'BEGIN{exit !(c>0)}' || { echo "::error::max_cost_usd must be above 0"; exit 1; }
+
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
