@@ -4,7 +4,7 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { makeDbg, readStdin, storeInfo } from './lib.mjs';
+import { makeDbg, readStdin, storeCacheFile, storeInfo, writeAtomic } from './lib.mjs';
 
 const dbg = makeDbg('session-info');
 const clean = (s) => String(s).replace(/[\u0000-\u001f\u007f`]/g, ' ').replace(/\s+/g, ' ').trim();
@@ -40,6 +40,8 @@ function run(input) {
   if (typeof cwd !== 'string' || cwd === '') return '';
 
   const { main, store } = storeInfo(cwd);
+  const cacheFile = storeCacheFile(input?.session_id);
+  if (cacheFile) writeAtomic(cacheFile, JSON.stringify({ cwd, store }));
   const lines = [`Orchestrator store: ${store}`];
   const editOff = process.env.ORCH_GUARD === 'off';
   const readOff = process.env.ORCH_READ_GUARD === 'off';

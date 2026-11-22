@@ -1,6 +1,6 @@
 // Shared helpers for the orchestrator hooks (stdin read, debug output, env ints, bounded file reads, transcript entry filter).
 import { execFileSync } from 'node:child_process';
-import { appendFileSync, closeSync, existsSync, fstatSync, lstatSync, openSync, mkdirSync, readSync, renameSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
+import { appendFileSync, closeSync, existsSync, fstatSync, lstatSync, openSync, mkdirSync, readFileSync, readSync, renameSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
 import { homedir, tmpdir, userInfo } from 'node:os';
 import { dirname, join } from 'node:path';
 
@@ -234,3 +234,25 @@ export function storeInfo(cwd) {
 }
 
 export const storeFor = (cwd) => storeInfo(cwd).store;
+
+// Per-session cache file for the store path (in the state dir); null when there is no session id or no usable state dir.
+export function storeCacheFile(sessionId) {
+  const sid = String(sessionId ?? '').replace(/[^A-Za-z0-9_-]/g, '').slice(0, 80);
+  const dir = sid === '' ? null : stateDir();
+  return dir === null ? null : join(dir, `orchestrator-store-${sid}.json`);
+}
+
+// Store path from the per-session cache when it was written for the same cwd; else computes storeFor and writes the cache.
+export function cachedStoreFor(cwd, sessionId) {
+  const f = storeCacheFile(sessionId);
+  if (f === null) return storeFor(cwd);
+  try {
+    const c = JSON.parse(readFileSync(f, 'utf8'));
+    if (c?.cwd === cwd && typeof c.store === 'string' && c.store !== '') return c.store;
+  } catch {
+    // no usable cache: compute below
+  }
+  const store = storeFor(cwd);
+  writeAtomic(f, JSON.stringify({ cwd, store }));
+  return store;
+}
