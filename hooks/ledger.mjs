@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 // SubagentStop hook: appends one line per orchestrator delegation ({ts, tier, status, agent_id}) to <store>/delegations.jsonl, capped at 1000 lines once over 256 KB.
 // Stats mode: `node ledger.mjs --stats <store>` prints one LEDGER line with the pass rate per tier.
-// Store computation: lib.storeFor (shared with session-info and trim-output). Fails open: any error prints nothing and exits 0; never blocks.
+// Store computation: lib.cachedStoreFor (per-session cache of lib.storeFor, primed by session-info and trim-output). Fails open: any error prints nothing and exits 0; never blocks.
 import { appendFileSync, closeSync, existsSync, fstatSync, mkdirSync, openSync, readFileSync, readSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { makeDbg, readStdin, storeFor, writeAtomic } from './lib.mjs';
+import { cachedStoreFor, makeDbg, readStdin, writeAtomic } from './lib.mjs';
 
 const dbg = makeDbg('ledger');
 
@@ -101,7 +101,7 @@ function record(input) {
   const ms = [...String(text).matchAll(/^[ \t>*_-]*STATUS[ \t*_]*:[ \t*_]*([A-Za-z_]+)/gim)];
   const status = ms.length ? ms[ms.length - 1][1].toUpperCase() : '?';
 
-  const store = storeFor(cwd);
+  const store = cachedStoreFor(cwd, input?.session_id);
   mkdirSync(store, { recursive: true });
   const file = join(store, 'delegations.jsonl');
   const line = JSON.stringify({ ts: new Date().toISOString(), tier, status, agent_id: String(input?.agent_id ?? '') }) + '\n';

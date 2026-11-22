@@ -6,7 +6,7 @@ import fs from 'fs';
 import os from 'os';
 import { execFileSync } from 'child_process';
 import path from 'path';
-import { makeDbg, orchestrationOff, readStdin } from './lib.mjs';
+import { makeDbg, orchestrationOff, readStdin, writeAtomic } from './lib.mjs';
 
 const dbg = makeDbg('guard-edit');
 
@@ -55,9 +55,7 @@ function bumpDenyStreak(input) {
     }
     if (!Number.isInteger(count) || count < 0) count = 0;
     count += 1;
-    const tmp = `${file}.${process.pid}.tmp`;
-    fs.writeFileSync(tmp, String(count));
-    fs.renameSync(tmp, file);
+    writeAtomic(file, String(count));
     return count;
   } catch (e) {
     dbg(e);

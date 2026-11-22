@@ -17,7 +17,10 @@ function fail(msg) {
 
 const argValue = (name) => {
   const i = process.argv.indexOf(name);
-  return i === -1 ? undefined : process.argv[i + 1];
+  if (i === -1) return undefined;
+  const v = process.argv[i + 1];
+  if (v === undefined || v.startsWith('-')) fail(`eval-select: ${name} needs a value`);
+  return v;
 };
 
 let files;
@@ -25,6 +28,7 @@ if (argValue('--files') !== undefined) {
   files = argValue('--files').split(',').filter(Boolean);
 } else if (argValue('--base') !== undefined) {
   const ref = argValue('--base');
+  if (!/^[A-Za-z0-9][A-Za-z0-9._\/@^~-]*$/.test(ref)) fail(`eval-select: invalid --base ref ${JSON.stringify(ref)}`);
   const r = spawnSync('git', ['diff', '--name-only', `${ref}...HEAD`], { cwd: root, encoding: 'utf8' });
   if (r.status !== 0) fail((r.stderr ?? '').trim() || `eval-select: git diff ${ref}...HEAD failed`);
   files = r.stdout.split('\n').filter(Boolean);

@@ -3,7 +3,7 @@
 // Fails open: on any error or unexpected input it prints nothing and exits 0.
 import { appendFileSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, statSync, unlinkSync } from 'node:fs';
 import { join } from 'node:path';
-import { makeDbg, posInt, readStdin, storeFor } from './lib.mjs';
+import { cachedStoreFor, makeDbg, posInt, readStdin } from './lib.mjs';
 
 const dbg = makeDbg('trim-output');
 
@@ -92,7 +92,7 @@ function record(input, before, after) {
     const sid = String(input?.session_id ?? '').replace(/[^A-Za-z0-9_-]/g, '').slice(0, 64);
     const cwd = typeof input?.cwd === 'string' && input.cwd !== '' ? input.cwd : process.cwd();
     if (sid === '') return;
-    const store = storeFor(cwd);
+    const store = cachedStoreFor(cwd, input?.session_id);
     const file = join(store, `trim-stats-${sid}.jsonl`);
     if (!existsSync(store)) mkdirSync(store, { recursive: true });
     if (existsSync(file) && statSync(file).size > 65536) return;
