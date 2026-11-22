@@ -21,4 +21,6 @@ Commands:
 
 Kill switches (env vars): `ORCH_GUARD=off` (edit and review guards), `ORCH_READ_GUARD=off` (large-read guard), `ORCH_NO_TRIM=1` (output trim; or add `# notrim` to one command), `ORCH_LONG=off` (long-session warning), `ORCH_DEBUG=1` (hook errors to stderr and `<tmpdir>/orchestrator-debug.log`).
 
+Tools: `node scripts/otel-export.mjs <transcript.jsonl> [--out <file>]` (session as OTLP/JSON spans for Jaeger, Langfuse or Grafana; no message content).
+
 Docs: `README.md` in the plugin folder (usage, hooks, data location), `CHANGELOG.md` (release notes per version), lessons and checkpoints in the store shown by `/orchestrator:status`.
