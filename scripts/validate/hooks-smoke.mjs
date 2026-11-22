@@ -89,6 +89,23 @@ const { root, err, exists, readText, runHook, rmQuiet, trimPayload, sessionInfo,
       } finally {
         fs.rmSync(isdirStore, { recursive: true, force: true });
       }
+      // IC-189: --project sums all recent session files, skips files older than 14 days, missing store -> none
+      const projStore = fs.mkdtempSync(path.join(os.tmpdir(), 'orch-trimstat-proj-'));
+      try {
+        const rec = '{"ts":1,"before":10,"after":2,"saved":8}\n';
+        fs.writeFileSync(path.join(projStore, 'trim-stats-a.jsonl'), rec + rec);
+        fs.writeFileSync(path.join(projStore, 'trim-stats-b.jsonl'), rec);
+        const oldF = path.join(projStore, 'trim-stats-old.jsonl');
+        fs.writeFileSync(oldF, rec);
+        const oldT = new Date(Date.now() - 30 * 24 * 3600e3);
+        fs.utimesSync(oldF, oldT, oldT);
+        const proj = spawnSync(process.execPath, [path.join(root, 'hooks', 'trim-output.mjs'), '--stats', projStore, '--project'], { encoding: 'utf8', cwd: root, env: { ...process.env, ...homeEnv } });
+        if (proj.stdout.trim() !== 'TRIM: 3 trims, ~6 tokens saved (24 bytes) (all sessions, last 14 days)') err('hooks/trim-output.mjs', `smoke "trim stats project": unexpected output "${proj.stdout.trim()}"`);
+        const projNone = spawnSync(process.execPath, [path.join(root, 'hooks', 'trim-output.mjs'), '--stats', path.join(projStore, 'nosuch'), '--project'], { encoding: 'utf8', cwd: root, env: { ...process.env, ...homeEnv } });
+        if (projNone.stdout.trim() !== 'TRIM: none') err('hooks/trim-output.mjs', `smoke "trim stats project missing store": unexpected output "${projNone.stdout.trim()}"`);
+      } finally {
+        fs.rmSync(projStore, { recursive: true, force: true });
+      }
       // IC-159: a session file over 64 KB is compacted to one summary line (1200 trims) before the new record is appended
       const bigFile = path.join(store, 'trim-stats-big.jsonl');
       fs.writeFileSync(bigFile, Array.from({ length: 1200 }, () => JSON.stringify({ ts: 1, before: 10, after: 2, saved: 10, pad: 'x'.repeat(20) })).join('\n') + '\n');
