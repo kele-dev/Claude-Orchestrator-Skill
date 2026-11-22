@@ -2,8 +2,8 @@
 // Pick the eval cases affected by changed files, so a run skips the rest. A manual all-cases run (--case "*") stays available.
 // Usage: node scripts/eval-select.mjs --files a,b,c | --base <git-ref> [--plan]   (--base uses git diff --name-only <ref>...HEAD)
 // Output: selected case names, sorted, one per line (nothing when none). With --plan: selected=, case=, skip=, partial= lines (the eval workflow reads these). Exit: 0 ok, 2 bad args or git/read failure.
-// Unknown skills/, agents/ or hooks/ paths, and changes to evals/touches.json, scripts/eval-* or .github/workflows/, select every case, so a wrong map never skips a regression.
-// NO_EVAL lists paths no eval case reads (skills/help/): a change there selects nothing.
+// Unmapped skills/, agents/ or scripts/ files and any hooks/ path, and changes to evals/touches.json, scripts/eval-* or .github/workflows/, select every case, so a wrong map never skips a regression.
+// NO_EVAL lists paths no eval case reads (skills/help/, scripts/validate, evals/README.md, evals/baseline.json): a change there selects nothing.
 import { readFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { dirname, join } from 'node:path';
@@ -48,7 +48,7 @@ const cases = Object.keys(touches);
 const prefixesOf = (c) => (Array.isArray(touches[c]) ? touches[c] : []);
 const picked = new Set();
 const all = () => cases.forEach((c) => picked.add(c));
-const NO_EVAL = ['skills/help/'];
+const NO_EVAL = ['skills/help/', 'scripts/validate', 'evals/README.md', 'evals/baseline.json'];
 
 for (const raw of files) {
   // A quoted name is a path git could not spell plainly; it might be a hooks change, so fail closed.
@@ -72,7 +72,7 @@ for (const raw of files) {
     continue;
   }
   if (NO_EVAL.some((p) => f.startsWith(p))) continue;
-  if (f.startsWith('skills/') || f.startsWith('agents/')) all();
+  if (f.startsWith('skills/') || f.startsWith('agents/') || f.startsWith('scripts/')) all();
 }
 
 const sel = [...picked].sort();

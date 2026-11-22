@@ -4,6 +4,10 @@ Per-version release notes. The README keeps only the current version's "Baru di"
 
 ## English
 
+### Unreleased
+- Fixed: lesson index without dangling colon; TRIM unavailable names ORCH_DEBUG=1; long-session uses shared session-id sanitizer; eval-select selects every case for an unmapped scripts/ file; README no longer claims failed commands keep a 10-line head; ideas doc store-key wording.
+- CI: partial eval runs call the eval once per selected case; pinned Claude Code version recorded in evals/README.md and checked by the validator; smoke tests cover the 64 KB boundary and the root-fallback guard without inherited GIT_* env.
+
 ### 1.15.0
 - New: `/orchestrator:status` TRIM row shows a project total across retained sessions and approx tokens saved; eval workflow `changed_since` input and `scripts/eval-select.mjs --plan` run only the selected eval cases; session start lists at most 10 lessons and reads only file heads; read guard honours `/orchestrator:off` and shows in the Guards line; trim-stats files compact into a summary line and are pruned after 14 days.
 - Fixed: ledger parses STATUS only at line start with a colon, leniently, and counts unknown separately; ledger caps and appends under a lock with an atomic rewrite; guard-edit deny streak lives in the private state dir; otel-export no longer emits 1970 or zero-length spans and exits 3 on write failure; eval-select rejects option-like values and keeps git-quoted paths.

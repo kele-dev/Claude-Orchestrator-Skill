@@ -49,7 +49,7 @@ Since v1.5.0: `rules.md` is also injected on resume (idea 3 matters more), and e
 14. **Done (v1.14.0).** Read guard hook: warn or deny a main-session Read of a large file without `offset`/`limit`; whole-file reads are the largest token sink no hook guards yet.
 15. **Done (v1.14.0).** Trim-hook statistics: log lines/chars saved per call to the store and show totals in `/orchestrator:status`, so trim thresholds are tuned from data. Shipped as the TRIM row in `/orchestrator:status` (`hooks/trim-output.mjs --stats`).
 16. **Partially done (compare script; scheduled run is opt-in).** Token regression gate in CI: run the eval suite on pull requests and fail when tokens rise more than X% over the stored baseline (builds on the plugin-eval-suite work).
-17. **Done (v1.14.0).** Store key from repo identity (remote URL or first-commit hash) instead of the folder path, so lessons survive a moved or re-cloned repo; keep the path key as fallback and migrate. Shipped for new stores; an existing path-based store keeps being used (no migration).
+17. **Done (v1.14.0).** Store key from repo identity (git remote origin URL; the folder path when there is no remote) instead of the folder path, so lessons survive a moved or re-cloned repo; keep the path key as fallback and migrate. Shipped for new stores; an existing path-based store keeps being used (no migration).
 18. **Done.** Checkpoint expiry: mark checkpoints older than N days in the session-info line and offer deletion; stale ones are printed at every session start.
 
 ## Done in v1.12.0
