@@ -113,6 +113,14 @@ const { root, err, exists, readText, runHook, rmQuiet, trimPayload, sessionInfo,
       const big = spawnSync(process.execPath, [path.join(root, 'hooks', 'trim-output.mjs'), '--stats', store, 'big'], { encoding: 'utf8', cwd: root, env: { ...process.env, ...homeEnv } });
       if (!/^TRIM: 1201 trims, ~\d+ tokens saved \(1[2-9]\d{3,} bytes\)$/.test(big.stdout.trim())) err('hooks/trim-output.mjs', `smoke "trim stats big file": unexpected output "${big.stdout.trim()}"`);
       if (fs.readFileSync(bigFile, 'utf8').split('\n').filter(Boolean).length !== 2) err('hooks/trim-output.mjs', 'smoke "trim stats big file": expected exactly 2 lines after compaction');
+      // IC-213: unreadable lines in an over-64 KB file survive compaction and are reported by --stats
+      const bigBadFile = path.join(store, 'trim-stats-bigbad.jsonl');
+      fs.writeFileSync(bigBadFile, Array.from({ length: 1000 }, () => JSON.stringify({ ts: 1, before: 10, after: 2, saved: 10, pad: 'x'.repeat(80) })).join('\n') + '\nnot json\nnot json\nnot json\n');
+      runHook('trim-output.mjs', { ...trimPayload('npm test'), cwd: tcwd, session_id: 'bigbad' }, homeEnv);
+      const bigBad = spawnSync(process.execPath, [path.join(root, 'hooks', 'trim-output.mjs'), '--stats', store, 'bigbad'], { encoding: 'utf8', cwd: root, env: { ...process.env, ...homeEnv } });
+      if (!/^TRIM: 1001 trims, ~\d+ tokens saved \(\d+ bytes\), 3 unreadable lines skipped$/.test(bigBad.stdout.trim())) err('hooks/trim-output.mjs', `smoke "trim stats big bad lines": unexpected output "${bigBad.stdout.trim()}"`);
+      const bigBadLines = fs.readFileSync(bigBadFile, 'utf8').split('\n').filter(Boolean);
+      if (bigBadLines.length !== 2 || JSON.parse(bigBadLines[0]).bad !== 3) err('hooks/trim-output.mjs', `smoke "trim stats big bad lines": expected 2 lines with bad === 3 on the first, got ${bigBadLines.length} lines`);
       // IC-181: a stats file of exactly 65536 bytes is appended to, not compacted; a small two-record file likewise
       const edgeFile = path.join(store, 'trim-stats-edge.jsonl');
       const edgeBase = { ts: 1, before: 10, after: 2, saved: 10, pad: '' };

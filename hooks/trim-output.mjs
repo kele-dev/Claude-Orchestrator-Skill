@@ -109,11 +109,8 @@ function record(input, before, after) {
 // IC-159: folds an over-64 KB session file into one {ts, n, saved, summary} line; returns false on error (never throws).
 function compact(file) {
   try {
-    let n = 0, saved = 0;
-    for (const l of readFileSync(file, 'utf8').split('\n')) {
-      try { const r = JSON.parse(l); n += Number(r.n) || 1; saved += Number(r.saved) || 0; } catch { /* skip */ }
-    }
-    return writeAtomic(file, JSON.stringify({ ts: Date.now(), n, saved, summary: true }) + '\n');
+    const { n, saved, bad } = sumFile(file);
+    return writeAtomic(file, JSON.stringify({ ts: Date.now(), n, saved, ...(bad ? { bad } : {}), summary: true }) + '\n');
   } catch (e) {
     dbg(e);
     return false;
@@ -159,20 +156,20 @@ function statsLine(store, sessionArg, project = false) {
   return format(n, saved, bad, suffix);
 }
 
-// Sums one stats file: n counts r.n || 1 per parsable line, bad counts unparsable non-empty lines.
+// Sums one stats file: n counts r.n || 1 per parsable line, bad counts unparsable non-empty lines, and r.bad carried by a compacted summary.
 function sumFile(file) {
   let n = 0, saved = 0, bad = 0;
   for (const l of readFileSync(file, 'utf8').split('\n')) {
     if (l.trim() === '') continue;
-    try { const r = JSON.parse(l); n += Number(r.n) || 1; saved += Number(r.saved) || 0; } catch { bad++; }
+    try { const r = JSON.parse(l); n += Number(r.n) || 1; saved += Number(r.saved) || 0; bad += Number(r.bad) || 0; } catch { bad++; }
   }
   return { n, saved, bad };
 }
 
 function format(n, saved, bad, suffix) {
   if (!n && bad) return 'TRIM: unavailable (unreadable stats file)';
-  // approximate tokens: 4 chars (bytes) per token
-  return n ? `TRIM: ${n} trims, ~${Math.round(saved / 4)} tokens saved (${saved} bytes)${suffix}` : NO_STATS;
+  // approximate tokens: 4 chars (bytes) per token; unreadable lines are reported, not dropped silently
+  return n ? `TRIM: ${n} trims, ~${Math.round(saved / 4)} tokens saved (${saved} bytes)${bad ? `, ${bad} unreadable lines skipped` : ''}${suffix}` : NO_STATS;
 }
 
 // IC-189: totals over all trim-stats files modified within STATS_MAX_AGE_MS.
