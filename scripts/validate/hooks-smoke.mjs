@@ -307,9 +307,6 @@ const { root, err, exists, readText, runHook, rmQuiet, trimPayload, sessionInfo,
         if (fs.readFileSync(victim, 'utf8') !== 'keep') err('hooks/guard-read.mjs', 'smoke "read marker symlink": symlink target was overwritten');
       }
     } finally {
-      for (const s of [sid, sid + '-b', sid + '-c']) {
-        for (const f of fs.readdirSync(os.tmpdir())) if (f.startsWith(`orchestrator-read-${s}-`)) rmQuiet(path.join(os.tmpdir(), f));
-      }
       rmQuiet(rdir, { recursive: true });
     }
   }

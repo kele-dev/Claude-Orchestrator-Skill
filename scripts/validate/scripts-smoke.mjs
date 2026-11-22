@@ -17,7 +17,7 @@ const { root, err, exists, readText, runHook, rmQuiet } = ctx;
   const sidD = `${sidA}-d`;
   const sidE = `${sidA}-e`;
   const markers = [sidA, sidB, sidC, sidD, sidE, `${sidA}-f`, `${sidA}-m`, `${sidA}-n`].flatMap((s) => [path.join(os.tmpdir(), `orchestrator-long-${s}`), path.join(os.tmpdir(), `orchestrator-long-${s}.count`), path.join(os.tmpdir(), `orchestrator-long-${s}.growth`)]);
-  markers.push(...['g', 'h', 'i', 'j', 'k'].flatMap((s) => [path.join(os.tmpdir(), `orchestrator-long-${sidA}-${s}`), path.join(os.tmpdir(), `orchestrator-long-${sidA}-${s}.count`)]));
+  markers.push(...['g', 'h', 'i', 'j', 'k'].flatMap((s) => [path.join(os.tmpdir(), `orchestrator-long-${sidA}-${s}`), path.join(os.tmpdir(), `orchestrator-long-${sidA}-${s}.count`), path.join(os.tmpdir(), `orchestrator-long-${sidA}-${s}.growth`)]));
   try {
     const digestPath = path.join(root, 'scripts', 'digest.mjs');
     if (!exists(digestPath)) {
@@ -184,10 +184,6 @@ const { root, err, exists, readText, runHook, rmQuiet } = ctx;
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
     for (const m of markers) fs.rmSync(m, { force: true });
-    // repeat-smoke sessions (sidA-g ... sidA-k) leave markers and .growth caches too
-    for (const f of fs.readdirSync(os.tmpdir())) {
-      if (f.startsWith(`orchestrator-long-${sidA}`)) rmQuiet(path.join(os.tmpdir(), f));
-    }
   }
 }
 
