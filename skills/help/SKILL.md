@@ -19,7 +19,7 @@ Commands:
 - `/orchestrator:status` - read-only state summary
 - `/orchestrator:help` - this list
 
-Kill switches (env vars): `ORCH_GUARD=off` (edit and review guards), `ORCH_READ_GUARD=off` (large-read guard), `ORCH_NO_TRIM=1` (output trim; or add `# notrim` to one command), `ORCH_LONG=off` (long-session warning), `ORCH_DEBUG=1` (hook errors to stderr and `<tmpdir>/orchestrator-debug.log`).
+Kill switches (env vars): `ORCH_GUARD=off` (edit and review guards), `ORCH_READ_GUARD=off` (large-read guard), `ORCH_NO_TRIM=1` (output trim; or add `# notrim` to one command), `ORCH_LONG=off` (long-session warning), `ORCH_DEBUG=1` (hook errors to stderr and `<tmpdir>/orchestrator-debug.log`). Also `ORCH_STALE_DAYS` (default 14, age before a lesson or checkpoint counts as stale) and `ORCH_STATE_DIR` (hook state dir).
 
 Tools: `node scripts/otel-export.mjs <transcript.jsonl> [--out <file>]` (session as OTLP/JSON spans for Jaeger, Langfuse or Grafana; no message content).
 
