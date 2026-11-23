@@ -1,11 +1,11 @@
 # Improvement Dashboard
 
-Date: 2026-11-22 (cycle 018)
+Date: 2026-11-24 (cycle 019)
 
 Tick `[x]` to pre-select an item for the next cycle's phase 3. Ticks are suggestions; the skill still asks you.
 Mark `- [-]` to suggest rejecting an item permanently; the skill asks you to confirm before it marks anything `rejected`.
 
-Last cycle: 018 (2026-11-22): 8 done (IC-207, IC-208, IC-212, IC-213, IC-217, IC-218, IC-219, IC-221), IC-215 and IC-220 deferred, IC-019 still blocked. Open: P0 0, P1 1 (blocked), P2 27, P3 21.
+Last cycle: 019 (2026-11-24, incremental): 8 done (IC-225, IC-226, IC-179, IC-227, IC-228, IC-229, IC-230, IC-238), IC-231 deferred, IC-019 still blocked. Open: P0 0, P1 1 (blocked), P2 33, P3 22.
 
 - [ ] IC-019 P1 DX/CI-CD/dependencies: Token-regression gate in eval CI is dead: evals/baseline.json not committed
 - [ ] IC-120 P2 Observability & ops: Debug log at a predictable tmp path follows symlinks and goes silent after the 256 KB cap
@@ -22,7 +22,6 @@ Last cycle: 018 (2026-11-22): 8 done (IC-207, IC-208, IC-212, IC-213, IC-217, IC
 - [ ] IC-149 P2 UX & accessibility: otel-export rejects --help as an unknown option and its messages lack the otel-export: prefix other scripts use
 - [ ] IC-168 P2 Performance: SessionStart stats every checkpoint file before keeping the newest five
 - [ ] IC-171 P2 Code quality & tests: eval-select smoke hard-codes case counts 12 and 9, so adding an eval case breaks validate
-- [ ] IC-179 P2 Security: eval.yml writes the unvalidated case input into $GITHUB_OUTPUT with echo, so a newline can add outputs such as skip=true
 - [ ] IC-182 P2 Code quality & tests: sanitizeSid in lib.mjs has no direct test of its charset, 80-char cap or empty result
 - [ ] IC-186 P2 UX & accessibility: eval-select accepts an empty --files value and prints skip=true with exit 0 instead of a usage error
 - [ ] IC-192 P2 Stability: long-session ignores the writeAtomic result for its warning marker, so a failed write repeats the long-session warning on every prompt
@@ -35,6 +34,14 @@ Last cycle: 018 (2026-11-22): 8 done (IC-207, IC-208, IC-212, IC-213, IC-217, IC
 - [ ] IC-215 P2 Code quality & tests: trim-stats smoke repeats the same spawnSync call about 11 times
 - [ ] IC-211 P2 Performance: validate wall time grew from 30 s to 181 s, cause not measured
 - [ ] IC-210 P2 Stability: writeAtomic stale same-pid temp file fails one write
+- [ ] IC-231 P2 Security: Checkpoint and lesson file names reach SessionStart context without clean()
+- [ ] IC-232 P2 Stability: hooks-smoke spawns PowerShell with no timeout, so a hung shell stalls validate on win32
+- [ ] IC-233 P2 DX/CI-CD/dependencies: eval.yml input defaults repeated in three places
+- [ ] IC-234 P2 Code quality & tests: session-info dead backslash check and CHANGELOG wording (re-validate: IC-238 removed the check)
+- [ ] IC-235 P2 UX & accessibility: docs/ideas/token-saving.md uses number 13 for two items
+- [ ] IC-236 P2 UX & accessibility: "TRIM: unavailable" gives no count or hint
+- [ ] IC-237 P2 Observability & ops: Digest line omitted (CR/LF paths) with no dbg() trace
+- [ ] IC-239 P2 Security: eval artifacts uploaded without a scan for the API key
 - [ ] IC-117 P3 UX & accessibility: status 16-row cap is ambiguous with per-file lesson and checkpoint rows
 - [ ] IC-118 P3 Code quality & tests: Validator split left module bodies unindented inside run(ctx)
 - [ ] IC-133 P3 Performance: Per-session marker and deny-streak files in the state and temp dirs are never pruned
@@ -56,3 +63,4 @@ Last cycle: 018 (2026-11-22): 8 done (IC-207, IC-208, IC-212, IC-213, IC-217, IC
 - [ ] IC-216 P3 DX/CI-CD/dependencies: eval.yml installs apt packages and the pinned CLI with no cache
 - [ ] IC-223 P3 UX & accessibility: README sentence about ORCH_TRIM_ERRORS "the 10" is ambiguous
 - [ ] IC-224 P3 New features: Proposal: review two old claude/* branches and delete or log them
+- [ ] IC-240 P3 Code quality & tests: Regression of IC-173 guard text (behaviour intact)
