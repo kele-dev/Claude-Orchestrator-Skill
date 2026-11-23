@@ -302,9 +302,11 @@ const { root, err, exists, readText, runHook, rmQuiet, trimPayload, sessionInfo,
       fs.utimesSync(path.join(cd, 'old.md'), t, t);
       const a = sess({});
       const b = sess({ ORCH_STALE_DAYS: '30' });
-      if (!(a.includes('old (old one) (stale 20d)') && a.includes('new (new one)') && !a.includes('new (new one) (stale') && a.includes('offer the user to delete') && !b.includes('stale'))) {
+      const c = sess({ ORCH_STALE_DAYS: 'off' });
+      if (!(a.includes('old (old one) (stale 20d)') && a.includes('new (new one)') && !a.includes('new (new one) (stale') && a.includes('offer the user to delete') && a.includes('ORCH_STALE_DAYS=off stops this note') && !b.includes('stale'))) {
         err('hooks/session-info.mjs', 'smoke "session-info stale": expected stale marker for 20d-old checkpoint only, none with ORCH_STALE_DAYS=30');
       }
+      if (c.includes('stale')) err('hooks/session-info.mjs', 'smoke "session-info stale off": expected no stale marker with ORCH_STALE_DAYS=off');
 
       // IC-229: Digest line quoting (single quotes) and omission on CR/LF; task-less checkpoint has no "()"
       const dig = (tp) => runHook('session-info.mjs', { hook_event_name: 'SessionStart', source: 'startup', cwd: scwd, transcript_path: tp }, { HOME: sh, USERPROFILE: sh, ORCH_STALE_DAYS: '' })?.stdout ?? '';
