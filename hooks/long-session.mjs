@@ -186,6 +186,8 @@ function readLevel(marker) {
   try { const s = readFileSync(marker, 'utf8').trim(); return /^[1-9]\d*$/.test(s) ? Number(s) : 1; } catch (e) { dbg(e); return 1; }
 }
 
+const HANDOFF = 'If a multi-step task is in progress, write a checkpoint per orchestrator:resume now (one haiku-coder delegation, bundled with any due housekeeping) and hand off per orchestrator:resume (summary plus a new-session card running /orchestrator:resume the real checkpoint name (never a placeholder)); otherwise suggest a new session or /compact in one line.';
+
 function run(input) {
   if (process.env.ORCH_LONG === 'off') return '';
 
@@ -210,7 +212,7 @@ function run(input) {
   if (warned > 0) {
     if (!g || level <= warned) return '';
     writeAtomic(marker, String(level));
-    return say(`orchestrator: this session is very long (+${Math.round(growth / 1000)}k context tokens; reminder ${level - 1} of ${levels.length - 1}). Every new message re-sends the whole conversation, so each turn costs more. A fresh session is cheaper; Claude can save your progress first so you can continue there.`, 'If a multi-step task is in progress, write a checkpoint per orchestrator:resume now (one haiku-coder delegation, bundled with any due housekeeping) and hand off per orchestrator:resume (summary plus a new-session card running /orchestrator:resume the real checkpoint name (never a placeholder)); otherwise suggest a new session or /compact in one line.');
+    return say(`orchestrator: this session is very long (+${Math.round(growth / 1000)}k context tokens; reminder ${level - 1} of ${levels.length - 1}). Every new message re-sends the whole conversation, so each turn costs more. A fresh session is cheaper; Claude can save your progress first so you can continue there.`, HANDOFF);
   }
 
   const bytesLimit = posInt(process.env.ORCH_LONG_BYTES, 2 * 1024 * 1024);
@@ -228,7 +230,7 @@ function run(input) {
     dbg(e);
     // ignore cleanup errors
   }
-  const tail = 'Write a checkpoint per orchestrator:resume and hand off per orchestrator:resume (summary plus a new-session card running /orchestrator:resume the real checkpoint name (never a placeholder)).';
+  const tail = HANDOFF;
   const line = g
     ? `orchestrator: this session is long (+${Math.round((g.last - g.first) / 1000)}k context tokens${tokensLong ? '' : `, ${delegations} delegations`}). Every new message re-sends the whole conversation, so a fresh session is cheaper; Claude can save your progress first so you can continue there.`
     : `orchestrator: this session is long (${(size / 1048576).toFixed(1)} MB, ${delegations} delegations). Every new message re-sends the whole conversation, so a fresh session is cheaper; Claude can save your progress first so you can continue there.`;
