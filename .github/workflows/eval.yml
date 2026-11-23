@@ -12,7 +12,7 @@ on:
         type: string
         default: ""
       runs:
-        description: "runs per case"
+        description: "runs per case (1-10)"
         type: string
         default: "1"
       model:
@@ -20,7 +20,7 @@ on:
         type: string
         default: "claude-opus-5-5"
       max_cost_usd:
-        description: "cost cap in USD"
+        description: "cost cap in USD (above 0, at most 20)"
         type: string
         default: "3"
 
@@ -40,10 +40,19 @@ jobs:
         env:
           RUNS: ${{ inputs.runs || '1' }}
           MAX_COST: ${{ inputs.max_cost_usd || '3' }}
+          MODEL: ${{ inputs.model || 'claude-opus-5-5' }}
+          BASE: ${{ inputs.changed_since }}
         run: |
           case "$RUNS" in ''|*[!0-9]*|0*) echo "::error::runs must be a whole number of at least 1, got '$RUNS'"; exit 1;; esac
-          printf '%s' "$MAX_COST" | grep -Eq '^[0-9]+(\.[0-9]+)?$' || { echo "::error::max_cost_usd must be a number such as 3 or 2.5, got '$MAX_COST'"; exit 1; }
+          [ "$RUNS" -le 10 ] 2>/dev/null || { echo "::error::runs must be at most 10, got '$RUNS'"; exit 1; }
+          re='^[0-9]+(\.[0-9]+)?$'
+          [[ $MAX_COST =~ $re ]] || { echo "::error::max_cost_usd must be a number such as 3 or 2.5, got '$MAX_COST'"; exit 1; }
           awk -v c="$MAX_COST" 'BEGIN{exit !(c>0)}' || { echo "::error::max_cost_usd must be above 0"; exit 1; }
+          awk -v c="$MAX_COST" 'BEGIN{exit !(c<=20)}' || { echo "::error::max_cost_usd must be at most 20, got '$MAX_COST'"; exit 1; }
+          re='^[A-Za-z0-9][A-Za-z0-9._:-]{0,99}$'
+          [[ $MODEL =~ $re ]] || { echo "::error::model must be a model id such as claude-opus-5-5, got '$MODEL'"; exit 1; }
+          re='^[A-Za-z0-9][A-Za-z0-9._/~^@-]{0,199}$'
+          [ -z "$BASE" ] || [[ $BASE =~ $re ]] || { echo "::error::changed_since must be a git ref such as main or HEAD~3, got '$BASE'"; exit 1; }
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
