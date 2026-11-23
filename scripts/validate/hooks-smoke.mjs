@@ -306,6 +306,20 @@ const { root, err, exists, readText, runHook, rmQuiet, trimPayload, sessionInfo,
         err('hooks/session-info.mjs', 'smoke "session-info stale": expected stale marker for 20d-old checkpoint only, none with ORCH_STALE_DAYS=30');
       }
 
+      // IC-229: Digest line quoting (single quotes) and omission on CR/LF; task-less checkpoint has no "()"
+      const dig = (tp) => runHook('session-info.mjs', { hook_event_name: 'SessionStart', source: 'startup', cwd: scwd, transcript_path: tp }, { HOME: sh, USERPROFILE: sh, ORCH_STALE_DAYS: '' })?.stdout ?? '';
+      const p1 = '/tmp/a$b' + String.fromCharCode(96) + 'c"d/t.jsonl';
+      const p2 = "/tmp/o'neil/t.jsonl";
+      const p3 = '/tmp/x\ny/t.jsonl';
+      const d1 = dig(p1);
+      if (!/^Digest: node '/m.test(d1) || !d1.includes("'" + p1 + "'")) err('hooks/session-info.mjs', 'smoke "session-info digest": expected a Digest line with the path in single quotes');
+      if (!dig(p2).includes("'\\''")) err('hooks/session-info.mjs', 'smoke "session-info digest": expected the single quote in the path escaped as \'\\\'\'');
+      const d3 = dig(p3);
+      if (d3.includes('Digest:') || !d1.includes('Digest:')) err('hooks/session-info.mjs', 'smoke "session-info digest": expected no Digest line for a path with a newline, but one for a normal path');
+      fs.writeFileSync(path.join(cd, 'notask.md'), '# notes\n');
+      const nt = sess({});
+      if (!nt.includes('notask') || nt.includes('notask ()')) err('hooks/session-info.mjs', 'smoke "session-info checkpoint": expected "notask" without an empty "()" task');
+
       // session-info map: no learned-map.md -> "Map: none"; present -> no "Map: none"
       if (!sess({}).includes('Map: none')) {
         err('hooks/session-info.mjs', 'smoke "session-info map": expected "Map: none" on fresh store');
