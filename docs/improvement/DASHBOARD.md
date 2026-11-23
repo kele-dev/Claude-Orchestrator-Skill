@@ -5,7 +5,7 @@ Date: 2026-11-24 (cycle 019)
 Tick `[x]` to pre-select an item for the next cycle's phase 3. Ticks are suggestions; the skill still asks you.
 Mark `- [-]` to suggest rejecting an item permanently; the skill asks you to confirm before it marks anything `rejected`.
 
-Last cycle: 019 (2026-11-24, incremental): 8 done (IC-225, IC-226, IC-179, IC-227, IC-228, IC-229, IC-230, IC-238), IC-231 deferred, IC-019 still blocked. Open: P0 0, P1 1 (blocked), P2 33, P3 22.
+Last cycle: 019 (2026-11-24, incremental): 8 done (IC-225, IC-226, IC-179, IC-227, IC-228, IC-229, IC-230, IC-238), IC-231 deferred, IC-019 still blocked. Open: P0 0, P1 1 (blocked), P2 34, P3 22.
 
 - [ ] IC-019 P1 DX/CI-CD/dependencies: Token-regression gate in eval CI is dead: evals/baseline.json not committed
 - [ ] IC-120 P2 Observability & ops: Debug log at a predictable tmp path follows symlinks and goes silent after the 256 KB cap
