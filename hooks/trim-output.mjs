@@ -97,7 +97,7 @@ function record(input, before, after) {
     const store = cachedStoreFor(cwd, input?.session_id);
     const file = join(store, `trim-stats-${sid}.jsonl`);
     if (!existsSync(store)) mkdirSync(store, { recursive: true });
-    if (existsSync(file) && statSync(file).size > 65536 && !compact(file)) return;
+    if (existsSync(file) && statSync(file).size > 65536 && !compact(file)) dbg(new Error('trim stats: compaction failed, appending instead'));
     if (!existsSync(file)) prune(store, file);
     const saved = Buffer.byteLength(before) - Buffer.byteLength(after);
     appendFileSync(file, JSON.stringify({ ts: Date.now(), before: before.split('\n').length, after: after.split('\n').length, saved }) + '\n');
@@ -110,7 +110,9 @@ function record(input, before, after) {
 function compact(file) {
   try {
     const { n, saved, bad } = sumFile(file);
-    return writeAtomic(file, JSON.stringify({ ts: Date.now(), n, saved, ...(bad ? { bad } : {}), summary: true }) + '\n');
+    const ok = writeAtomic(file, JSON.stringify({ ts: Date.now(), n, saved, ...(bad ? { bad } : {}), summary: true }) + '\n');
+    if (!ok) dbg(new Error('trim stats: compaction write failed'));
+    return ok;
   } catch (e) {
     dbg(e);
     return false;

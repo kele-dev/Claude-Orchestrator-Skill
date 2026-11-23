@@ -302,9 +302,25 @@ const { root, err, exists, readText, runHook, rmQuiet, trimPayload, sessionInfo,
       fs.utimesSync(path.join(cd, 'old.md'), t, t);
       const a = sess({});
       const b = sess({ ORCH_STALE_DAYS: '30' });
-      if (!(a.includes('old (old one) (stale 20d)') && a.includes('new (new one)') && !a.includes('new (new one) (stale') && a.includes('offer the user to delete') && !b.includes('stale'))) {
+      const c = sess({ ORCH_STALE_DAYS: 'off' });
+      if (!(a.includes('old (old one) (stale 20d)') && a.includes('new (new one)') && !a.includes('new (new one) (stale') && a.includes('offer the user to delete') && a.includes('ORCH_STALE_DAYS=off stops this note') && !b.includes('stale'))) {
         err('hooks/session-info.mjs', 'smoke "session-info stale": expected stale marker for 20d-old checkpoint only, none with ORCH_STALE_DAYS=30');
       }
+      if (c.includes('stale')) err('hooks/session-info.mjs', 'smoke "session-info stale off": expected no stale marker with ORCH_STALE_DAYS=off');
+
+      // IC-229: Digest line quoting (single quotes) and omission on CR/LF; task-less checkpoint has no "()"
+      const dig = (tp) => runHook('session-info.mjs', { hook_event_name: 'SessionStart', source: 'startup', cwd: scwd, transcript_path: tp }, { HOME: sh, USERPROFILE: sh, ORCH_STALE_DAYS: '' })?.stdout ?? '';
+      const p1 = '/tmp/a$b' + String.fromCharCode(96) + 'c"d/t.jsonl';
+      const p2 = "/tmp/o'neil/t.jsonl";
+      const p3 = '/tmp/x\ny/t.jsonl';
+      const d1 = dig(p1);
+      if (!/^Digest: node '/m.test(d1) || !d1.includes("'" + p1 + "'")) err('hooks/session-info.mjs', 'smoke "session-info digest": expected a Digest line with the path in single quotes');
+      if (!dig(p2).includes("'\\''")) err('hooks/session-info.mjs', 'smoke "session-info digest": expected the single quote in the path escaped as \'\\\'\'');
+      const d3 = dig(p3);
+      if (d3.includes('Digest:') || !d1.includes('Digest:')) err('hooks/session-info.mjs', 'smoke "session-info digest": expected no Digest line for a path with a newline, but one for a normal path');
+      fs.writeFileSync(path.join(cd, 'notask.md'), '# notes\n');
+      const nt = sess({});
+      if (!nt.includes('notask') || nt.includes('notask ()')) err('hooks/session-info.mjs', 'smoke "session-info checkpoint": expected "notask" without an empty "()" task');
 
       // session-info map: no learned-map.md -> "Map: none"; present -> no "Map: none"
       if (!sess({}).includes('Map: none')) {
@@ -755,6 +771,7 @@ if (spawnSync('git', ['--version']).status === 0) {
   };
   const base = fwdSlash(shome) + '/.claude/orchestrator/';
   const norm = (s) => s.trim().split(path.sep).join('/').toLowerCase();
+  const psQueue = [];
   const check = (name, dir, want) => {
     const hook = sessionInfo(dir, { HOME: shome, USERPROFILE: shome, ORCH_STALE_DAYS: '' }, true);
     const out = hook.stdout ?? '';
@@ -766,10 +783,7 @@ if (spawnSync('git', ['--version']).status === 0) {
       const b = spawnSync('bash', ['-c', block('bash')], { encoding: 'utf8', cwd: dir, env });
       if (norm(b.stdout ?? '') !== norm(want)) err(refPath, `store key smoke "${name}": bash "${(b.stdout ?? '').trim()}" vs "${want}"`);
     }
-    if (psShell && block('powershell')) {
-      const p = spawnSync(psShell, ['-NoProfile', '-Command', block('powershell')], { encoding: 'utf8', cwd: dir, env });
-      if (norm(p.stdout ?? '') !== norm(want)) err(refPath, `store key smoke "${name}": powershell "${(p.stdout ?? '').trim()}" vs "${want}"`);
-    }
+    if (psShell && block('powershell')) psQueue.push({ name, dir, want });
   };
   try {
     check('https with credentials', mkRepo('https://user:secret@GitHub.com/Foo/Bar.git'), base + 'github-com-foo-bar');
@@ -778,10 +792,22 @@ if (spawnSync('git', ['--version']).status === 0) {
     const legacy = mkRepo('https://example.com/legacy/proj.git');
     const oldKey = pathKey(fwdSlash(legacy));
     fs.mkdirSync(path.join(shome, '.claude', 'orchestrator', oldKey), { recursive: true });
-    check('old path dir kept', legacy, base + oldKey);
     fs.mkdirSync(path.join(shome, '.claude', 'orchestrator', 'example-com-legacy-proj'), { recursive: true });
     check('path dir wins when remote dir also exists', legacy, base + oldKey);
+    const legacy5 = mkRepo('https://example.com/legacy/proj5.git');
+    fs.mkdirSync(path.join(shome, '.claude', 'orchestrator', pathKey(fwdSlash(legacy5))), { recursive: true });
+    check('old path dir kept', legacy5, base + pathKey(fwdSlash(legacy5)));
     check('no remote uses path key', mkRepo(null), base + pathKey(fwdSlash(dirs[dirs.length - 1])));
+    if (psQueue.length) {
+      const script = psQueue.map((q) => `Set-Location -LiteralPath '${q.dir.replace(/'/g, "''")}'; & { ${block('powershell')} }; '---ORCH---'`).join('\n');
+      const p = spawnSync(psShell, ['-NoProfile', '-Command', script], { encoding: 'utf8', env: { ...process.env, HOME: shome, USERPROFILE: shome } });
+      const parts = (p.stdout ?? '').split('---ORCH---');
+      if (p.status !== 0 || parts.length !== psQueue.length + 1) {
+        err(refPath, `store key smoke: one PowerShell run for ${psQueue.length} cases exited ${p.status} with ${parts.length - 1} results`);
+      } else {
+        psQueue.forEach((q, i) => { if (norm(parts[i]) !== norm(q.want)) err(refPath, `store key smoke "${q.name}": powershell "${parts[i].trim()}" vs "${q.want}"`); });
+      }
+    }
   } finally {
     for (const d of dirs) rmQuiet(d, { recursive: true });
     rmQuiet(shome, { recursive: true });
