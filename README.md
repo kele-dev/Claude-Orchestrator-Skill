@@ -135,7 +135,7 @@ If you previously installed via `install.ps1`, delete `haiku-coder.md`, `sonnet-
 - Claude akan menyarankan team/autopilot kalau tugasnya cocok, tapi default tetap `on`. Batas iterasi naik otomatis (maks 4 putaran fix) hanya selama perbaikannya ada kemajuan.
 - Belajar: di akhir tugas Claude sendiri yang memutuskan pelajaran mana yang disimpan (maks 3, hanya yang sudah terbukti), serta memperbaiki atau menghapus yang usang, sebagai file lokal di store project (`~/.claude/orchestrator/<project-key>/lessons/`). Satu baris di laporan memberi tahu apa yang berubah. `/orchestrator:learn list` untuk melihat, `prune` untuk merapikan.
 - Hemat token: jawaban ringkas, output test dipotong, Opus tidak mendikte file panjang, self-review sebelum lapor, `learned-map` untuk peta project, saran sesi baru saat ganti topik, dan satu baris laporan token di akhir.
-- Baru di 1.15.2: Digest hanya untuk path transkrip yang aman, peringatan sesi panjang lebih jelas, statistik trim melaporkan baris tak terbaca, smoke Windows memanggil PowerShell sekali, workflow eval memvalidasi input lebih awal, dan proposal jalur edit langsung didokumentasikan; daftar lengkap ada di [CHANGELOG.md](CHANGELOG.md).
+- Baru di 1.15.2: Digest hanya untuk path transkrip yang aman, peringatan sesi panjang lebih jelas, statistik trim melaporkan baris tak terbaca, smoke Windows memeriksa PowerShell sekali per run dan menjalankan semua kasus store key dalam satu panggilan PowerShell, workflow eval memvalidasi input lebih awal, dan proposal jalur edit langsung didokumentasikan; daftar lengkap ada di [CHANGELOG.md](CHANGELOG.md).
 Release notes per version: see [CHANGELOG.md](CHANGELOG.md).
 - Mode orkestrasi aktif otomatis di setiap sesi.
 

@@ -755,6 +755,7 @@ if (spawnSync('git', ['--version']).status === 0) {
   };
   const base = fwdSlash(shome) + '/.claude/orchestrator/';
   const norm = (s) => s.trim().split(path.sep).join('/').toLowerCase();
+  const psQueue = [];
   const check = (name, dir, want) => {
     const hook = sessionInfo(dir, { HOME: shome, USERPROFILE: shome, ORCH_STALE_DAYS: '' }, true);
     const out = hook.stdout ?? '';
@@ -766,10 +767,7 @@ if (spawnSync('git', ['--version']).status === 0) {
       const b = spawnSync('bash', ['-c', block('bash')], { encoding: 'utf8', cwd: dir, env });
       if (norm(b.stdout ?? '') !== norm(want)) err(refPath, `store key smoke "${name}": bash "${(b.stdout ?? '').trim()}" vs "${want}"`);
     }
-    if (psShell && block('powershell')) {
-      const p = spawnSync(psShell, ['-NoProfile', '-Command', block('powershell')], { encoding: 'utf8', cwd: dir, env });
-      if (norm(p.stdout ?? '') !== norm(want)) err(refPath, `store key smoke "${name}": powershell "${(p.stdout ?? '').trim()}" vs "${want}"`);
-    }
+    if (psShell && block('powershell')) psQueue.push({ name, dir, want });
   };
   try {
     check('https with credentials', mkRepo('https://user:secret@GitHub.com/Foo/Bar.git'), base + 'github-com-foo-bar');
@@ -778,10 +776,22 @@ if (spawnSync('git', ['--version']).status === 0) {
     const legacy = mkRepo('https://example.com/legacy/proj.git');
     const oldKey = pathKey(fwdSlash(legacy));
     fs.mkdirSync(path.join(shome, '.claude', 'orchestrator', oldKey), { recursive: true });
-    check('old path dir kept', legacy, base + oldKey);
     fs.mkdirSync(path.join(shome, '.claude', 'orchestrator', 'example-com-legacy-proj'), { recursive: true });
     check('path dir wins when remote dir also exists', legacy, base + oldKey);
+    const legacy5 = mkRepo('https://example.com/legacy/proj5.git');
+    fs.mkdirSync(path.join(shome, '.claude', 'orchestrator', pathKey(fwdSlash(legacy5))), { recursive: true });
+    check('old path dir kept', legacy5, base + pathKey(fwdSlash(legacy5)));
     check('no remote uses path key', mkRepo(null), base + pathKey(fwdSlash(dirs[dirs.length - 1])));
+    if (psQueue.length) {
+      const script = psQueue.map((q) => `Set-Location -LiteralPath '${q.dir.replace(/'/g, "''")}'; & { ${block('powershell')} }; '---ORCH---'`).join('\n');
+      const p = spawnSync(psShell, ['-NoProfile', '-Command', script], { encoding: 'utf8', env: { ...process.env, HOME: shome, USERPROFILE: shome } });
+      const parts = (p.stdout ?? '').split('---ORCH---');
+      if (p.status !== 0 || parts.length !== psQueue.length + 1) {
+        err(refPath, `store key smoke: one PowerShell run for ${psQueue.length} cases exited ${p.status} with ${parts.length - 1} results`);
+      } else {
+        psQueue.forEach((q, i) => { if (norm(parts[i]) !== norm(q.want)) err(refPath, `store key smoke "${q.name}": powershell "${parts[i].trim()}" vs "${q.want}"`); });
+      }
+    }
   } finally {
     for (const d of dirs) rmQuiet(d, { recursive: true });
     rmQuiet(shome, { recursive: true });
