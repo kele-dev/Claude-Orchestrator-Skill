@@ -1,11 +1,11 @@
 # Improvement Dashboard
 
-Date: 2026-11-24 (cycle 019)
+Date: 2026-11-25 (cycle 020)
 
 Tick `[x]` to pre-select an item for the next cycle's phase 3. Ticks are suggestions; the skill still asks you.
 Mark `- [-]` to suggest rejecting an item permanently; the skill asks you to confirm before it marks anything `rejected`.
 
-Last cycle: 019 (2026-11-24, incremental): 8 done (IC-225, IC-226, IC-179, IC-227, IC-228, IC-229, IC-230, IC-238), IC-231 deferred, IC-019 still blocked. Open: P0 0, P1 1 (blocked), P2 34, P3 22.
+Last cycle: 020 (2026-11-25, full audit): 6 done (IC-241, IC-242, IC-243, IC-244, IC-232, IC-237), IC-211 first step done (still open), IC-245 and IC-246 deferred, IC-019 still blocked. Open: P0 0, P1 1, P2 32, P3 24
 
 - [ ] IC-019 P1 DX/CI-CD/dependencies: Token-regression gate in eval CI is dead: evals/baseline.json not committed
 - [ ] IC-120 P2 Observability & ops: Debug log at a predictable tmp path follows symlinks and goes silent after the 256 KB cap
@@ -35,12 +35,10 @@ Last cycle: 019 (2026-11-24, incremental): 8 done (IC-225, IC-226, IC-179, IC-22
 - [ ] IC-211 P2 Performance: validate wall time grew from 30 s to 181 s, cause not measured
 - [ ] IC-210 P2 Stability: writeAtomic stale same-pid temp file fails one write
 - [ ] IC-231 P2 Security: Checkpoint and lesson file names reach SessionStart context without clean()
-- [ ] IC-232 P2 Stability: hooks-smoke spawns PowerShell with no timeout, so a hung shell stalls validate on win32
 - [ ] IC-233 P2 DX/CI-CD/dependencies: eval.yml input defaults repeated in three places
 - [ ] IC-234 P2 Code quality & tests: session-info dead backslash check and CHANGELOG wording (re-validate: IC-238 removed the check)
 - [ ] IC-235 P2 UX & accessibility: docs/ideas/token-saving.md uses number 13 for two items
 - [ ] IC-236 P2 UX & accessibility: "TRIM: unavailable" gives no count or hint
-- [ ] IC-237 P2 Observability & ops: Digest line omitted (CR/LF paths) with no dbg() trace
 - [ ] IC-239 P2 Security: eval artifacts uploaded without a scan for the API key
 - [ ] IC-117 P3 UX & accessibility: status 16-row cap is ambiguous with per-file lesson and checkpoint rows
 - [ ] IC-118 P3 Code quality & tests: Validator split left module bodies unindented inside run(ctx)
@@ -64,3 +62,5 @@ Last cycle: 019 (2026-11-24, incremental): 8 done (IC-225, IC-226, IC-179, IC-22
 - [ ] IC-223 P3 UX & accessibility: README sentence about ORCH_TRIM_ERRORS "the 10" is ambiguous
 - [ ] IC-224 P3 New features: Proposal: review two old claude/* branches and delete or log them
 - [ ] IC-240 P3 Code quality & tests: Regression of IC-173 guard text (behaviour intact)
+- [ ] IC-245 P3 UX & accessibility: Invalid ORCH_STALE_DAYS and ORCH_LONG_REPEAT values fall back silently and README does not say what happens
+- [ ] IC-246 P3 UX & accessibility: README.md:139 is an English sentence inside the Indonesian summary (concrete instance of IC-206)
