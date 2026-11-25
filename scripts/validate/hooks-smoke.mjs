@@ -85,7 +85,7 @@ const { root, err, exists, readText, runHook, rmQuiet, trimPayload, sessionInfo,
       try {
         fs.writeFileSync(path.join(badStore, 'trim-stats-bad.jsonl'), 'not json\n');
         const badOut = spawnSync(process.execPath, [path.join(root, 'hooks', 'trim-output.mjs'), '--stats', badStore, 'bad'], { encoding: 'utf8', cwd: root, env: { ...process.env, ...homeEnv } });
-        if (badOut.stdout.trim() !== 'TRIM: unavailable (unreadable stats file)') err('hooks/trim-output.mjs', `smoke "trim stats unreadable file": unexpected output "${badOut.stdout.trim()}"`);
+        if (badOut.stdout.trim() !== 'TRIM: unavailable (unreadable stats file, 1 unreadable line)') err('hooks/trim-output.mjs', `smoke "trim stats unreadable file": unexpected output "${badOut.stdout.trim()}"`);
       } finally {
         fs.rmSync(badStore, { recursive: true, force: true });
       }
