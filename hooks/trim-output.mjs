@@ -169,7 +169,7 @@ function sumFile(file) {
 }
 
 function format(n, saved, bad, suffix) {
-  if (!n && bad) return 'TRIM: unavailable (unreadable stats file)';
+  if (!n && bad) return `TRIM: unavailable (unreadable stats file, ${bad} unreadable line${bad === 1 ? '' : 's'})`;
   // approximate tokens: 4 chars (bytes) per token; unreadable lines are reported, not dropped silently
   return n ? `TRIM: ${n} trims, ~${Math.round(saved / 4)} tokens saved (${saved} bytes)${bad ? `, ${bad} unreadable lines skipped` : ''}${suffix}` : NO_STATS;
 }
