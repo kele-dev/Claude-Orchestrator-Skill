@@ -5,7 +5,7 @@ Per-version release notes. The README keeps only the current version's "Baru di"
 ## English
 
 ### 1.16.0
-- New: `/orchestrator:maestro` (user-invoked, opt-in per project with `setup`, `enable`, `disable` and `status`): Codex CLI writes code in a temporary git worktree, and the patch is applied only after path, snapshot and conflict checks; Antigravity CLI (Gemini) reviews with every tool denied; Claude plans and verifies. A quota ledger tracks use, and any non-PASS status falls back to the Claude ladder.
+- New: `/orchestrator:maestro` (user-invoked, opt-in per project with `setup`, `on`, `off` and `status`): Codex CLI writes code in a temporary git worktree, and the patch is applied only after path, snapshot and conflict checks; Antigravity CLI (Gemini) reviews with every tool denied; Claude plans and verifies. A quota ledger tracks use, and any non-PASS status falls back to the Claude ladder.
 - Tests: new maestro smoke tests in the validator.
 
 ### 1.15.2

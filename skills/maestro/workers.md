@@ -47,5 +47,5 @@ Skipped paths are listed in the summary `skipped` field.
 ## Privacy note
 - Code is sent to OpenAI (Codex) and Google (Gemini through Antigravity CLI).
 - Codex sees every tracked file, including tracked secrets. Secret-path skipping applies to Gemini only.
-- Maestro is opt-in per project (`enable`); turn it off with `disable`.
+- Maestro is opt-in per project (`on`); turn it off with `off`.
 - Both CLIs use the user's own subscription login. No API keys.
