@@ -318,6 +318,8 @@ const { root, err, exists, readText, runHook, rmQuiet, trimPayload, sessionInfo,
       if (!dig(p2).includes("'\\''")) err('hooks/session-info.mjs', 'smoke "session-info digest": expected the single quote in the path escaped as \'\\\'\'');
       const d3 = dig(p3);
       if (d3.includes('Digest:') || !d1.includes('Digest:')) err('hooks/session-info.mjs', 'smoke "session-info digest": expected no Digest line for a path with a newline, but one for a normal path');
+      const d3d = runHook('session-info.mjs', { hook_event_name: 'SessionStart', source: 'startup', cwd: scwd, transcript_path: p3 }, { HOME: sh, USERPROFILE: sh, ORCH_STALE_DAYS: '', ORCH_DEBUG: '1', TMPDIR: sh, TMP: sh, TEMP: sh });
+      if (!(d3d && d3d.status === 0 && !d3d.stdout.includes('Digest:') && d3d.stderr.includes('digest omitted'))) err('hooks/session-info.mjs', 'smoke "session-info digest trace": expected exit 0, no Digest line and a "digest omitted" debug line on stderr for a path with a newline');
       fs.writeFileSync(path.join(cd, 'notask.md'), '# notes\n');
       const nt = sess({});
       if (!nt.includes('notask') || nt.includes('notask ()')) err('hooks/session-info.mjs', 'smoke "session-info checkpoint": expected "notask" without an empty "()" task');
