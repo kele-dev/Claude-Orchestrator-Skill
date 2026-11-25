@@ -13,6 +13,7 @@ Commands:
 - `/orchestrator:off` - turn it off for this session
 - `/orchestrator:team <task>` - parallel lanes (add `--dry-run` to see the plan)
 - `/orchestrator:autopilot <task>` - batch after batch without asking (add `--dry-run`)
+- `/orchestrator:maestro <task>` - Codex writes, Gemini reviews, Claude verifies (`setup` first)
 - `/orchestrator:init [--refresh]` - map the project once
 - `/orchestrator:resume <slug>` - continue from a checkpoint
 - `/orchestrator:learn [list | add <lesson> | remove <lesson> | prune]` - project lessons

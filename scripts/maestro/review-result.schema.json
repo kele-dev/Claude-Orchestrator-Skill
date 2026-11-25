@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Maestro review result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["status", "findings", "notes"],
+  "properties": {
+    "status": { "type": "string", "enum": ["done", "failed"] },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["file", "line", "severity", "issue"],
+        "properties": {
+          "file": { "type": "string" },
+          "line": { "type": "integer" },
+          "severity": { "type": "string", "enum": ["high", "medium", "low"] },
+          "issue": { "type": "string" }
+        }
+      }
+    },
+    "notes": { "type": "string" }
+  }
+}

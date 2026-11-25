@@ -182,7 +182,7 @@ if (exists(path.join(root, 'skills/status/caps.md'))) {
     if (!s || !c || s[1] !== c[1] || s[2] !== c[2]) err('skills/status/caps.md', `caps differ from ${name} ## Budget: ${capRe.source}`);
   }
 }
-for (const s of ['off', 'team', 'autopilot', 'status', 'help']) {
+for (const s of ['off', 'team', 'autopilot', 'status', 'help', 'maestro']) {
   const f = `skills/${s}/SKILL.md`;
   if (!exists(path.join(root, f))) continue;
   const fm = frontmatter(f);

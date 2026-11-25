@@ -7,13 +7,14 @@ import { createContext } from './validate/context.mjs';
 import * as layout from './validate/layout.mjs';
 import * as hooksSmoke from './validate/hooks-smoke.mjs';
 import * as scriptsSmoke from './validate/scripts-smoke.mjs';
+import * as maestroSmoke from './validate/maestro-smoke.mjs';
 import * as evals from './validate/evals.mjs';
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(process.argv[2] ?? path.join(scriptDir, '..'));
 const ctx = createContext(root);
 
-for (const mod of [layout, hooksSmoke, scriptsSmoke, evals]) await mod.run(ctx);
+for (const mod of [layout, hooksSmoke, scriptsSmoke, maestroSmoke, evals]) await mod.run(ctx);
 
 const { errors, skillDirs, agentFiles, version } = ctx;
 
