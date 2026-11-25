@@ -119,6 +119,7 @@ function run(input) {
   const pluginRoot = fwd(dirname(dirname(fileURLToPath(import.meta.url))));
   const unsafe = /[\r\n]/;
   if (tp !== '' && !unsafe.test(tp) && !unsafe.test(pluginRoot)) lines.push(`Digest: node ${sq(pluginRoot + '/scripts/digest.mjs')} ${sq(tp)} --last 60`);
+  else if (tp !== '') dbg(new Error('digest omitted: CR/LF in path'));
 
   return lines.join('\n');
 }

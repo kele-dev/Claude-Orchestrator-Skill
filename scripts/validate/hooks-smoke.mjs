@@ -9,7 +9,7 @@ import { spawnSync } from 'child_process';
 // IC-212: probe PowerShell once per run (each cold start costs about 0.5-1 s on win32)
 function winPs() {
   if (winPs.v === undefined) {
-    const ok = (sh) => spawnSync(sh, ['-NoProfile', '-Command', 'exit 0']).status === 0;
+    const ok = (sh) => spawnSync(sh, ['-NoProfile', '-Command', 'exit 0'], { timeout: 30000 }).status === 0;
     winPs.v = process.platform !== 'win32' ? null : ok('pwsh') ? 'pwsh' : ok('powershell') ? 'powershell' : null;
   }
   return winPs.v;
@@ -318,6 +318,8 @@ const { root, err, exists, readText, runHook, rmQuiet, trimPayload, sessionInfo,
       if (!dig(p2).includes("'\\''")) err('hooks/session-info.mjs', 'smoke "session-info digest": expected the single quote in the path escaped as \'\\\'\'');
       const d3 = dig(p3);
       if (d3.includes('Digest:') || !d1.includes('Digest:')) err('hooks/session-info.mjs', 'smoke "session-info digest": expected no Digest line for a path with a newline, but one for a normal path');
+      const d3d = runHook('session-info.mjs', { hook_event_name: 'SessionStart', source: 'startup', cwd: scwd, transcript_path: p3 }, { HOME: sh, USERPROFILE: sh, ORCH_STALE_DAYS: '', ORCH_DEBUG: '1', TMPDIR: sh, TMP: sh, TEMP: sh });
+      if (!(d3d && d3d.status === 0 && !d3d.stdout.includes('Digest:') && d3d.stderr.includes('digest omitted'))) err('hooks/session-info.mjs', 'smoke "session-info digest trace": expected exit 0, no Digest line and a "digest omitted" debug line on stderr for a path with a newline');
       fs.writeFileSync(path.join(cd, 'notask.md'), '# notes\n');
       const nt = sess({});
       if (!nt.includes('notask') || nt.includes('notask ()')) err('hooks/session-info.mjs', 'smoke "session-info checkpoint": expected "notask" without an empty "()" task');
@@ -388,6 +390,14 @@ const { root, err, exists, readText, runHook, rmQuiet, trimPayload, sessionInfo,
     const loud = rawHook(name, { ORCH_DEBUG: '1' });
     if (loud.stdout.trim() !== '') err(`hooks/${name}`, 'smoke "invalid stdin ORCH_DEBUG=1": expected empty stdout on the error path');
     if (!(loud.stderr ?? '').startsWith(prefix)) err(`hooks/${name}`, `smoke "invalid stdin ORCH_DEBUG=1": expected stderr starting with "${prefix}"`);
+  }
+  {
+    // IC-241: a callback that throws must not surface as an uncaught error (fail open, empty stderr)
+    const url = pathToFileURL(path.join(root, 'hooks', 'lib.mjs')).href;
+    for (const input of ['x', '']) {
+      const th = spawnSync(process.execPath, ['--input-type=module', '-e', `import { readStdin } from ${JSON.stringify(url)}; readStdin(() => { throw new Error('x'); });`], { input, encoding: 'utf8' });
+      if (th.status !== 0 || (th.stderr ?? '').trim() !== '') err('hooks/lib.mjs', `smoke "readStdin throwing callback": expected exit 0 and empty stderr for input ${JSON.stringify(input)} (exit ${th.status})`);
+    }
   }
 
   {
@@ -725,13 +735,13 @@ const { root, err, exists, readText, runHook, rmQuiet, trimPayload, sessionInfo,
           const bodyEnd = refText.indexOf('```', bodyStart);
           const cmd = refText.slice(bodyStart, bodyEnd).split('\n').map((l) => l.trim()).filter(Boolean).join('\n');
           const env = { ...process.env, HOME: shome, USERPROFILE: shome };
-          const p = spawnSync(shell, ['-NoProfile', '-Command', cmd], { encoding: 'utf8', cwd: sdir, env });
+          const p = spawnSync(shell, ['-NoProfile', '-Command', cmd], { encoding: 'utf8', cwd: sdir, env, timeout: 30000 });
           const hook = sessionInfo(sdir, { HOME: shome, USERPROFILE: shome, ORCH_STALE_DAYS: '' }, true);
           const store = /Orchestrator store: (.*)/.exec(hook.stdout ?? '')?.[1]?.trim();
           const norm = (s) => s.trim().replace(/\\/g, '/').toLowerCase();
           const psOut = (p.stdout ?? '').trim();
           if (!psOut || !store || norm(psOut) !== norm(store)) {
-            err('skills/learn/reference.md', `store key smoke: powershell "${psOut}" vs session-info "${store ?? ''}"`);
+            err('skills/learn/reference.md', `store key smoke: powershell "${psOut}" vs session-info "${store ?? ''}"${p.error ? ' (' + p.error.code + ')' : ''}`);
           }
         }
       } finally {
@@ -800,10 +810,10 @@ if (spawnSync('git', ['--version']).status === 0) {
     check('no remote uses path key', mkRepo(null), base + pathKey(fwdSlash(dirs[dirs.length - 1])));
     if (psQueue.length) {
       const script = psQueue.map((q) => `Set-Location -LiteralPath '${q.dir.replace(/'/g, "''")}'; & { ${block('powershell')} }; '---ORCH---'`).join('\n');
-      const p = spawnSync(psShell, ['-NoProfile', '-Command', script], { encoding: 'utf8', env: { ...process.env, HOME: shome, USERPROFILE: shome } });
+      const p = spawnSync(psShell, ['-NoProfile', '-Command', script], { encoding: 'utf8', env: { ...process.env, HOME: shome, USERPROFILE: shome }, timeout: 30000 });
       const parts = (p.stdout ?? '').split('---ORCH---');
       if (p.status !== 0 || parts.length !== psQueue.length + 1) {
-        err(refPath, `store key smoke: one PowerShell run for ${psQueue.length} cases exited ${p.status} with ${parts.length - 1} results`);
+        err(refPath, `store key smoke: one PowerShell run for ${psQueue.length} cases exited ${p.status} with ${parts.length - 1} results${p.error ? ' (' + p.error.code + ')' : ''}`);
       } else {
         psQueue.forEach((q, i) => { if (norm(parts[i]) !== norm(q.want)) err(refPath, `store key smoke "${q.name}": powershell "${parts[i].trim()}" vs "${q.want}"`); });
       }
