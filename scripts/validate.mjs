@@ -7,10 +7,11 @@ import { createContext } from './validate/context.mjs';
 import * as layout from './validate/layout.mjs';
 import * as hooksSmoke from './validate/hooks-smoke.mjs';
 import * as scriptsSmoke from './validate/scripts-smoke.mjs';
+import * as maestroSmoke from './validate/maestro-smoke.mjs';
 import * as evals from './validate/evals.mjs';
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
-const sections = { layout, 'hooks-smoke': hooksSmoke, 'scripts-smoke': scriptsSmoke, evals };
+const sections = { layout, 'hooks-smoke': hooksSmoke, 'scripts-smoke': scriptsSmoke, 'maestro-smoke': maestroSmoke, evals };
 const only = process.argv[2] === '--only' ? (process.argv[3] ?? '') : null;
 const rootArg = only === null ? process.argv[2] : process.argv[4];
 const root = path.resolve(rootArg ?? path.join(scriptDir, '..'));

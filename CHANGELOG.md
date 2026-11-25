@@ -4,6 +4,10 @@ Per-version release notes. The README keeps only the current version's "Baru di"
 
 ## English
 
+### 1.16.0
+- New: `/orchestrator:maestro` (user-invoked, opt-in per project with `setup`, `enable`, `disable` and `status`): Codex CLI writes code in a temporary git worktree, and the patch is applied only after path, snapshot and conflict checks; Antigravity CLI (Gemini) reviews with every tool denied; Claude plans and verifies. A quota ledger tracks use, and any non-PASS status falls back to the Claude ladder.
+- Tests: new maestro smoke tests in the validator.
+
 ### 1.15.2
 - Fixed: lesson index without dangling colon; TRIM unavailable names ORCH_DEBUG=1; long-session uses shared session-id sanitizer; eval-select selects every case for an unmapped scripts/ file; README no longer claims failed commands keep a 10-line head; ideas doc store-key wording; session start omits the Digest line for transcript paths with `$`, backtick, quote or backslash, and checkpoint lines no longer print an empty `()`; long-session warning in plain language, resume steps only for the model; stats trim counts and reports unreadable lines; win32 smoke probes PowerShell once per run.
 - CI: partial eval runs call the eval once per selected case; pinned Claude Code version recorded in evals/README.md and checked by the validator; smoke tests cover the 64 KB boundary and the root-fallback guard without inherited GIT_* env; eval workflow validates `runs` and `max_cost_usd` before any step.
@@ -111,3 +115,4 @@ Per-version release notes. The README keeps only the current version's "Baru di"
 - Baru di 1.15.1: `SECURITY.md` dengan jalur pelaporan kerentanan privat; langkah PLAN di team memakai `scripts/plan-dag.mjs` untuk menurunkan lane jika PRD punya tabel tugas; README dan help mendokumentasikan `ORCH_STALE_DAYS`, `ORCH_STATE_DIR`, hook ledger, dan cadangan `verify.ps1`.
 - Juga di 1.15.1 (perbaikan): long-session pada start dingin hanya menghitung delegasi di 4 MB terakhir transkrip; `trace-tokens` dan `eval-compare` hanya membaca trace di dalam folder hasil (`tracePath` relatif kini dihitung dari folder itu); peringatan tanpa Node menyebut read guard; init dan learn menampilkan baris perintah `verify.sh`, dan `on` menampilkannya ke pengguna dulu bila belum dilaporkan.
 - Baru di 1.15.2: Digest tidak ditampilkan untuk path transkrip yang tidak aman dan baris checkpoint tidak lagi memuat `()` kosong; peringatan sesi panjang memakai bahasa biasa dan langkah resume hanya untuk model; statistik trim melaporkan baris yang tak terbaca; smoke Windows memeriksa PowerShell sekali per run dan menjalankan semua kasus store key dalam satu panggilan PowerShell; workflow eval memvalidasi input sebelum langkah apa pun; dan proposal jalur edit langsung dicatat sebagai dokumen.
+- Baru di 1.16.0: `/orchestrator:maestro` (opsional): Codex menulis kode, Gemini lewat Antigravity CLI membaca dan mereview tanpa akses tool, Claude merencanakan dan memverifikasi; hemat kuota Claude dengan memakai langganan ChatGPT dan Gemini.
