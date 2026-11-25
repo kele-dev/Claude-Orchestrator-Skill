@@ -1,7 +1,7 @@
 # Improvement Backlog
 
 Project: orchestrator (Claude Code plugin, kele-dev marketplace)
-Last updated: 2026-11-25 (P2 batch after cycle 020)
+Last updated: 2026-11-25 (P2 batch, IC-168 rejected)
 
 Scoring: see the improvement-cycle skill `references/scoring.md`. Score = Impact x Confidence / Effort. P0 >= 8.0 (score-based P0 only for Security/Stability/data integrity) or any override, P1 4.0-7.9 (cap for other dimensions without an override), P2 2.0-3.9, P3 < 2.0. New features are capped at P2 unless the user asked for features that cycle.
 
@@ -31,7 +31,7 @@ Scoring: see the improvement-cycle skill `references/scoring.md`. Score = Impact
 | IC-154 | P3 | 1.0 | Security | Stored lesson and checkpoint text reaches SessionStart context guarded only by a data label and clean() | hooks/session-info.mjs:10,62,93; refute: downgrade (plugin's own guidance, no exploit found); std: none: judgement; goal: none | S | proposed | 014 |
 | IC-155 | P3 | 1.0 | Code quality & tests | Help-list validator checks only the first line that mentions /orchestrator:learn | scripts/validate/layout.mjs:199-201; std: none: judgement; goal: none | S | proposed | 014 |
 | IC-156 | P3 | 1.0 | UX & accessibility | ledger and trim-output --stats without a store argument exit 0 with a no-data line instead of a usage error | hooks/ledger.mjs:122-123,156; hooks/trim-output.mjs:12,125; refute: downgrade (only caller skills/status/SKILL.md:21-22 always passes the store); std: none: judgement; goal: none | S | proposed | 014 |
-| IC-168 | P2 | 3.0 | Performance | SessionStart stats every checkpoint file before keeping the newest five | hooks/session-info.mjs:79-87; hotspot x1.5; std: none: judgement; goal: Success measure: startup cost; finding: checkpoint names are slugs (skills/resume/SKILL.md:14), so newest-by-mtime needs one stat per file and file heads are already read only for the newest 5; recommend reject; re-reported in cycle 019 (B7) | S | proposed | 015 |
+| IC-168 | P2 | 3.0 | Performance | SessionStart stats every checkpoint file before keeping the newest five | hooks/session-info.mjs:79-87; hotspot x1.5; std: none: judgement; goal: Success measure: startup cost; finding: checkpoint names are slugs (skills/resume/SKILL.md:14), so newest-by-mtime needs one stat per file and file heads are already read only for the newest 5; recommend reject; re-reported in cycle 019 (B7); user decision 2026-11-25: rejected (checkpoint names are slugs, one stat per file is needed) | S | rejected | 015 |
 | IC-171 | P2 | 2.0 | Code quality & tests | eval-select smoke hard-codes case counts 12 and 9, so adding an eval case breaks validate | scripts/validate/scripts-smoke.mjs:561-563; std: none: judgement; goal: none | S | proposed | 015 |
 | IC-178 | P3 | 1.0 | Stability | eval-select does not fail closed on an empty or null touches.json (Object.keys(null) throws, {} gives skip=true) | scripts/eval-select.mjs:42-48; refute: downgrade (scripts/validate/evals.mjs:22-30 already checks the map in CI); std: none: judgement; goal: Success measure: no skipped regression checks | S | proposed | 016 |
 | IC-179 | P2 | 3.0 | Security | eval.yml writes the unvalidated case input into $GITHUB_OUTPUT with echo, so a newline can add outputs such as skip=true | .github/workflows/eval.yml:62-65,71 (line numbers as of cycle 019); dispatch already needs write access; hotspot x1.5; std: none: judgement; goal: none | S | done | 019 |
