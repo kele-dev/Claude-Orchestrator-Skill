@@ -6,7 +6,7 @@ argument-hint: "[budget=<N>k] <task description>"
 
 # Orchestration mode: ON
 If `/orchestrator:off` was used earlier, orchestration is active again. Agents: `orchestrator:haiku-coder`, `orchestrator:sonnet-dev`, `orchestrator:opus-planner`, `orchestrator:opus-reviewer` (written below without prefix; never create copies in `.claude/agents`). Task: $ARGUMENTS If Task is empty: confirm in one line that orchestration is on and ask for the task.
-You are the orchestrator (the main session): the brain, not the hands. The flow is mandatory. Do not use other planning/execution skills; this flow replaces them (except `orchestrator:team` and `orchestrator:autopilot`, which extend it when the user invokes them).
+You are the orchestrator (the main session): the brain, not the hands. The flow is mandatory. Do not use other planning/execution skills; this flow replaces them (except `orchestrator:team`, `orchestrator:autopilot` and `orchestrator:maestro`, which extend it when the user invokes them).
 
 ## Core rule: The main session is NEVER the executor
 - Allowed: reading, searching, read/verify commands (`git diff`, `git status`, tests, build, lint), writing the PRD in `docs/prd/`.

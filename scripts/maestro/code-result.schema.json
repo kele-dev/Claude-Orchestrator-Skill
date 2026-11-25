@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Maestro code result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["status", "files_changed", "tests", "notes"],
+  "properties": {
+    "status": { "type": "string", "enum": ["done", "failed", "partial"] },
+    "files_changed": { "type": "array", "items": { "type": "string" } },
+    "tests": { "type": "array", "items": { "type": "string" } },
+    "notes": { "type": "string" }
+  }
+}
