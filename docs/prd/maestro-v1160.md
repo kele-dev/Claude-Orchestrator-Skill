@@ -83,7 +83,7 @@ Node 18+, no dependencies, ESM. Every subcommand prints exactly one JSON line to
   - Codex login: `codex login status`. Gemini models: `agy models`, ids starting with `gemini-` only.
   - Gemini warnings: read `~/.gemini/antigravity-cli/settings.json` if present; warn when `allowNonWorkspaceAccess` is true or `trustedWorkspaces` contains the home folder or a drive root. Only warn.
   - Missing CLI: `installed:false` plus an `install` hint (`npm install -g @openai/codex`; for Antigravity the page `https://antigravity.google/docs/cli/overview`).
-- `enable` / `disable`: set `enabled` in the project config. Summary `{"cmd":"enable","enabled":true,"file":"<path>"}`.
+- `on` / `off`: set `enabled` in the project config. Summary `{"cmd":"on","enabled":true,"file":"<path>"}`.
 - `codex --task <slug> --brief <file> --files <a,b,...> [--profile code|fix] [--effort <e>] [--model <m>] [--keep]`:
   1. Not enabled → `DISABLED`. `codex.blockedUntil` in the future → `QUOTA` (no CLI call).
   2. No `HEAD` → `FAIL` "repository has no commit". Snapshot the main tree: `base` = `git stash create` output, or `HEAD` when empty (changes no refs, index or files). The snapshot is NOT the `base` SHA (each `stash create` call returns a new SHA for the same content). It is: the working-tree id (`git rev-parse <base>^{tree}`), the index id (`git rev-parse <base>^2^{tree}` when `base` is a stash commit, else `git write-tree`), and the sorted untracked files (`git ls-files -o --exclude-standard -z`) with `git hash-object` of each. Step 7 recomputes it the same way (a fresh `stash create`) and compares the three parts.
@@ -109,7 +109,7 @@ Node 18+, no dependencies, ESM. Every subcommand prints exactly one JSON line to
 - Bundled JSON schemas in `scripts/maestro/`: `code-result.schema.json` (`status` done|failed|partial, `files_changed`, `tests`, `notes`) and `review-result.schema.json` (`status` done|failed, `findings`: array of `{file, line, severity: high|medium|low, issue}`, `notes`). Both `additionalProperties: false`, all keys required.
 
 ## Skill flow: `skills/maestro/SKILL.md`
-Frontmatter: `name: maestro`, `disable-model-invocation: true`, `argument-hint: "[setup | enable | disable | status] [effort=low|medium|high] [--dry-run] <task description>"`.
+Frontmatter: `name: maestro`, `disable-model-invocation: true`, `argument-hint: "[setup | on | off | status] [effort=low|medium|high] [--dry-run] <task description>"`.
 Body under about 60 lines; routing, profiles and the status table go to `skills/maestro/workers.md`, read on demand.
 - Base rules: every `orchestrator:on` rule applies (load it first if it is not in context). Maestro only changes who executes and who reviews. Decision 3 verbatim. Script path: `node "${CLAUDE_PLUGIN_ROOT}/scripts/maestro-run.mjs" <sub> ...`. Briefs and prompts: Write to `<store>/maestro/briefs/<task>.md`.
 - Step 0: run `setup`. Missing CLI, no login, or not enabled → one short table of what is missing, the install or login commands (login is the user's step), ask once to enable for this project; stop.
@@ -163,7 +163,7 @@ Body under about 60 lines; routing, profiles and the status table go to `skills/
 **T2 runner**: implements the script contract, importing T1 and `storeInfo` from `hooks/lib.mjs`.
 
 **T3 smoke** (new module, registered in `scripts/validate.mjs:16` after `scriptsSmoke`):
-- Temp dir as `HOME` and `USERPROFILE` for every spawned run (as `hooks-smoke.mjs:54`), so the store and ledger land in the temp dir. A git repo with one commit (`git -c user.name=t -c user.email=t@t commit`). The project enabled via `maestro-run.mjs enable` (cwd = repo).
+- Temp dir as `HOME` and `USERPROFILE` for every spawned run (as `hooks-smoke.mjs:54`), so the store and ledger land in the temp dir. A git repo with one commit (`git -c user.name=t -c user.email=t@t commit`). The project enabled via `maestro-run.mjs on` (cwd = repo).
 - Mocks are `.mjs` files passed through `MAESTRO_CODEX_BIN` / `MAESTRO_AGY_BIN`; behavior from `MOCK_MODE`. Every mock writes a marker file when invoked.
   - codex `pass`: edits the allowed file in its `-C` dir, prints `turn.completed`, writes the `-o` file → `PASS`; the change is in the repo working tree; the index is unchanged.
   - Sequential: a second `pass` task on another file sees the first task's change in its worktree (mock asserts the first file's new content and exits 3 otherwise) → `PASS`.
@@ -174,7 +174,7 @@ Body under about 60 lines; routing, profiles and the status table go to `skills/
   - `CONFLICT` is only reachable when the tree changes between the snapshot check and `git apply`; it is covered by a direct test of T1 `applyPatch` on a temp repo instead: a patch that does not apply returns `ok:false` and leaves the file byte-identical and the index unchanged.
   - agy `pass`: reads the stdin line, prints a result event with `structured_output` → `PASS` with findings.
   - agy `denied`: `structured_output:null` and the stderr text → `DENIED`.
-  - Model guard: `--model claude-opus-5-5-high` → `FAIL` and no marker. Not enabled (`disable` first) → `DISABLED` and no marker.
+  - Model guard: `--model claude-opus-5-5-high` → `FAIL` and no marker. Not enabled (`off` first) → `DISABLED` and no marker.
 - Run every T1 example as an assertion.
 - Clean up in `finally`. Failures: `ctx.err('scripts/maestro-run.mjs', '<case>: expected X, got Y')`.
 
@@ -189,7 +189,7 @@ Body under about 60 lines; routing, profiles and the status table go to `skills/
 - `skills/on/non-opus.md`: append one line: `- In \`/orchestrator:maestro\`, a Gemini review with status PASS and no high finding replaces the opus-reviewer final-diff pass, also for the step 6 report check; the PRD review stays (see the maestro skill).`
 - The context budget must still pass; report the new byte count.
 
-**T6 release**: version 1.16.0 in both manifests. CHANGELOG: an English entry and a new `- Baru di 1.16.0: ...` line after the 1.15.2 line. README: replace the single `Baru di 1.15.2` line with the 1.16.0 line, list `/orchestrator:maestro` with the other commands, and add a short "Maestro" section (what it does; requirements: Codex CLI logged in with ChatGPT, Antigravity CLI logged in with Google AI Pro; `/orchestrator:maestro setup`; the privacy note; how to turn it off with `disable`). Indonesian line: "`/orchestrator:maestro` (opsional): Codex menulis kode, Gemini lewat Antigravity CLI membaca dan mereview tanpa akses tool, Claude merencanakan dan memverifikasi; hemat kuota Claude dengan memakai langganan ChatGPT dan Gemini."
+**T6 release**: version 1.16.0 in both manifests. CHANGELOG: an English entry and a new `- Baru di 1.16.0: ...` line after the 1.15.2 line. README: replace the single `Baru di 1.15.2` line with the 1.16.0 line, list `/orchestrator:maestro` with the other commands, and add a short "Maestro" section (what it does; requirements: Codex CLI logged in with ChatGPT, Antigravity CLI logged in with Google AI Pro; `/orchestrator:maestro setup`; the privacy note; how to turn it off with `off`). Indonesian line: "`/orchestrator:maestro` (opsional): Codex menulis kode, Gemini lewat Antigravity CLI membaca dan mereview tanpa akses tool, Claude merencanakan dan memverifikasi; hemat kuota Claude dengan memakai langganan ChatGPT dan Gemini."
 
 ## Acceptance (main session, after T6)
 1. `node scripts/validate.mjs` → `OK: ... version 1.16.0`; report the context byte count.

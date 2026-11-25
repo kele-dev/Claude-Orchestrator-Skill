@@ -178,15 +178,15 @@ export async function run(ctx) {
     const R = (name, got, want) => chk(RUN, name, got, want);
     const codex = (task, files, env, extra = []) => maestro(['codex', '--task', task, '--brief', briefFile, '--files', files, ...extra], env);
 
-    // ---- setup, enable ----
+    // ---- setup, on ----
     const su = maestro(['setup']);
     R('setup cmd', su.json?.cmd, 'setup');
     R('setup one line', su.lines, 1);
     R('setup codex login', su.json?.codex?.login, 'ChatGPT');
     R('setup gemini models', su.json?.gemini?.models, ['gemini-4-neon-high', 'gemini-4-neon-medium']);
     R('setup not enabled', su.json?.enabled, false);
-    const en = maestro(['enable']);
-    R('enable', [en.json?.cmd, en.json?.enabled], ['enable', true]);
+    const en = maestro(['on']);
+    R('on', [en.json?.cmd, en.json?.enabled], ['on', true]);
 
     // ---- codex pass ----
     clearMarker();
@@ -297,8 +297,8 @@ export async function run(ctx) {
     R('model guard status', mg.json?.status, 'FAIL');
     R('model guard error', /only gemini models/.test(mg.json?.error ?? ''), true);
     R('model guard no call', calls(), 0);
-    const dis = maestro(['disable']);
-    R('disable', [dis.json?.cmd, dis.json?.enabled], ['disable', false]);
+    const dis = maestro(['off']);
+    R('off', [dis.json?.cmd, dis.json?.enabled], ['off', false]);
     const d1 = codex('off', 'a.txt', { MOCK_MODE: 'pass', MOCK_FILE: 'a.txt' });
     const d2 = maestro(['gemini', '--task', 'off', '--prompt', promptFile], { MOCK_MODE: 'pass' });
     R('disabled codex status', d1.json?.status, 'DISABLED');

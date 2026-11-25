@@ -1,7 +1,7 @@
 ---
 name: maestro
 description: Codex writes code, Gemini (Antigravity CLI) reads and reviews with no tools, Claude plans and verifies, under the orchestrator cost rules. Per-project opt-in. Only runs when the user types /orchestrator:maestro.
-argument-hint: "[setup | enable | disable | status] [effort=low|medium|high] [--dry-run] <task description>"
+argument-hint: "[setup | on | off | status] [effort=low|medium|high] [--dry-run] <task description>"
 disable-model-invocation: true
 ---
 
@@ -16,8 +16,8 @@ Maestro is `orchestrator:on` with two workers. Every `orchestrator:on` rule appl
 - Briefs and prompts: Write to `<store>/maestro/briefs/<task>.md` (`<store>`: the session-start `Orchestrator store:` line, or `store` in the `setup` summary).
 
 ## 0. Setup check
-- Run `setup`. Missing CLI, no login, or not enabled: show one short table of what is missing, the install or login commands (login is the user's step), ask once whether to enable for this project (`enable`); stop.
-- `enable` / `disable` / `status`: run the subcommand, show its summary, stop.
+- Run `setup`. Missing CLI, no login, or not enabled: show one short table of what is missing, the install or login commands (login is the user's step), ask once whether to enable for this project (`on`); stop.
+- `on` / `off` / `status`: run the subcommand, show its summary, stop.
 
 ## 1-2. Plan and PRD
 - Plan and PRD as in `orchestrator:on`.

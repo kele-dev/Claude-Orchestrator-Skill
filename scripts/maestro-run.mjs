@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Maestro runner: setup, enable, disable, codex, gemini, status.
+// Maestro runner: setup, on, off, codex, gemini, status.
 // Prints exactly one JSON summary line on stdout. Logs live in <store>/maestro/runs/<runId>/.
 import { spawn, spawnSync } from 'node:child_process';
 import {
@@ -197,7 +197,7 @@ function updateLedger(home, fn) {
   writeLedger(home, l);
 }
 
-// ---------- setup / enable / disable / status ----------
+// ---------- setup / on / off / status ----------
 
 function cmdSetup() {
   const c = ctx();
@@ -235,7 +235,7 @@ function cmdSetup() {
 function cmdEnable(on) {
   const c = ctx();
   saveProjectConfig(c.store, { enabled: on });
-  emit({ cmd: on ? 'enable' : 'disable', enabled: on, file: join(c.store, 'maestro.json').replace(/\\/g, '/') });
+  emit({ cmd: on ? 'on' : 'off', enabled: on, file: join(c.store, 'maestro.json').replace(/\\/g, '/') });
 }
 
 function cmdStatus() {
@@ -606,12 +606,12 @@ async function main() {
   try {
     switch (sub) {
       case 'setup': return cmdSetup();
-      case 'enable': return cmdEnable(true);
-      case 'disable': return cmdEnable(false);
+      case 'on': return cmdEnable(true);
+      case 'off': return cmdEnable(false);
       case 'status': return cmdStatus();
       case 'codex': return await cmdCodex(rest);
       case 'gemini': return await cmdGemini(rest);
-      default: throw new Usage('usage: maestro-run.mjs setup|enable|disable|status|codex|gemini ...');
+      default: throw new Usage('usage: maestro-run.mjs setup|on|off|status|codex|gemini ...');
     }
   } catch (e) {
     if (e instanceof Usage) emit({ cmd: sub || '', status: 'USAGE', error: e.message }, 1);
