@@ -182,9 +182,12 @@ function modeOf(entry) {
 // Reads all of stdin as utf8 and passes it to cb.
 export function readStdin(cb) {
   let raw = '';
+  let done = false;
+  const finish = (s) => { if (done) return; done = true; try { cb(s); } catch { /* fail open */ } };
   process.stdin.setEncoding('utf8');
   process.stdin.on('data', (d) => { raw += d; });
-  process.stdin.on('end', () => cb(raw));
+  process.stdin.on('end', () => finish(raw));
+  process.stdin.on('error', () => finish(''));
 }
 
 // Reads up to len bytes at start; returns a Buffer with the bytes actually read.

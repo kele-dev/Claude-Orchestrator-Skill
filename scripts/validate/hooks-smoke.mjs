@@ -391,6 +391,14 @@ const { root, err, exists, readText, runHook, rmQuiet, trimPayload, sessionInfo,
     if (loud.stdout.trim() !== '') err(`hooks/${name}`, 'smoke "invalid stdin ORCH_DEBUG=1": expected empty stdout on the error path');
     if (!(loud.stderr ?? '').startsWith(prefix)) err(`hooks/${name}`, `smoke "invalid stdin ORCH_DEBUG=1": expected stderr starting with "${prefix}"`);
   }
+  {
+    // IC-241: a callback that throws must not surface as an uncaught error (fail open, empty stderr)
+    const url = pathToFileURL(path.join(root, 'hooks', 'lib.mjs')).href;
+    for (const input of ['x', '']) {
+      const th = spawnSync(process.execPath, ['--input-type=module', '-e', `import { readStdin } from ${JSON.stringify(url)}; readStdin(() => { throw new Error('x'); });`], { input, encoding: 'utf8' });
+      if (th.status !== 0 || (th.stderr ?? '').trim() !== '') err('hooks/lib.mjs', `smoke "readStdin throwing callback": expected exit 0 and empty stderr for input ${JSON.stringify(input)} (exit ${th.status})`);
+    }
+  }
 
   {
     // IC-050: ORCH_DEBUG=1 also appends a redacted line to <tmpdir>/orchestrator-debug.log (hook prefix, no stdin content)
