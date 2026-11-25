@@ -13,7 +13,7 @@ Each case is a directory `<case>/` containing:
 
 - `case.yaml` - case definition
 - `prompt.md` - the user prompt sent to the session
-- `fixture.sh` - sets up the starting repo state
+- `fixture.sh` - optional, sets up the starting repo state (delegation-startup and status-slash have none)
 - `graders/*.md` - grading rubrics
 
 ## Run on GitHub
