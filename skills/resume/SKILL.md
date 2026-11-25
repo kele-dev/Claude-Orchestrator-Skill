@@ -54,3 +54,4 @@ After writing a checkpoint because the session is long, or at a stop the user wi
 ## Finishing
 - When the task reaches DONE, delete only its checkpoint in `<store>` with `rm "<absolute path>"` (RUN may delete only the file named in the brief): as a step in the same `haiku-coder` brief as the final COMMIT, if one is due, else a lone `TYPE: RUN`. Say so in the report line.
 - A finished legacy checkpoint: tell the user its path; never delete it yourself.
+- When the user asks to delete a checkpoint (including after the SessionStart stale note), confirm the file name once, then delete only that file in `<store>` with one `TYPE: RUN` brief naming its absolute path and `rm "<path>"`; never delete legacy checkpoints.
